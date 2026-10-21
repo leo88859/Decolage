@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Décollage
 
 Constructeur guidé de micro-SaaS, **sans IA et sans clé API**. Tout repose sur des modèles prédéfinis, des briques préprogrammées, des règles déterministes et des contenus rédigés à l'avance.
@@ -38,3 +39,6 @@ Ces fonctions s'activent dès que les variables de `.env.example` sont renseign�
   - niveau 2 : export d'un **projet Next.js exécutable** (onglet Export) et de fichiers réels (landing HTML/CSS, `prototype.html` autonome, configuration JSON). Les données du projet généré sont gardées dans le navigateur (`localStorage`) ;
   - niveau 3 : application en ligne multi-utilisateurs (comptes, base partagée, paiements). Ce niveau n'est pas généré.
 - **Tester le générateur pour de vrai :** `GEN_OUT=<dossier> npx vitest run src/lib/codegen` écrit trois projets de référence (tâches, clients, revenus) ; dans chacun, `npm install` puis `npx next build`.
+=======
+# Decolage
+>>>>>>> d2ca568a3374d228bb48cb5e8aa8c18380c6e49e
