@@ -1,0 +1,14 @@
+# Secrets — ne jamais publier
+.env
+.env*.local
+!.env.example
+
+node_modules/
+.next/
+out/
+build/
+.vercel
+
+*.log
+*.tsbuildinfo
+next-env.d.ts
