@@ -9,7 +9,7 @@ type Row = Record<string, unknown>;
 const h = vi.hoisted(() => ({
   cloud: true,
   user: null as { id: string } | null,
-  db: { brand_configs: [] as Row[], brand_entitlements: [] as Row[] },
+  db: { brand_configs: [] as Row[], brand_entitlements: [] as Row[], profiles: [] as Row[] },
   dropWrites: false,
 }));
 
@@ -17,7 +17,7 @@ class Query {
   private filters: [string, unknown][] = [];
   private op: "select" | "insert" | "update" = "select";
   private payload: Row = {};
-  constructor(private table: "brand_configs" | "brand_entitlements") {}
+  constructor(private table: "brand_configs" | "brand_entitlements" | "profiles") {}
   select() { return this; }
   eq(c: string, v: unknown) { this.filters.push([c, v]); return this; }
   insert(p: Row) { this.op = "insert"; this.payload = p; return this; }
@@ -38,7 +38,7 @@ class Query {
   maybeSingle() { const r = this.run(); return Promise.resolve({ data: Array.isArray(r.data) ? (r.data[0] ?? null) : r.data, error: r.error }); }
   then<T>(res: (v: { data: unknown; error: { code?: string } | null }) => T) { return Promise.resolve(this.run()).then(res); }
 }
-const client = () => ({ from: (t: "brand_configs" | "brand_entitlements") => new Query(t) });
+const client = () => ({ from: (t: "brand_configs" | "brand_entitlements" | "profiles") => new Query(t) });
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/env", () => ({ isCloudConfigured: () => h.cloud, appUrl: () => "https://app.test" }));
@@ -63,7 +63,9 @@ function req(method: string, body?: unknown, headers: Record<string, string> = {
   });
 }
 const brand = (o: Record<string, unknown> = {}) => ({ ...DEFAULT_BRAND, name: "Acme", ...o });
-const enable = (id: string) => h.db.brand_entitlements.push({ user_id: id, enabled: true });
+// Droit activé sur un compte Solo (la marque blanche y est une option) ; la formule est lue dans profiles.
+const setPlan = (id: string, plan: string) => { h.db.profiles = h.db.profiles.filter((r) => r.id !== id); h.db.profiles.push({ id, plan }); };
+const enable = (id: string) => { h.db.brand_entitlements.push({ user_id: id, enabled: true }); setPlan(id, "solo"); };
 const rowOf = (id: string) => h.db.brand_configs.find((r) => r.user_id === id);
 
 beforeEach(() => {
@@ -71,6 +73,7 @@ beforeEach(() => {
   h.user = { id: A };
   h.db.brand_configs = [];
   h.db.brand_entitlements = [];
+  h.db.profiles = [];
   h.dropWrites = false;
   delete process.env.WHITE_LABEL_USER_IDS;
 });
@@ -113,6 +116,28 @@ describe("sans configuration, sans session, sans droit", () => {
   it("le droit d'un autre compte ne profite pas à A", async () => {
     enable(B);
     expect((await PUT(req("PUT", brand()))).status).toBe(403);
+  });
+
+  it("droit activé mais formule Gratuit : refusé", async () => {
+    h.db.brand_entitlements.push({ user_id: A, enabled: true });
+    setPlan(A, "gratuit");
+    expect((await PUT(req("PUT", brand()))).status).toBe(403);
+    expect((await GET(req("GET", undefined, {}))).status).toBe(403);
+    expect(h.db.brand_configs).toHaveLength(0);
+  });
+
+  it("droit activé mais aucun profil : traité comme Gratuit, refusé", async () => {
+    h.db.brand_entitlements.push({ user_id: A, enabled: true });
+    expect((await PUT(req("PUT", brand()))).status).toBe(403);
+  });
+
+  it("Solo sans l'option : refusé ; Pro et Illimité : inclus sans option", async () => {
+    setPlan(A, "solo");
+    expect((await PUT(req("PUT", brand()))).status).toBe(403);
+    setPlan(A, "pro");
+    expect((await GET(req("GET", undefined, {}))).status).toBe(200);
+    setPlan(A, "illimite");
+    expect((await GET(req("GET", undefined, {}))).status).toBe(200);
   });
 
   it("WHITE_LABEL_USER_IDS autorise un identifiant précis (et pas un autre)", async () => {

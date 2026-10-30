@@ -2,6 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { appUrl, isCloudConfigured } from "@/lib/env";
 import { createAdminClient, getUser } from "@/lib/supabase/server";
+import { normalizePlan, whiteLabelAllowed } from "@/lib/plans";
 import { isAllowListed } from "./access";
 import { BODY_MAX_BYTES, DEFAULT_BRAND, type Brand, type BrandState } from "./types";
 import { validateBrand } from "./validate";
@@ -77,7 +78,11 @@ export async function authorize(req: Request, mutating: boolean): Promise<Ctx | 
   if (!allowed) {
     const { data, error } = await supabase.from("brand_entitlements").select("enabled").eq("user_id", user.id).maybeSingle();
     if (error) return json({ error: "Vérification du droit impossible pour le moment.", code: "server" }, 500);
-    allowed = data?.enabled === true;
+    // Le droit dépend aussi de la formule active (lue côté serveur dans profiles) : Gratuit jamais ;
+    // Pro et Illimité inclus ; Solo seulement avec l'option (brand_entitlements.enabled).
+    const { data: profile, error: planError } = await supabase.from("profiles").select("plan").eq("id", user.id).maybeSingle();
+    if (planError) return json({ error: "Vérification de la formule impossible pour le moment.", code: "server" }, 500);
+    allowed = whiteLabelAllowed(normalizePlan(profile?.plan), data?.enabled === true);
   }
   if (!allowed) return json({ error: "Fonction non activée sur ton compte.", code: "not_entitled" }, 403);
   return { userId: user.id, supabase };

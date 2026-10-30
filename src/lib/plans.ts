@@ -39,6 +39,11 @@ export const normalizePlan = (x: unknown): Plan => (x === "premium" ? "illimite"
 export type Feature = "modelesPremium" | "exportFichiers" | "duplication" | "personnalisationAvancee" | "plansDetailles";
 
 export const can = (plan: Plan, f: Feature) => PLANS[plan][f];
+/**
+ * Marque blanche : Gratuit non ; Pro et Illimité inclus ; Solo seulement avec l'option activée
+ * (brand_entitlements.enabled). Miroir de public.my_white_label_allowed() dans supabase/0004_limites_serveur.sql.
+ */
+export const whiteLabelAllowed = (plan: Plan, optionActive: boolean) => plan === "pro" || plan === "illimite" || (plan === "solo" && optionActive);
 export const canCreateProject = (plan: Plan, count: number) => count < PLANS[plan].maxProjets;
 
 export const prixLabel = (plan: Plan) => (PLANS[plan].prix === 0 ? "0 €" : `${PLANS[plan].prix.toLocaleString("fr-FR", { minimumFractionDigits: 2 })} € / mois`);
