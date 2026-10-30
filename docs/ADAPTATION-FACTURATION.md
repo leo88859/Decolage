@@ -24,8 +24,11 @@ Analyse du 30/10/2026. Aucune opération Stripe, Supabase ou Vercel n'a été fa
 |---|---|
 | Affichage de la nouvelle grille (plans.ts, cartes, accueil, Paramètres, CGV, docs) | **Fait localement**, non déployé |
 | Reconnaissance d'anciens prix par le webhook (variables facultatives `STRIPE_PRICE_SOLO_LEGACY`, `STRIPE_PRICE_PRO_LEGACY`, `STRIPE_PRICE_ILLIMITE_LEGACY`) | **Fait et testé** (`env.ts`, `billing.ts`, webhook, `billing.test.ts`), rétrocompatible : variable absente = comportement identique à avant |
-| Checkout à deux lignes (Solo + option) | **Non fait volontairement** (facturation sensible, à valider par le patron) : décrit ci-dessous |
-| Création des prix Stripe, variables Vercel, portail | **À faire par le patron** |
+| Checkout Solo avec ou sans option (2 lignes d'UN SEUL abonnement), interface et total affiché | **Fait et testé en simulation** (`checkout/route.ts`, `billing.ts` `buildCheckoutLines`, `CheckoutDialog.tsx`, Paramètres) |
+| Ajout / retrait de l'option sur un abonnement Solo existant | **Fait et testé en simulation** : route `/api/stripe/option` (uniquement sur clic) |
+| Webhook : lit tous les éléments, droit `brand_entitlements` (source `stripe`) accordé/retiré, retrait de la ligne option si Pro/Illimité | **Fait et testé** (Stripe simulé ; base réelle en mémoire PGlite pour les limites et le droit) |
+| Prix Stripe du patron (4 identifiants vérifiés en lecture le 30/10/2026) | **Vérifiés** (voir plus bas) ; variables locales renseignées dans `.env.local` (non versionné) |
+| Variables Vercel, portail Stripe, tests en mode TEST, déploiement | **À faire par le patron** : voir `docs/CHECKLIST-LANCEMENT.md`, section « Stripe : mise en service » |
 
 ## (a) Nouveau prix Pro à 12,99 €
 
@@ -47,39 +50,67 @@ Analyse du 30/10/2026. Aucune opération Stripe, Supabase ou Vercel n'a été fa
 - Les abonnés à 9,99 € le restent-ils (recommandé tant qu'aucun avis n'a été envoyé) ou passent-ils à 12,99 € (migration dans Stripe + information préalable des abonnés, à cadrer juridiquement) ? Le code ne change pas leur prix.
 - Ne **modifier ni archiver** l'ancien prix avant d'avoir vérifié, dans Stripe (Catalogue de produits, prix à 9,99 €, onglet des abonnements), qu'aucun abonné ne l'utilise. Archiver un prix empêche seulement de nouvelles souscriptions ; les abonnements existants continuent, mais mieux vaut ne pas y toucher avant vérification.
 
-## (b) Option marque blanche pour Solo (+4,99 €/mois)
+## (b) Option marque blanche pour Solo (+4,99 €/mois) : FAIT (30/10/2026, local, non déployé)
 
-État actuel : le **webhook** sait déjà lire l'option (`STRIPE_PRICE_BRAND`, `analyzeSubscription`, `syncBrandOption` dans `brand_entitlements`, source `stripe`, sans jamais modifier la formule, ni toucher un droit `manuel`). Le **checkout** ne l'ajoute pas : l'option n'est pas achetable en ligne, et l'interface le dit (« bientôt disponible à l'achat »).
+### Les 4 prix (vérifiés en lecture seule chez Stripe : mode LIVE, actifs, EUR, mensuels, `interval_count` 1)
 
-### Checkout à deux lignes (à décrire, pas fait)
+| Variable | Identifiant | Montant | Produit |
+|---|---|---|---|
+| `STRIPE_PRICE_SOLO` | `price_1UTOYlQl0aNnS3rPqmzoTBfH` | 2,99 € | Décollage Solo |
+| `STRIPE_PRICE_BRAND` | `price_1UWIsqQl0aNnS3rPe6swbnSW` | 4,99 € | Décollage — Option marque blanche |
+| `STRIPE_PRICE_PRO` | `price_1UTOZXQl0aNnS3rPwL7z8Gb5` | 12,99 € | Décollage Pro |
+| `STRIPE_PRICE_ILLIMITE` | `price_1UTOagQl0aNnS3rP9q3LLjc0` | 29,99 € | Décollage Illimité |
 
-Changements proposés dans `src/app/api/stripe/checkout/route.ts` :
-1. Accepter un champ booléen `marqueBlanche` dans le corps. Règles serveur : valable **uniquement** si `plan === "solo"` ET `stripeBrandPrice()` est renseigné ; pour Pro ou Illimité, **refus 400** (jamais de ligne option : elle est déjà incluse, sinon double facturation) ; jamais de prix venant du navigateur.
-2. `line_items: [{ price: <prix Solo>, quantity: 1 }, { price: <STRIPE_PRICE_BRAND>, quantity: 1 }]` : **un seul abonnement à deux lignes** (une facture, un renouvellement, un prorata).
-3. Clé d'idempotence : y ajouter le drapeau de l'option, sinon un clic avec option réutiliserait la session sans option (même fenêtre de 10 minutes).
-4. `subscription_data.metadata` : ajouter l'option pour le suivi.
-5. `isPaymentConfigured` : ne pas exiger `STRIPE_PRICE_BRAND` (le paiement se couperait en production). Sans la variable, l'option reste invendable.
-6. Interface : `CheckoutDialog.tsx` doit afficher le total 7,98 €/mois et le détail 2,99 + 4,99 avant paiement (obligation d'information) ; la CGV et le texte d'engagement doivent suivre ce montant.
-7. Tests à ajouter : option refusée pour Pro/Illimité, option sans variable refusée, deux lignes pour Solo, clé d'idempotence distincte.
+Ces prix sont en mode LIVE : ils n'existent pas en mode TEST (les identifiants de test sont différents).
 
-### Retrait de l'option au passage à Pro ou Illimité
+### Paiement (`/api/stripe/checkout`)
 
-- Pro et Illimité incluent la marque blanche : un abonné Solo+option qui passe à Pro paierait 4,99 € pour rien si la ligne option reste.
-- Le portail Stripe gère mal les abonnements à plusieurs lignes (changement de formule avec retrait d'une ligne : **à vérifier en mode test**, ne pas supposer). Si le portail ne le permet pas : route serveur dédiée de changement de formule (remplace la ligne formule, supprime la ligne option dans la même mise à jour Stripe), ou traitement manuel par le support.
-- Webhook : ajouter une alerte journalisée si l'option figure sur un abonnement Pro ou Illimité (double facturation détectée), sans rien changer automatiquement.
-- Résiliation de l'option seule : le webhook repasse `brand_entitlements.enabled` à faux (déjà codé).
+- Corps : `plan` + `brandOption` (booléen). Liste blanche côté serveur (`buildCheckoutLines`) : l'option n'est acceptée que pour `solo` et seulement si `STRIPE_PRICE_BRAND` est renseignée ; toute autre valeur (texte, nombre, liste « deux fois ») est refusée en 400 ; Pro/Illimité + option : 400. Les prix ne viennent jamais du navigateur.
+- Session d'abonnement unique : `line_items` = [Solo, option]. Clé d'idempotence = utilisateur + formule + « +brand » + identifiants de prix + fenêtre de 10 min (Solo et Solo+option ne se confondent pas).
+- Inchangé : refus prudent si un abonnement existe (base ET relecture Stripe), preuve CGV + renonciation enregistrée avant l'ouverture du paiement.
+- Interface : case « Ajouter l'option marque blanche » dans la fenêtre de commande de Solo, total 7,98 € ou 2,99 €. La case n'apparaît que si le serveur confirme que l'option est vendable (`GET /api/stripe/option`).
 
-### Portail
+### Ajout / retrait sur un abonnement Solo existant (`/api/stripe/option`)
 
-- Ajouter le produit de l'option aux produits autorisés du portail (Paramètres Stripe > Portail client > Abonnements), et vérifier le comportement : ajout et retrait de l'option par l'abonné Solo ; changement Solo vers Pro ; résiliation.
+Choix retenu : route serveur dédiée (plutôt que le portail, dont le comportement sur plusieurs lignes n'est pas vérifié). Sur clic uniquement :
+- l'abonnement est identifié en base, puis relu chez Stripe : même client, statut `active`/`trialing` (pas past_due, unpaid, paused), formule Solo reconnue, aucun élément inconnu, pas de fin programmée (pour l'ajout) ;
+- **ajout** : `subscriptions.update` avec la ligne option, `proration_behavior: always_invoice` (le prorata du mois en cours est facturé tout de suite) et `payment_behavior: error_if_incomplete` (si le paiement échoue, Stripe refuse et rien n'est ajouté : pas d'accès offert) ; CGV et renonciation exigées et enregistrées ;
+- **retrait** : suppression de la seule ligne option (`subscriptionItems.del`), crédit au prorata (`create_prorations`) sur la prochaine facture ;
+- idempotente : option déjà présente (ajout) ou absente (retrait) = succès sans modification ; clés d'idempotence Stripe ;
+- elle n'écrit JAMAIS le droit : seul le webhook le fait, après relecture de l'abonnement.
+
+### Webhook
+
+- Lit tous les éléments : formule = élément formule connu (ou ses `*_LEGACY`) ; option = élément `STRIPE_PRICE_BRAND` ; élément inconnu = rien accordé (journalisé).
+- Droit : abonnement actif (`active`, `trialing`, `past_due` : accès gardé) + formule Solo + élément option → `brand_entitlements.enabled = true`, `source = 'stripe'`. Option retirée, abonnement `canceled`/`unpaid`/`paused`/`incomplete*`, ou formule ≠ Solo → ligne `stripe` désactivée (Pro/Illimité : droit inclus par la formule, `whiteLabelAllowed`). Retour à Solo sans option : la mention « Créé avec Décollage » est de nouveau affichée. Droit `manuel` : jamais modifié (la mise à jour est aussi filtrée par `source = 'stripe'` dans la requête) ; si l'option est payée alors qu'un droit manuel désactivé existe, c'est seulement journalisé.
+- Aucune migration nécessaire : la colonne `source` existe depuis la migration 0006. Si elle manque, le webhook journalise, ne donne pas le droit, et la mention reste affichée.
+- **Double facturation Solo+option → Pro/Illimité** : si une formule Pro/Illimité reconnue figure sur un abonnement actif/trialing qui porte encore l'élément option, le webhook SUPPRIME cet élément (crédit au prorata, clé d'idempotence par élément). Échec = 500, Stripe rejoue, et le rejeu ne trouve plus l'élément. Jamais fait sur un abonnement impayé (past_due…) ni sans formule reconnue ; seul un élément au prix exact de l'option est retiré.
+- Erreur de lecture/écriture en base → 500 (rejeu), jamais de faux succès.
+
+### Portail Stripe : ce que le patron doit configurer (action manuelle, mode TEST d'abord)
+
+1. Dashboard → Paramètres → Facturation → Portail client. Activer « Résilier les abonnements » (au choix : immédiatement ou fin de période).
+2. « Les clients peuvent changer de formule » : autoriser les produits Solo, Pro et Illimité (les 3 prix mensuels ci-dessus). **Ne pas ajouter le produit « Option marque blanche »** : l'ajout/retrait de l'option passe par Paramètres › Formule (route ci-dessus), qui est la voie testée.
+3. Vérifier en mode TEST le comportement du portail sur un abonnement Solo+option : (a) ce que propose le portail ; (b) passage à Pro : l'option doit disparaître seule (sinon le webhook la retire, avec crédit) ; (c) Pro → Solo : l'option est absente par défaut. Si le portail refuse de changer de formule sur un abonnement à deux lignes, l'abonné doit d'abord retirer l'option dans Paramètres, puis changer de formule.
+4. Webhook : mêmes 6 événements (checkout.session.completed, customer.subscription.created/updated/deleted/paused/resumed).
+
+### Anciens prix (`STRIPE_PRICE_*_LEGACY`) : usage précis
+
+- Rôle : le webhook reconnaît le prix porté par un abonné existant (ex. Pro à 9,99 €) comme la même formule ; le paiement ne les propose JAMAIS ; aucun prix d'abonné existant n'est modifié ; un abonné à l'ancien prix Pro garde Pro.
+- **Avant** de remplacer `STRIPE_PRICE_PRO` dans Vercel : recopier l'ancien identifiant (la valeur actuelle de `STRIPE_PRICE_PRO` en production, si c'est l'ancien prix) dans `STRIPE_PRICE_PRO_LEGACY` (liste séparée par des virgules). Sans cela, ces abonnés auraient un « prix inconnu » : formule conservée seulement s'ils sont déjà connus, sinon Découverte.
+- Même principe pour `STRIPE_PRICE_SOLO_LEGACY` et `STRIPE_PRICE_ILLIMITE_LEGACY` si un de ces prix change un jour. Pas de valeurs dans ce dépôt.
+
+### Ce qui n'est testé qu'en simulation
+
+Tout le comportement de Stripe (prorata, refus de paiement à l'ajout, effet du portail, envoi réel des webhooks, suppression d'élément) est SIMULÉ : aucun test n'appelle Stripe ni Supabase réels. Les limites (1/5/illimité) et le droit `my_white_label_allowed()` sont vérifiés sur de vraies migrations dans PGlite. Il reste à faire le parcours complet en mode TEST Stripe (carte 4242 4242 4242 4242 ; échecs 4000 0000 0000 0341 ou 4000 0000 0000 9995).
 
 ## (c) Ordre de déploiement
 
 1. **Stripe en mode test** : créer les objets ci-dessous, tester le parcours complet (Solo, Pro à 12,99 €, résiliation, webhook reçu, portail).
 2. **Stripe en live** : créer le nouveau prix Pro et le prix de l'option. Ne rien modifier ni archiver côté anciens prix.
 3. **Vercel (production), dans la même opération** : renseigner `STRIPE_PRICE_PRO` avec le nouveau `price_…` ; si des abonnés sont sur l'ancien prix, mettre l'ancien dans `STRIPE_PRICE_PRO_LEGACY` ; puis déployer le code. Les variables ne s'appliquent qu'au déploiement suivant : le code qui affiche 12,99 € et la variable qui facture 12,99 € arrivent ensemble. **Ne jamais déployer l'affichage à 12,99 € avec l'ancien `STRIPE_PRICE_PRO`.**
-4. **Seulement plus tard**, une fois le checkout à deux lignes écrit, testé et validé : renseigner `STRIPE_PRICE_BRAND`, puis déployer ; l'option devient alors achetable (retirer alors « bientôt disponible » dans `OfferCards.tsx`, la CGV et la page marque blanche).
-5. Ne jamais déployer le code du checkout à deux lignes avant que le prix de l'option existe dans Stripe.
+4. Le checkout à deux lignes est écrit et testé en simulation. Renseigner `STRIPE_PRICE_BRAND` dans Vercel **avant** le déploiement qui contient ce code (sans la variable, l'option reste invendable et rien d'autre ne change). Ordre complet : `docs/CHECKLIST-LANCEMENT.md`.
+5. Ne jamais déployer avant d'avoir testé le parcours en mode TEST Stripe.
 
 Remarque : le code qui lit `STRIPE_PRICE_PRO_LEGACY` et celui qui affiche 12,99 € sont dans la même branche locale ; il n'y a donc pas de déploiement séparé possible, et c'est sans danger tant que la variable `STRIPE_PRICE_PRO` change dans la même opération (étape 3).
 

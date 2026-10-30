@@ -173,6 +173,18 @@ Rien n'a été modifié. Effort : S = moins d'une heure, M = quelques heures, L 
 - **À faire par le patron avant d'afficher 12,99 €** : créer le nouveau prix Pro (12,99 €/mois) et l'option marque blanche (4,99 €/mois) dans Stripe, mettre le nouveau `price_…` dans `STRIPE_PRICE_PRO`, voir `docs/ADAPTATION-FACTURATION.md`.
 - **CGV** : version passée à 2026-10-30 (`VERSIONS.cgv`). Elle est enregistrée à chaque achat (`legal_acceptances`, contexte « achat ») : aucun abonné existant n'est bloqué, mais les abonnés en cours n'ont pas ré-accepté ces conditions ; voir s'il faut les informer.
 
+## Stripe : mise en service des 4 tarifs et de l'option marque blanche (étapes manuelles, dans l'ordre)
+
+Prix déjà créés et vérifiés en lecture le 30/10/2026 (mode LIVE, actifs, EUR, mensuels) : Solo 2,99 €, option 4,99 €, Pro 12,99 €, Illimité 29,99 € (identifiants dans `docs/ADAPTATION-FACTURATION.md`). Code prêt en local, **non déployé**.
+
+1. **Anciens abonnés Pro (9,99 €)** : dans Stripe, compter les abonnements actifs sur l'ancien prix Pro et noter son identifiant. Dans Vercel (Production), **avant** tout changement, si `STRIPE_PRICE_PRO` désigne encore l'ancien prix, recopier sa valeur dans une nouvelle variable `STRIPE_PRICE_PRO_LEGACY`. Ne rien modifier ni archiver chez Stripe.
+2. **Vercel → Settings → Environment Variables (Production, puis Preview si utilisé)** : `STRIPE_PRICE_SOLO` = prix Solo 2,99 € ; `STRIPE_PRICE_PRO` = prix Pro 12,99 € ; `STRIPE_PRICE_ILLIMITE` = prix Illimité 29,99 € ; `STRIPE_PRICE_BRAND` = prix option 4,99 € ; `STRIPE_PRICE_PRO_LEGACY` = ancien prix Pro (étape 1). Les variables ne s'appliquent qu'au déploiement suivant. Tu les saisis toi-même : rien à transmettre à un agent.
+3. **Portail client Stripe** (Dashboard → Paramètres → Facturation → Portail client) : résiliation activée ; changement de formule entre Solo, Pro et Illimité ; **ne pas ajouter** le produit de l'option. Détail et vérifications : `docs/ADAPTATION-FACTURATION.md`.
+4. **Webhook** : l'endpoint existant doit recevoir `checkout.session.completed`, `customer.subscription.created`, `.updated`, `.deleted`, `.paused`, `.resumed` (inchangé). Rien à créer de plus.
+5. **Test en mode TEST d'abord** (clé `sk_test_`, prix de test créés à l'identique, webhook de test, variables sur un aperçu Vercel ou en local avec `stripe listen`) : (a) Solo seul ; (b) Solo + option : une seule souscription à deux lignes, droit actif ; (c) retrait puis ajout de l'option dans Paramètres ; (d) passage Solo+option → Pro dans le portail : une seule ligne doit rester, aucune option facturée ; (e) Pro → Solo ; (f) carte d'échec 4000 0000 0000 0341 ; (g) résiliation ; (h) rejeu d'un événement depuis le Dashboard. Les prix LIVE ne servent pas en mode test.
+6. **Déploiement** : seulement après l'étape 5 réussie et les variables de l'étape 2 en place ; puis vérifier `/parametres` et `/parametres/marque-blanche` en ligne. Premier achat réel de contrôle (Solo + option), puis résiliation/remboursement par toi.
+7. **Migration** : aucune à exécuter pour cette fonction, mais la colonne `brand_entitlements.source` vient de la migration 0006 : vérifier qu'elle a bien été exécutée, sinon l'option est vendue sans que le droit soit accordé (la mention reste affichée).
+
 ## Non vérifié (récapitulatif)
 
 État de la base Supabase et des migrations 0001 à 0006 ; contenu du Dashboard Stripe (clients, abonnements, produits, webhooks, portail, droits de la clé restreinte) ; variables Vercel de production ; plan Vercel et limites des crons ; sauvegardes Supabase ; si le code actuel de `main` est déjà déployé ; conformité juridique des textes.
