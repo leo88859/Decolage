@@ -161,7 +161,7 @@ export default function Page() {
           <Link href="/parametres" className="small mut">← Paramètres</Link>
           <span className="eyebrow" style={{ display: "flex", marginTop: 10 }}>Marque blanche</span>
           <h1 className="h-page" style={{ marginTop: 10 }}>Ta marque</h1>
-          <p className="mut" style={{ maxWidth: 680, marginTop: 8 }}>Choisis un nom, un logo et des couleurs, puis vérifie le résultat dans l&apos;aperçu. Pour l&apos;instant, la marque est enregistrée sur ton compte ; elle n&apos;est pas encore appliquée aux sites publiés ni aux exports (voir « Ce qui est actif » en bas de page).</p>
+          <p className="mut" style={{ maxWidth: 680, marginTop: 8 }}>Choisis un nom, un logo et des couleurs, puis vérifie le résultat dans l&apos;aperçu. La marque est enregistrée sur ton compte. Elle est appliquée à tes boutiques publiées (la mention « Créé avec Décollage » est retirée du pied de page et des titres), mais pas aux autres pages publiées ni aux exports (voir « Ce qui est actif » en bas de page).</p>
         </div>
 
         {access === "anon" && <div className="alert alert-info bw-alert bw-alert-info" role="status"><span>Connecte-toi pour utiliser la marque blanche. <Link href="/connexion?next=/parametres/marque-blanche" style={{ textDecoration: "underline" }}>Se connecter</Link></span></div>}
@@ -297,7 +297,9 @@ export default function Page() {
           <h2 className="h-sec" id="bw-actif">Ce qui est actif</h2>
           <ul className="small" style={{ paddingLeft: 18, margin: 0 }}>
             <li>Actif : enregistrement de ton nom, de tes couleurs, de ton logo et de ton favicon sur ton compte, avec retour à la version précédente.</li>
-            <li>Non appliqué pour l&apos;instant : aux sites publiés (<code>/s/…</code>), aux exports ZIP, à l&apos;interface de Décollage et aux domaines personnalisés.</li>
+            <li>Actif sur tes boutiques publiées (<code>/b/…</code>) : la mention « Créé avec Décollage » est retirée du pied de page et des titres (Pro et Illimité : inclus ; Solo : avec l&apos;option marque blanche activée sur ton compte).</li>
+            <li>Les sites publiés (<code>/s/…</code>) ne contiennent aucune mention « Créé avec Décollage » : il n&apos;y a rien à retirer.</li>
+            <li>Non appliqué : aux exports ZIP, à l&apos;interface de Décollage et aux domaines personnalisés.</li>
           </ul>
         </section>
       </div>

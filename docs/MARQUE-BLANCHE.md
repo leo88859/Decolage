@@ -1,6 +1,6 @@
 # Marque blanche : architecture, activation, limites
 
-Statut : **fondations**. La marque d'un client s'enregistre et se prévisualise ; elle n'est pas encore appliquée aux sites publiés, aux exports ni à un domaine personnalisé (voir « Limites »).
+Statut : la marque d'un client s'enregistre et se prévisualise, et la marque blanche est **branchée sur les boutiques publiées** `/b/<slug>` (voir `docs/MARQUE-BLANCHE-PUBLIQUE.md`). Elle n'est pas appliquée aux exports ni à un domaine personnalisé (voir « Limites »).
 
 ## État précis (octobre 2026) : ce qui est branché et ce qui ne l'est pas
 
@@ -9,7 +9,7 @@ Statut : **fondations**. La marque d'un client s'enregistre et se prévisualise 
 | Enregistrer, prévisualiser, restaurer sa marque (`/api/brand`) | branché ; refusé à Découverte (« gratuit » en interne), accepté en Pro et Illimité, en Solo seulement avec l'option activée |
 | Règle « Pro et Illimité inclus, Solo avec option, Découverte jamais » | branchée côté serveur (`whiteLabelAllowed`, `my_white_label_allowed()`) |
 | Option Solo payante (+4,99 €/mois, 7,98 €/mois au total avec Solo) | **non vendue** : aucun produit Stripe, aucun bouton de paiement. Le webhook sait la reconnaître si tu crées le prix et renseignes `STRIPE_PRICE_BRAND` (droit `brand_entitlements.source = 'stripe'`, formule jamais modifiée), mais le checkout ne l'ajoute pas encore |
-| **Retrait de « Créé avec Décollage » des applications publiées** | **NON branché.** La seule mention « Créé avec Décollage » est le pied de page de la boutique publique (`src/app/b/[slug]/layout.tsx`) : elle est affichée pour tout le monde. Les pages `/s/<slug>` n'ont pas cette mention. Tant que ce n'est pas branché, ne pas annoncer la marque blanche comme « active » sur les pages publiées |
+| **Retrait de « Créé avec Décollage » des boutiques publiées** | **Branché** (`src/app/b/[slug]/layout.tsx`) : masquée pour Pro, Illimité et Solo avec droit `brand_entitlements` actif, affichée sinon (fail-closed). **Testé en simulation** (base simulée en mémoire), **pas encore vérifié sur la vraie base Supabase**. Activation Solo manuelle par `brand_entitlements` (SQL ci-dessous). L'option Solo (+4,99 €/mois, 7,98 €/mois au total) n'est **pas vendable en ligne** tant que le prix Stripe d'option (`STRIPE_PRICE_BRAND`) n'existe pas. Les pages `/s/<slug>` n'ont aucune mention à retirer |
 | Domaine personnalisé, exports, e-mails | non branchés |
 
 ## Vue d'ensemble
@@ -64,7 +64,7 @@ La marque déjà enregistrée reste en base mais devient inaccessible via l'API 
 
 ## Limites actuelles (à dire honnêtement aux clients)
 
-- **Non appliquée** : aux sites publiés (`/s/<slug>`, qui ont leur propre nom, logo et couleurs par projet), aux exports ZIP, à l'interface de Décollage, aux e-mails, à la facturation Stripe. Ces pages ne contiennent d'ailleurs aucune marque Décollage à retirer, sauf la ligne « Généré avec Décollage » du README d'un export (`src/lib/export.ts`), non modifiée.
+- **Non appliquée** : aux sites publiés (`/s/<slug>`, qui ont leur propre nom, logo et couleurs par projet ; seules les boutiques `/b/<slug>` sont branchées), aux exports ZIP, à l'interface de Décollage, aux e-mails, à la facturation Stripe. Ces pages ne contiennent d'ailleurs aucune marque Décollage à retirer, sauf la ligne « Généré avec Décollage » du README d'un export (`src/lib/export.ts`), non modifiée.
 - **Pas de domaine personnalisé** : voir `docs/DOMAINES-PERSONNALISES.md`. `resolveBrandFromHost()` existe et est testée mais n'est pas branchée dans `proxy.ts`.
 - Logos stockés en base (data URL) : acceptable pour quelques clients ; Supabase Storage est l'évolution prévue (bucket privé, URL signée ou publique en lecture, mêmes contrôles d'octets).
 - Un seul niveau d'historique ; une marque par compte.

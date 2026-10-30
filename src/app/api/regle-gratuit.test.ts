@@ -157,7 +157,7 @@ describe("boutique : publication et vitrine publique", () => {
     expect(r.status).toBe(403);
     const b = await r.json();
     expect(b.code).toBe("publication_formule");
-    expect(b.error).toMatch(/Gratuit/);
+    expect(b.error).toMatch(/formule Découverte/);
     expect(b.error).toMatch(/Solo/);
     expect(JSON.stringify(b)).not.toContain("interne");
   });
@@ -168,7 +168,7 @@ describe("boutique : publication et vitrine publique", () => {
     expect(r.status).toBe(403);
     const b = await r.json();
     expect(b.code).toBe("publication_formule");
-    expect(b.error).toMatch(/Gratuit/);
+    expect(b.error).toMatch(/formule Découverte/);
     expect(b.error).toMatch(/Solo/);
     expect(JSON.stringify(b)).not.toContain("interne");
   });
