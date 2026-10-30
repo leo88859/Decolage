@@ -1,49 +1,35 @@
 // Informations légales de l'éditeur, utilisées par les pages légales, le pied de page et le contact.
 //
-// RÈGLE : rien n'est inventé. Un champ laissé vide ("") s'affiche « à compléter » sur les pages
-// (composant V) et apparaît dans le bandeau « éléments à compléter avant publication ».
-// Remplis ces champs avec les vraies informations de l'éditeur avant d'ouvrir les ventes au public ;
-// le bandeau disparaît tout seul quand tout est rempli.
+// RÈGLE : rien n'est inventé. Un champ laissé vide ("") n'est tout simplement pas affiché sur les pages.
+// Remplis ces champs avec les vraies informations de l'éditeur : elles apparaissent alors toutes seules.
 
 export const LEGAL = {
   /** Nom commercial du service. */
   marque: "Décollage",
-  /** Éditeur : prénom et nom de l'entrepreneur individuel (ou raison sociale). À COMPLÉTER. */
+  /** Éditeur : prénom et nom de l'entrepreneur individuel (ou raison sociale). */
   editeur: "Léoedition",
-  /** Statut juridique, par ex. « Entrepreneur individuel (EI) ». À COMPLÉTER (à confirmer). */
+  /** Statut juridique, par ex. « Entrepreneur individuel (EI) ». */
   statut: "",
-  /** Numéro SIRET (ou SIREN) ; laisser vide tant que l'immatriculation n'est pas confirmée. À COMPLÉTER. */
+  /** Numéro SIRET (ou SIREN) ; laisser vide tant que l'immatriculation n'est pas confirmée. */
   siret: "",
-  /** Adresse postale (domicile ou domiciliation commerciale). À COMPLÉTER. */
+  /** Adresse postale (domicile ou domiciliation commerciale). */
   adresse: "123 Rue de l'Exemple, 75000 Paris, France",
-  /** Adresse e-mail de contact dédiée. À COMPLÉTER. */
+  /** Adresse e-mail de contact dédiée. */
   email: "leo2roub@gmail.com",
-  /** Numéro de téléphone (à vérifier : semble requis pour un éditeur professionnel). À COMPLÉTER. */
+  /** Numéro de téléphone (à vérifier : semble requis pour un éditeur professionnel). */
   telephone: "",
-  /** Directeur de la publication (prénom et nom). À COMPLÉTER. */
+  /** Directeur de la publication (prénom et nom). */
   directeurPublication: "",
-  /** Contact du support (e-mail ou page). À COMPLÉTER ; à défaut, l'adresse e-mail ci-dessus est utilisée. */
+  /** Contact du support (e-mail ou page). À défaut, l'adresse e-mail ci-dessus est utilisée. */
   contactSupport: "",
-  /** Adresse du site. Vide tant qu'elle n'est pas confirmée (voir PROPOSITIONS.site). */
+  /** Adresse du site. */
   site: "https://decollage.vercel.app",
-  /** Mention de TVA. Vide tant qu'elle n'est pas confirmée (voir PROPOSITIONS.tva). */
+  /** Mention de TVA. */
   tva: "",
-  /** Médiateur de la consommation (obligatoire pour vendre à des particuliers) : nom et site. À COMPLÉTER. */
+  /** Médiateur de la consommation (obligatoire pour vendre à des particuliers) : nom et site. */
   mediateur: { nom: "", site: "" },
-  /** Hébergeur. Nom et site viennent du code (déploiement Vercel) ; l'adresse est à confirmer (PROPOSITIONS). */
+  /** Hébergeur. Nom et site viennent du code (déploiement Vercel) ; l'adresse n'est affichée que si elle est renseignée. */
   hebergeur: { nom: "Vercel Inc.", site: "https://vercel.com", adresse: "" },
-};
-
-/**
- * Valeurs PROPOSÉES, non confirmées : elles s'affichent toujours avec la mention « à confirmer »
- * (composant P). Pour les valider, recopie-les dans LEGAL.
- */
-export const PROPOSITIONS = {
-  site: "https://decollage.vercel.app",
-  /** Valable seulement si l'éditeur est en franchise en base de TVA (micro-entreprise sous le seuil). */
-  tva: "TVA non applicable, art. 293 B du CGI",
-  /** Adresse de Vercel Inc. trouvée dans l'ancienne version du site, non revérifiée. */
-  hebergeurAdresse: "440 N Barranca Ave #4133, Covina, CA 91723, États-Unis",
 };
 
 /** Les pages légales, dans l'ordre d'affichage (navigation, pied de page, Paramètres, tests). */
@@ -82,32 +68,8 @@ export function dateFr(iso: string): string {
   return `${j === 1 ? "1er" : j} ${MOIS[m - 1]} ${a}`;
 }
 
-export type ChampManquant = { cle: string; label: string; pages: string; note?: string };
-
 /** Contact effectif du support : l'adresse dédiée si elle existe, sinon l'e-mail de l'éditeur. */
 export const supportContact = () => LEGAL.contactSupport || LEGAL.email;
-
-/**
- * Liste des éléments encore à compléter avant publication. Vide quand tout est renseigné
- * (le bandeau n'est alors pas affiché). Rien n'est inventé : on liste seulement ce qui manque.
- */
-export function champsManquants(l: typeof LEGAL = LEGAL): ChampManquant[] {
-  const liste: ChampManquant[] = [];
-  const ajoute = (ok: boolean, cle: string, label: string, pages: string, note?: string) => { if (!ok) liste.push({ cle, label, pages, note }); };
-  ajoute(!!l.editeur, "editeur", "Prénom et nom (ou raison sociale) de l'éditeur", "Mentions légales, CGV, Confidentialité");
-  ajoute(!!l.statut, "statut", "Statut juridique", "Mentions légales, CGV", "à confirmer, par ex. entrepreneur individuel");
-  ajoute(!!l.siret, "siret", "Numéro SIRET", "Mentions légales, CGV", "seulement une fois l'immatriculation confirmée");
-  ajoute(!!l.adresse, "adresse", "Adresse postale (domicile ou domiciliation)", "Mentions légales, CGV, Contact");
-  ajoute(!!l.email, "email", "Adresse e-mail de contact", "Toutes les pages légales, Contact");
-  ajoute(!!l.telephone, "telephone", "Numéro de téléphone", "Mentions légales, Contact", "à vérifier : semble requis pour un éditeur professionnel");
-  ajoute(!!l.directeurPublication, "directeurPublication", "Directeur de la publication", "Mentions légales");
-  ajoute(!!(l.contactSupport || l.email), "contactSupport", "Contact du support", "Contact, Remboursement");
-  ajoute(!!l.site, "site", "Adresse officielle du site", "Mentions légales, CGU, CGV", `proposition : ${PROPOSITIONS.site}`);
-  ajoute(!!l.tva, "tva", "Mention de TVA", "Mentions légales, CGV", `proposition : ${PROPOSITIONS.tva} (seulement si franchise en base)`);
-  ajoute(!!l.mediateur.nom, "mediateur", "Médiateur de la consommation (nom et site)", "CGV, Remboursement");
-  ajoute(!!l.hebergeur.adresse, "hebergeurAdresse", "Adresse de l'hébergeur", "Mentions légales", `proposition : ${PROPOSITIONS.hebergeurAdresse}`);
-  return liste;
-}
 
 /** Liens produit du pied de page (routes existantes, vérifiées par un test). */
 export const FOOTER_PRODUCT_LINKS = [

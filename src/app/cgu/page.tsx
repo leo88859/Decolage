@@ -1,17 +1,17 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { LegalPage, P, V } from "@/components/Legal";
-import { LEGAL, PROPOSITIONS } from "@/data/legal";
+import { LegalPage } from "@/components/Legal";
+import { LEGAL } from "@/data/legal";
 
 export const metadata: Metadata = { title: "Conditions générales d'utilisation" };
 
 export default function Cgu() {
   return (
     <LegalPage title="Conditions générales d'utilisation" doc="cgu">
-      <p>Ces conditions expliquent les règles d&apos;utilisation de {LEGAL.marque} (<P v={LEGAL.site} proposition={PROPOSITIONS.site} />). Les règles d&apos;achat d&apos;une formule payante sont dans les <Link href="/cgv">conditions générales de vente</Link>. Tes données personnelles sont expliquées dans la <Link href="/confidentialite">politique de confidentialité</Link>.</p>
+      <p>Ces conditions expliquent les règles d&apos;utilisation de {LEGAL.marque} {LEGAL.site ? <>({LEGAL.site})</> : null}. Les règles d&apos;achat d&apos;une formule payante sont dans les <Link href="/cgv">conditions générales de vente</Link>. Tes données personnelles sont expliquées dans la <Link href="/confidentialite">politique de confidentialité</Link>.</p>
 
       <h2>1. Le service</h2>
-      <p>{LEGAL.marque} est un constructeur guidé de micro-SaaS. Tu décris ton idée, tu choisis un design, et le moteur Décollage assemble pour toi, à partir de modèles écrits à l&apos;avance, une application interactive, une page de vente, un plan de lancement et du code exportable. Le service est édité par <V v={LEGAL.editeur} label="Prénom et nom de l'éditeur" /> (voir les <Link href="/mentions-legales">mentions légales</Link>).</p>
+      <p>{LEGAL.marque} est un constructeur guidé de micro-SaaS. Tu décris ton idée, tu choisis un design, et le moteur Décollage assemble pour toi, à partir de modèles écrits à l&apos;avance, une application interactive, une page de vente, un plan de lancement et du code exportable. Le service est édité{LEGAL.editeur ? <> par {LEGAL.editeur}</> : null} (voir les <Link href="/mentions-legales">mentions légales</Link>).</p>
       <p>Le moteur ne garantit ni le succès commercial d&apos;un projet, ni qu&apos;il convienne à ton cas précis : il t&apos;aide à démarrer. C&apos;est à toi de vérifier ce que tu publies et ce que tu en fais.</p>
 
       <h2>2. Utiliser sans compte, ou avec un compte</h2>

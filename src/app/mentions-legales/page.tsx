@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { LegalPage, Mail, P, V } from "@/components/Legal";
-import { LEGAL, PROPOSITIONS } from "@/data/legal";
+import { LegalPage, Mail } from "@/components/Legal";
+import { LEGAL } from "@/data/legal";
 
 export const metadata: Metadata = { title: "Mentions légales" };
 
@@ -10,25 +10,29 @@ export default function MentionsLegales() {
     <LegalPage title="Mentions légales" doc="mentions">
       <h2>Éditeur du site</h2>
       <p>
-        Le service {LEGAL.marque} (site : <P v={LEGAL.site} proposition={PROPOSITIONS.site} />) est édité par :
+        Le service {LEGAL.marque} {LEGAL.site ? <>(site : {LEGAL.site}) </> : null}est édité par :
       </p>
       <ul>
-        <li>Nom (ou raison sociale) : <V v={LEGAL.editeur} label="Prénom et nom de l'éditeur" /></li>
-        <li>Statut : <V v={LEGAL.statut} label="Statut juridique" /></li>
-        <li>SIRET : <V v={LEGAL.siret} label="Numéro SIRET" /></li>
-        <li>Adresse : <V v={LEGAL.adresse} label="Adresse postale" /></li>
-        <li>E-mail : <Mail /></li>
-        <li>Téléphone : <V v={LEGAL.telephone} label="Numéro de téléphone" /></li>
-        <li>TVA : <P v={LEGAL.tva} proposition={PROPOSITIONS.tva} /></li>
+        {LEGAL.editeur ? <li>Nom (ou raison sociale) : {LEGAL.editeur}</li> : null}
+        {LEGAL.statut ? <li>Statut : {LEGAL.statut}</li> : null}
+        {LEGAL.siret ? <li>SIRET : {LEGAL.siret}</li> : null}
+        {LEGAL.adresse ? <li>Adresse : {LEGAL.adresse}</li> : null}
+        {LEGAL.email ? <li>E-mail : <Mail /></li> : null}
+        {LEGAL.telephone ? <li>Téléphone : {LEGAL.telephone}</li> : null}
+        {LEGAL.tva ? <li>TVA : {LEGAL.tva}</li> : null}
       </ul>
       <p>Nom commercial : « {LEGAL.marque} ».</p>
 
-      <h2>Directeur de la publication</h2>
-      <p><V v={LEGAL.directeurPublication} label="Directeur de la publication" />.</p>
+      {LEGAL.directeurPublication ? (
+        <>
+          <h2>Directeur de la publication</h2>
+          <p>{LEGAL.directeurPublication}.</p>
+        </>
+      ) : null}
 
       <h2>Hébergement</h2>
       <p>
-        Le site est hébergé par {LEGAL.hebergeur.nom}, <P v={LEGAL.hebergeur.adresse} proposition={PROPOSITIONS.hebergeurAdresse} /> ·{" "}
+        Le site est hébergé par {LEGAL.hebergeur.nom}{LEGAL.hebergeur.adresse ? <>, {LEGAL.hebergeur.adresse}</> : null} ·{" "}
         <a href={LEGAL.hebergeur.site}>{LEGAL.hebergeur.site}</a>.
       </p>
       <p>

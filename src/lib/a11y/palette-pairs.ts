@@ -324,8 +324,6 @@ export function buildPairs(src: Source = currentSource()): Pair[] {
   text("Nouveaux écrans", "nx-t3", "Liens du panneau cookies (#1f45e0 sur #fffdf8)", "#1f45e0", "#fffdf8");
   text("Nouveaux écrans", "nx-t4", "Préfixe Note (#1f45e0 sur #e4eaff)", "#1f45e0", "#e4eaff");
   text("Nouveaux écrans", "nx-t5", "Préfixe Attention (#8a5206 sur #fbecd2)", "#8a5206", "#fbecd2");
-  text("Nouveaux écrans", "nx-t6", "Bandeau à compléter (#0b1330 sur #fbecd2)", "#0b1330", "#fbecd2");
-  text("Nouveaux écrans", "nx-t7", "Repère à compléter (#7c2d12 sur #fde68a)", "#7c2d12", "#fde68a");
   text("Nouveaux écrans", "nx-t8", "En-têtes de tableau (#0b1330 sur #ede5d5)", "#0b1330", "#ede5d5");
   text("Nouveaux écrans", "nx-t9", "Cellules, panneau (#0b1330 sur #fffdf8)", "#0b1330", "#fffdf8");
   text("Nouveaux écrans", "nx-t10", "Boutons du panneau cookies (#0b1330 sur #ffffff)", "#0b1330", "#ffffff");

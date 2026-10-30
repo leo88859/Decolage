@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { PAID_PLANS, PLANS, prixLabel } from "../lib/plans";
-import { champsManquants, dateFr, FOOTER_PRODUCT_LINKS, LEGAL, LEGAL_PAGES, PROPOSITIONS, supportContact, VERSIONS } from "./legal";
+import { dateFr, FOOTER_PRODUCT_LINKS, LEGAL, LEGAL_PAGES, supportContact, VERSIONS } from "./legal";
 
 const APP = join(process.cwd(), "src", "app");
 const pageFile = (route: string) => join(APP, ...route.split("/").filter(Boolean), "page.tsx");
@@ -83,20 +83,11 @@ describe("informations légales non vérifiées", () => {
     const src = readFileSync(join(process.cwd(), "src", "data", "legal.ts"), "utf8");
     expect(src).not.toMatch(/Dechantier|rue de Lille/i);
   });
-  it("les champs à compléter sont listés quand ils sont vides, et rien n'est listé quand tout est rempli", () => {
-    const vide: typeof LEGAL = {
-      ...LEGAL, editeur: "", statut: "", siret: "", adresse: "", email: "", telephone: "",
-      directeurPublication: "", contactSupport: "", site: "", tva: "",
-      mediateur: { nom: "", site: "" }, hebergeur: { nom: "Vercel Inc.", site: "https://vercel.com", adresse: "" },
-    };
-    const cles = champsManquants(vide).map((c) => c.cle);
-    for (const k of ["editeur", "adresse", "email", "telephone", "siret", "statut", "directeurPublication", "mediateur"]) expect(cles).toContain(k);
-    const rempli = {
-      ...LEGAL, editeur: "A B", statut: "EI", siret: "123", adresse: "1 rue X", email: "a@b.fr", telephone: "0102030405",
-      directeurPublication: "A B", contactSupport: "s@b.fr", site: PROPOSITIONS.site, tva: PROPOSITIONS.tva,
-      mediateur: { nom: "M", site: "https://m.fr" }, hebergeur: { ...LEGAL.hebergeur, adresse: "x" },
-    };
-    expect(champsManquants(rempli)).toEqual([]);
+  it("aucune mention « à compléter / à confirmer / à définir » ni repère orange dans les pages légales", () => {
+    for (const p of LEGAL_PAGES) {
+      const src = read(p.href);
+      expect(src, p.href).not.toMatch(/à compléter|à confirmer|à définir|legal-todo|TodoBanner/i);
+    }
   });
   it("le contact support retombe sur l'e-mail de l'éditeur", () => {
     expect(supportContact()).toBe(LEGAL.contactSupport || LEGAL.email);

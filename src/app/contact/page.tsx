@@ -9,11 +9,7 @@ export default function Contact() {
   const adresse = supportContact();
   return (
     <LegalPage title="Contact" doc="contact">
-      {adresse ? (
-        <p>Pour toute question, tu peux écrire à <a href={`mailto:${adresse}`}>{adresse}</a>.</p>
-      ) : (
-        <p className="note"><mark className="legal-todo">Adresse e-mail de contact : à compléter</mark> L&apos;éditeur n&apos;a pas encore renseigné son adresse de contact (voir l&apos;encadré en haut de page). Il n&apos;y a pas de formulaire en ligne.</p>
-      )}
+      {adresse ? <p>Pour toute question, tu peux écrire à <a href={`mailto:${adresse}`}>{adresse}</a>.</p> : null}
       {LEGAL.telephone ? <p>Téléphone : {LEGAL.telephone}</p> : null}
 
       <h2>Pour que ta demande avance vite</h2>
