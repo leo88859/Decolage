@@ -46,6 +46,7 @@ Boutique **publiée** uniquement (brouillon, inconnue : 404). Réponse :
 `{ boutique: { id, slug, nom, description, couleur_principale, couleur_accent, logo, adresse, whatsapp, email, telephone, modes, published_at }, categories: [{ id, nom, position }], produits: [{ id, categorie_id, titre, description, prix_centimes, images, position, variantes: [{ id, nom, position, disponible, stock_bas }] }] }`
 **Le stock exact n'est plus public** (migration 0007) : le public reçoit seulement `disponible` (stock > 0) et `stock_bas` (1 à 5 restants), jamais la quantité. Le commerçant, lui, voit toujours le stock exact de SES variantes (`GET /api/boutique/{id}`). Une quantité trop grande est refusée à la commande (409 `stock_insuffisant`), pas dans le panier.
 Seuls les produits et variantes actifs sont renvoyés. Le panier ne garde que `variante_id` et `quantite`.
+**Marque blanche** : la réponse contient aussi `marque_blanche: boolean`, calculé côté serveur à chaque appel (formule du propriétaire + option, voir `docs/MARQUE-BLANCHE-PUBLIQUE.md`). `true` = la mention « Créé avec Décollage » est masquée ; `false` (y compris en cas d'erreur de lecture) = elle s'affiche. C'est le seul ajout : ni `proprietaire_id` ni la formule ne sont exposés, et aucun paramètre ni en-tête ne peut le modifier.
 
 ### `POST /api/boutique/commande`
 Corps :

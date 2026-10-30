@@ -1,4 +1,5 @@
 import { json, notFound } from "@/lib/boutique/api";
+import { marqueBlancheBoutique } from "@/lib/brand/public";
 import { isCloudConfigured } from "@/lib/env";
 import { createPublicClient } from "@/lib/supabase/server";
 
@@ -26,10 +27,11 @@ export async function GET(_req: Request, { params }: { params: Promise<{ slug: s
     .maybeSingle();
   if (error) return json({ error: "Lecture impossible pour le moment.", code: "server" }, 500);
   if (!b) return notFound();
-  const [cats, prods, vues] = await Promise.all([
+  const [cats, prods, vues, marqueBlanche] = await Promise.all([
     db.from("categories").select("id, nom, position").eq("boutique_id", b.id).order("position").order("nom"),
     db.from("produits").select("id, categorie_id, titre, description, prix_centimes, images, position").eq("boutique_id", b.id).order("position").order("created_at"),
     db.from("variantes_publiques").select("id, produit_id, nom, position, disponible, stock_bas").eq("boutique_id", b.id).order("position"),
+    marqueBlancheBoutique(slug), // booléen décidé côté serveur (fail-closed : false = mention affichée)
   ]);
   if (cats.error || prods.error) return json({ error: "Lecture impossible pour le moment.", code: "server" }, 500);
   let variantes: VariantePublique[] = [];
@@ -48,5 +50,5 @@ export async function GET(_req: Request, { params }: { params: Promise<{ slug: s
       .sort((x, y) => x.position - y.position)
       .map((v) => ({ id: v.id, nom: v.nom, position: v.position, disponible: v.disponible, stock_bas: v.stock_bas })),
   }));
-  return Response.json({ boutique: b, categories: cats.data ?? [], produits }, { headers: { "cache-control": "public, max-age=15, stale-while-revalidate=60" } });
+  return Response.json({ boutique: b, categories: cats.data ?? [], produits, marque_blanche: marqueBlanche === true }, { headers: { "cache-control": "public, max-age=15, stale-while-revalidate=60" } });
 }

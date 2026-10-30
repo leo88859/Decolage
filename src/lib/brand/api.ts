@@ -3,8 +3,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { isCloudConfigured } from "@/lib/env";
 import { originOk as sharedOriginOk } from "@/lib/origin";
 import { createAdminClient, getUser } from "@/lib/supabase/server";
-import { normalizePlan, whiteLabelAllowed } from "@/lib/plans";
 import { isAllowListed } from "./access";
+import { decideWhiteLabel } from "./decision";
 import { BODY_MAX_BYTES, DEFAULT_BRAND, type Brand, type BrandState } from "./types";
 import { validateBrand } from "./validate";
 
@@ -74,7 +74,7 @@ export async function authorize(req: Request, mutating: boolean): Promise<Ctx | 
     // Pro et Illimité inclus ; Solo seulement avec l'option (brand_entitlements.enabled).
     const { data: profile, error: planError } = await supabase.from("profiles").select("plan").eq("id", user.id).maybeSingle();
     if (planError) return json({ error: "Vérification de la formule impossible pour le moment.", code: "server" }, 500);
-    allowed = whiteLabelAllowed(normalizePlan(profile?.plan), data?.enabled === true);
+    allowed = decideWhiteLabel(profile?.plan, data?.enabled); // même fonction que la mention des boutiques publiées
   }
   if (!allowed) return json({ error: "Fonction non activée sur ton compte.", code: "not_entitled" }, 403);
   return { userId: user.id, supabase };

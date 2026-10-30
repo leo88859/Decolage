@@ -21,7 +21,7 @@ export type BoutiquePub = {
   whatsapp: string | null; email: string | null; telephone: string | null;
   modes: ("retrait" | "livraison" | "contact")[]; published_at: string | null;
 };
-export type CataloguePub = { boutique: BoutiquePub; categories: { id: string; nom: string; position: number }[]; produits: ProduitPub[] };
+export type CataloguePub = { boutique: BoutiquePub; categories: { id: string; nom: string; position: number }[]; produits: ProduitPub[]; marque_blanche?: boolean };
 
 export const MAX_LIGNES = 20;
 export const MAX_QTE = 99;
