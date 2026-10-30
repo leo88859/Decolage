@@ -87,8 +87,8 @@ describe("abonnement Décollage", () => {
     expect(planFromSubscription("canceled", "price_pro", prices)).toBe("gratuit");
     expect(planFromSubscription("incomplete_expired", "price_solo", prices)).toBe("gratuit");
     expect(planFromSubscription(null, null, prices)).toBe("gratuit");
-    // Prix inconnu sur un abonnement actif : on ne pénalise jamais un client qui paie.
-    expect(planFromSubscription("active", "price_ancien", prices)).toBe("illimite");
+    // Prix inconnu sur un abonnement actif : JAMAIS une formule payante (ancien comportement : Illimité, faille corrigée en octobre 2026).
+    expect(planFromSubscription("active", "price_ancien", prices)).toBe("gratuit");
   });
 
   it("retrouve l'abonnement concerné par un événement", () => {

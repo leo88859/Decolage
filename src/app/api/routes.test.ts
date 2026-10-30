@@ -26,6 +26,7 @@ vi.mock("@/lib/env", () => ({
   isCloudConfigured: () => true,
   isPaymentConfigured: () => true,
   stripePrices: () => ({ solo: "price_solo", pro: "price_pro", illimite: "price_ill" }),
+  stripeBrandPrice: () => "price_brand",
   stripeWebhookSecret: () => "whsec_test",
   appUrl: () => "https://decollage.test",
 }));

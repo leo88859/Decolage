@@ -2,6 +2,16 @@
 
 Statut : **fondations**. La marque d'un client s'enregistre et se prévisualise ; elle n'est pas encore appliquée aux sites publiés, aux exports ni à un domaine personnalisé (voir « Limites »).
 
+## État précis (octobre 2026) : ce qui est branché et ce qui ne l'est pas
+
+| Élément | État |
+|---|---|
+| Enregistrer, prévisualiser, restaurer sa marque (`/api/brand`) | branché ; refusé au Gratuit, accepté en Pro et Illimité, en Solo seulement avec l'option activée |
+| Règle « Pro et Illimité inclus, Solo avec option, Gratuit jamais » | branchée côté serveur (`whiteLabelAllowed`, `my_white_label_allowed()`) |
+| Option Solo payante (+1,99 €) | **non vendue** : aucun produit Stripe, aucun bouton de paiement. Le webhook sait la reconnaître si tu crées le prix et renseignes `STRIPE_PRICE_BRAND` (droit `brand_entitlements.source = 'stripe'`, formule jamais modifiée), mais le checkout ne l'ajoute pas encore |
+| **Retrait de « Créé avec Décollage » des applications publiées** | **NON branché.** La seule mention « Créé avec Décollage » est le pied de page de la boutique publique (`src/app/b/[slug]/layout.tsx`) : elle est affichée pour tout le monde. Les pages `/s/<slug>` n'ont pas cette mention. Tant que ce n'est pas branché, ne pas annoncer la marque blanche comme « active » sur les pages publiées |
+| Domaine personnalisé, exports, e-mails | non branchés |
+
 ## Vue d'ensemble
 
 | Élément | Fichier |

@@ -25,6 +25,9 @@ export const stripeWebhookSecret = () => required("STRIPE_WEBHOOK_SECRET");
 /** Identifiants des prix Stripe de chaque formule payante (seule liste autorisée). */
 export const stripePrices = () => ({ solo: read("STRIPE_PRICE_SOLO"), pro: read("STRIPE_PRICE_PRO"), illimite: read("STRIPE_PRICE_ILLIMITE") });
 
+/** Prix Stripe de l'option marque blanche Solo (facultatif : absent = l'option n'est pas vendue, rien ne change). */
+export const stripeBrandPrice = () => read("STRIPE_PRICE_BRAND");
+
 export const isCloudConfigured = () => Boolean(read("NEXT_PUBLIC_SUPABASE_URL") && read("NEXT_PUBLIC_SUPABASE_ANON_KEY"));
 export const isPaymentConfigured = () => {
   const p = stripePrices();
