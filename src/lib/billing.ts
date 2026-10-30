@@ -70,6 +70,67 @@ export const subscriptionBlocksCheckout = (status: string | null | undefined): b
 
 export const EXISTING_SUBSCRIPTION_MESSAGE =
   "Un abonnement existe déjà sur ton compte : pour changer d'offre ou le gérer, ouvre le portail de gestion (« Gérer mon abonnement »). Si tu ne le retrouves pas, contacte-nous : aucun second abonnement n'a été créé et rien n'a été débité.";
+
+// ─── Refus du paiement : message clair + action sûre (voir docs/STRIPE-ABONNEMENT-PRUDENT.md) ───────────────────
+export type RefusalAction = "portail" | "contact" | "reessayer";
+export type CheckoutRefusal = {
+  code: "abonnement_existant" | "verification_impossible";
+  error: string;
+  /** Action principale proposée à l'utilisateur. */
+  action: RefusalAction;
+  /** Statut Stripe qui a motivé le refus (null = inconnu ou lecture impossible). */
+  statut: string | null;
+};
+
+const NO_DOUBLE = "Tu ne seras pas facturé deux fois : nous ne créons pas de second abonnement, et cette demande n'a rien débité.";
+/** Du plus « vivant » au plus incertain : sert à choisir le message quand Stripe renvoie plusieurs abonnements. */
+const SEVERITY = ["active", "trialing", "past_due", "unpaid", "paused", "incomplete"];
+
+/** Statut le plus significatif parmi les abonnements non terminés (null = aucun ne bloque). Un statut inconnu ou absent bloque. */
+export function blockingStatus(statuses: readonly (string | null | undefined)[]): string | null | undefined {
+  const blocking = statuses.filter((s) => subscriptionBlocksCheckout(s));
+  if (!blocking.length) return undefined;
+  const known = SEVERITY.find((k) => blocking.includes(k));
+  return known ?? null;
+}
+
+/**
+ * Refus « abonnement existant » selon le statut. Le portail n'est proposé en action principale que s'il existe un client Stripe
+ * ET que le statut s'y prête ; il n'est jamais présenté comme la solution garantie pour unpaid / paused / incomplete
+ * (comportement exact du portail : à vérifier en mode test).
+ */
+export function existingSubscriptionRefusal(status: string | null | undefined, hasCustomer: boolean): CheckoutRefusal {
+  const base = "Un abonnement existe déjà sur ton compte";
+  const portal = (error: string, statut: string): CheckoutRefusal => ({ code: "abonnement_existant", error: `${error} ${NO_DOUBLE}`, action: hasCustomer ? "portail" : "contact", statut });
+  switch (status) {
+    case "active":
+    case "trialing":
+      return portal(`${base} et il est actif. Pour changer d'offre, mettre à jour ton moyen de paiement ou résilier, ouvre le portail de gestion.`, status);
+    case "past_due":
+      return portal(`${base}, mais son dernier paiement a échoué. Ouvre le portail de gestion pour vérifier ton moyen de paiement ; ne prends pas un nouvel abonnement.`, status);
+    case "unpaid":
+      return portal(`${base}, mais il est impayé. Le portail de gestion te montre tes factures et ton moyen de paiement ; s'il ne règle pas la situation, contacte-nous.`, status);
+    case "paused":
+      return portal(`${base}, mais il est en pause. Ouvre le portail de gestion pour le consulter ; si la reprise n'y est pas proposée, contacte-nous.`, status);
+    case "incomplete":
+      return { code: "abonnement_existant", error: `${base}, mais son premier paiement n'a pas été finalisé (par exemple une confirmation bancaire restée en attente). N'en prends pas un autre : patiente un peu, puis contacte-nous si cela ne se débloque pas. ${NO_DOUBLE}`, action: "contact", statut: status };
+    default:
+      return { code: "abonnement_existant", error: `${base}, mais nous ne reconnaissons pas son état. Par précaution nous bloquons un nouveau paiement : contacte-nous et nous l'examinerons. ${NO_DOUBLE}`, action: "contact", statut: null };
+  }
+}
+
+export const verificationRefusal = (): CheckoutRefusal => ({
+  code: "verification_impossible",
+  error: `${SUBSCRIPTION_CHECK_FAILED_MESSAGE} ${NO_DOUBLE}`,
+  action: "reessayer",
+  statut: null,
+});
+
+/** Boutons à afficher dans la page Paramètres pour un refus (logique pure, testée). Le contact est toujours proposé en dernier recours. */
+export function refusalButtons(r: { code?: string; action?: string }): { portail: boolean; reessayer: boolean; contact: boolean } {
+  if (r.code === "verification_impossible") return { portail: true, reessayer: true, contact: false };
+  return { portail: r.action === "portail", reessayer: false, contact: true };
+}
 export const SUBSCRIPTION_CHECK_FAILED_MESSAGE =
   "Nous n'avons pas pu vérifier ton abonnement actuel (Stripe ne répond pas). Par précaution, le paiement n'a pas été ouvert et rien n'a été débité : réessaie dans quelques minutes, ou ouvre le portail de gestion si tu as déjà un abonnement.";
 

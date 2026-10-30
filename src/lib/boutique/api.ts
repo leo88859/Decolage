@@ -1,6 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { appUrl, isCloudConfigured } from "@/lib/env";
+import { isCloudConfigured } from "@/lib/env";
+import { originOk as sharedOriginOk } from "@/lib/origin";
 import { createAdminClient, getUser } from "@/lib/supabase/server";
 import { UUID_RE } from "./validate";
 
@@ -9,17 +10,8 @@ import { UUID_RE } from "./validate";
 export const json = (body: unknown, status = 200) => Response.json(body, { status, headers: { "cache-control": "no-store" } });
 export const BODY_MAX_BYTES = 64_000;
 
-export function originOk(req: Request): boolean {
-  const origin = req.headers.get("origin");
-  if (!origin || origin === "null") return false;
-  let own = "";
-  try {
-    own = new URL(req.url).origin;
-  } catch {
-    // URL illisible : seule l'adresse publique configurée peut correspondre.
-  }
-  return origin === own || origin === appUrl();
-}
+/** Contrôle d'origine commun (src/lib/origin.ts), SANS repli sur le Referer : une écriture sans en-tête Origin reste refusée ici. */
+export const originOk = (req: Request): boolean => sharedOriginOk(req, { referer: false });
 
 export async function readJson(req: Request): Promise<{ ok: true; body: unknown } | { ok: false; res: Response }> {
   const declared = Number(req.headers.get("content-length"));

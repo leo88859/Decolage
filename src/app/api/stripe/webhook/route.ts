@@ -33,7 +33,7 @@ export async function POST(req: Request) {
     const customerId = typeof sub.customer === "string" ? sub.customer : sub.customer.id;
     const admin = createAdminClient();
     // L'utilisateur est retrouvé grâce au lien enregistré par NOTRE serveur au moment du paiement.
-    const { data: profile, error: profileError } = await admin.from("profiles").select("id, plan, stripe_subscription_id").eq("stripe_customer_id", customerId).maybeSingle();
+    const { data: profile, error: profileError } = await admin.from("profiles").select("id, plan, stripe_subscription_id, subscription_status").eq("stripe_customer_id", customerId).maybeSingle();
     // Lecture impossible ≠ client inconnu : on ne répond JAMAIS 200 sur une panne de base (Stripe doit rejouer).
     if (profileError) throw new Error(profileError.message);
     // Client inconnu : compte supprimé entre-temps (la suppression résilie l'abonnement, ce qui déclenche
@@ -50,6 +50,11 @@ export async function POST(req: Request) {
     if (sub.metadata?.user_id && sub.metadata.user_id !== profile.id) {
       console.error(`[stripe] user_id incohérent pour ${sub.id} : ignoré`);
       return Response.json({ received: true, ignored: true });
+    }
+    // Deux abonnements actifs en même temps (deux pages de paiement payées) : rien n'est résilié automatiquement, mais c'est signalé
+    // dans les journaux pour une vérification manuelle dans Stripe (voir docs/STRIPE-ABONNEMENT-PRUDENT.md).
+    if (profile.stripe_subscription_id && profile.stripe_subscription_id !== sub.id && isActiveStatus(sub.status) && isActiveStatus(profile.subscription_status as string | null)) {
+      console.error(`[stripe] ALERTE double abonnement : ${sub.id} est actif alors que ${profile.stripe_subscription_id} l'est aussi. Vérifier dans Stripe et résilier/rembourser l'un des deux.`);
     }
     // TOUS les éléments de l’abonnement sont analysés (formule principale + option marque blanche + inconnus).
     const analysis = analyzeSubscription(sub.status, sub.items.data.map((i) => i.price?.id), stripePrices(), stripeBrandPrice());

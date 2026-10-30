@@ -9,6 +9,7 @@ import { ManageCookiesButton } from "@/components/ConsentManager";
 import { LEGAL_PAGES } from "@/data/legal";
 import { OfferCards } from "@/components/OfferCards";
 import { Confirm, download, toast } from "@/components/ui";
+import { refusalButtons } from "@/lib/billing";
 import { refreshPlan, signOut, useCloud } from "@/lib/cloud";
 import { dataJson, parseImport } from "@/lib/export";
 import { PLANS, type PaidPlan } from "@/lib/plans";
@@ -25,7 +26,7 @@ export default function Page() {
 async function post(url: string, method = "POST", body?: object) {
   const r = await fetch(url, { method, headers: body ? { "content-type": "application/json" } : undefined, body: body ? JSON.stringify(body) : undefined });
   const res = await r.json().catch(() => ({}));
-  return { ok: r.ok, ...res } as { ok: boolean; url?: string; error?: string; code?: string };
+  return { ok: r.ok, ...res } as { ok: boolean; url?: string; error?: string; code?: string; action?: string };
 }
 
 function Parametres() {
@@ -40,7 +41,8 @@ function Parametres() {
   const [busy, setBusy] = useState(false);
   const [buy, setBuy] = useState<PaidPlan | null>(null);
   const [buyError, setBuyError] = useState("");
-  const [existingSub, setExistingSub] = useState("");
+  const [refusal, setRefusal] = useState<{ message: string; code?: string; action?: string; plan: PaidPlan } | null>(null);
+  const [retryWait, setRetryWait] = useState(false);
   const [deleteError, setDeleteError] = useState("");
   const file = useRef<HTMLInputElement>(null);
   const paiement = params.get("paiement");
@@ -87,8 +89,14 @@ function Parametres() {
     const r = await post("/api/stripe/checkout", "POST", { plan: buy, ...consent, ...(retour ? { retour } : {}) });
     if (r.url) { window.location.assign(r.url); return; }
     setBusy(false);
-    // Abonnement déjà présent chez nous ou chez Stripe : pas de second paiement, on oriente vers le portail de gestion.
-    if (r.code === "abonnement_existant") { setBuy(null); setExistingSub(r.error ?? "Un abonnement existe déjà sur ton compte."); return; }
+    // Abonnement déjà présent (ou vérification impossible) : jamais de second paiement ; message clair + action sûre selon le cas.
+    if (r.code === "abonnement_existant" || r.code === "verification_impossible") {
+      const wanted = buy;
+      setBuy(null);
+      setRefusal({ message: r.error ?? "Un abonnement existe déjà sur ton compte. Tu ne seras pas facturé deux fois.", code: r.code, action: r.action, plan: wanted });
+      if (r.code === "verification_impossible") { setRetryWait(true); setTimeout(() => setRetryWait(false), 8000); }
+      return;
+    }
     setBuyError(r.error ?? "Paiement indisponible pour le moment. Aucun montant n'a été débité.");
   }
 
@@ -165,7 +173,21 @@ function Parametres() {
         <section className="panel stack" style={{ gap: 16 }} id="formule">
           <div className="row between"><h2 className="h-sec">Formule</h2><span className={`badge ${plan !== "gratuit" ? "badge-coral" : "badge-line"}`}>{PLANS[plan].nom}</span></div>
           {!payments && !session && <div className="alert alert-warn">Mode test : aucun paiement n&apos;est actif. Tu peux activer n&apos;importe quelle formule gratuitement dans ce navigateur pour l&apos;essayer.</div>}
-          {existingSub && <div className="alert alert-bad" role="alert"><span>{existingSub}</span> <button className="btn" disabled={busy} onClick={() => go("/api/stripe/portal")}>Ouvrir le portail de gestion</button></div>}
+          {refusal && (() => {
+            const b = refusalButtons(refusal);
+            return (
+              <div className="alert alert-bad stack" role="alert" style={{ gap: 10 }}>
+                <span>{refusal.message}</span>
+                <div className="row">
+                  {b.portail && <button className="btn" disabled={busy} onClick={() => go("/api/stripe/portal")}>Ouvrir le portail de gestion</button>}
+                  {b.reessayer && <button className="btn" disabled={busy || retryWait} onClick={() => { setBuyError(""); setBuy(refusal.plan); setRefusal(null); }}>{retryWait ? "Réessayer dans un instant…" : "Réessayer"}</button>}
+                  {b.reessayer && <button className="btn btn-ghost" disabled={busy} onClick={() => go("/api/stripe/portal")}>J&apos;ai déjà un abonnement : ouvrir le portail</button>}
+                  {b.contact && <Link href="/contact" className="btn btn-ghost">Contacter le support</Link>}
+                  <button className="btn btn-ghost" onClick={() => setRefusal(null)}>Fermer</button>
+                </div>
+              </div>
+            );
+          })()}
           {!payments && session && <p className="hint">Le paiement n&apos;est pas encore activé sur ce site : ta formule est gérée par l&apos;administrateur.</p>}
           <OfferCards current={plan} cta={(k) => {
             if (!payments) {

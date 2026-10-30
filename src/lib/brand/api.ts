@@ -1,6 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { appUrl, isCloudConfigured } from "@/lib/env";
+import { isCloudConfigured } from "@/lib/env";
+import { originOk as sharedOriginOk } from "@/lib/origin";
 import { createAdminClient, getUser } from "@/lib/supabase/server";
 import { normalizePlan, whiteLabelAllowed } from "@/lib/plans";
 import { isAllowListed } from "./access";
@@ -52,17 +53,8 @@ const brandToColumns = (b: Brand) => ({
   favicon_data: b.favicon,
 });
 
-function originOk(req: Request): boolean {
-  const origin = req.headers.get("origin");
-  if (!origin || origin === "null") return false;
-  let own = "";
-  try {
-    own = new URL(req.url).origin;
-  } catch {
-    // URL illisible : seule l'adresse publique configurée peut correspondre.
-  }
-  return origin === own || origin === appUrl();
-}
+/** Contrôle d'origine commun (src/lib/origin.ts), SANS repli sur le Referer. */
+const originOk = (req: Request): boolean => sharedOriginOk(req, { referer: false });
 
 /**
  * Vérifie, dans l'ordre : configuration, Origin (écritures), session, droit.

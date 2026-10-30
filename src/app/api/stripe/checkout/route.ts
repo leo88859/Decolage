@@ -1,4 +1,4 @@
-import { EXISTING_SUBSCRIPTION_MESSAGE, SUBSCRIPTION_CHECK_FAILED_MESSAGE, subscriptionBlocksCheckout } from "@/lib/billing";
+import { blockingStatus, existingSubscriptionRefusal, subscriptionBlocksCheckout, verificationRefusal } from "@/lib/billing";
 import { appUrl, isPaymentConfigured, stripePrices } from "@/lib/env";
 import { checkPurchaseConsent, recordAcceptances } from "@/lib/legal-acceptance";
 import { originGuard } from "@/lib/origin";
@@ -32,13 +32,15 @@ export async function POST(req: Request) {
 
   const admin = createAdminClient();
   const { data: profile, error: profileError } = await admin.from("profiles").select("plan, stripe_customer_id, stripe_subscription_id, subscription_status").eq("id", user.id).maybeSingle();
-  if (profileError) return Response.json({ error: SUBSCRIPTION_CHECK_FAILED_MESSAGE, code: "verification_impossible" }, { status: 503 });
+  if (profileError) return Response.json(verificationRefusal(), { status: 503 });
   // Un seul abonnement à la fois : les changements de formule passent par le portail Stripe (prorata géré par Stripe).
   // Refus dans le doute : seul un abonnement PROUVÉ terminé (canceled / incomplete_expired) autorise un nouveau paiement.
-  const existing = { error: EXISTING_SUBSCRIPTION_MESSAGE, code: "abonnement_existant" };
-  if (normalizePlan(profile?.plan) !== "gratuit") return Response.json(existing, { status: 409 });
-  if (profile?.stripe_subscription_id && subscriptionBlocksCheckout(profile.subscription_status as string | null)) return Response.json(existing, { status: 409 });
+  // Le message et l'action dépendent du statut (docs/STRIPE-ABONNEMENT-PRUDENT.md) ; le refus reste identique : jamais de second abonnement.
   const knownCustomer = (profile?.stripe_customer_id as string | null) ?? null;
+  const existing = (status: string | null | undefined) => Response.json(existingSubscriptionRefusal(status, Boolean(knownCustomer)), { status: 409 });
+  const storedStatus = (profile?.subscription_status as string | null) ?? null;
+  if (normalizePlan(profile?.plan) !== "gratuit") return existing(storedStatus);
+  if (profile?.stripe_subscription_id && subscriptionBlocksCheckout(storedStatus)) return existing(storedStatus);
   if (knownCustomer) {
     // Stripe est la source de vérité : la base peut être en retard sur un webhook. Une erreur de lecture ne prouve jamais l'absence.
     let subs: { data?: { status?: string }[]; has_more?: boolean };
@@ -46,10 +48,11 @@ export async function POST(req: Request) {
       subs = await getStripe().subscriptions.list({ customer: knownCustomer, status: "all", limit: 100 });
     } catch (err) {
       console.error("[stripe/checkout] lecture des abonnements impossible", (err as { type?: string }).type);
-      return Response.json({ error: SUBSCRIPTION_CHECK_FAILED_MESSAGE, code: "verification_impossible" }, { status: 503 });
+      return Response.json(verificationRefusal(), { status: 503 });
     }
-    if (!Array.isArray(subs?.data) || subs.has_more) return Response.json({ error: SUBSCRIPTION_CHECK_FAILED_MESSAGE, code: "verification_impossible" }, { status: 503 });
-    if (subs.data.some((s) => subscriptionBlocksCheckout(s.status))) return Response.json(existing, { status: 409 });
+    if (!Array.isArray(subs?.data) || subs.has_more) return Response.json(verificationRefusal(), { status: 503 });
+    const worst = blockingStatus(subs.data.map((s) => s.status));
+    if (worst !== undefined) return existing(worst);
   }
 
   const saved = await recordAcceptances(admin, [
@@ -68,15 +71,26 @@ export async function POST(req: Request) {
   }
 }
 
+/** Empreinte courte (non secrète) : une même clé d'idempotence ne doit jamais servir avec des paramètres différents (retour). */
+function shortHash(s: string): string {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0;
+  return h.toString(36);
+}
+
 async function openCheckout(userId: string, email: string | undefined, customerId: string | null, priceId: string, plan: string, retour: string, admin: ReturnType<typeof createAdminClient>) {
   const stripe = getStripe();
   if (!customerId) {
-    const customer = await stripe.customers.create({ email, metadata: { user_id: userId } });
+    // Clé d'idempotence Stripe : deux demandes simultanées sans client connu obtiennent le MÊME client (pas de client orphelin).
+    const customer = await stripe.customers.create({ email, metadata: { user_id: userId } }, { idempotencyKey: `decollage-customer-${userId}` });
     customerId = customer.id;
     // Le lien client Stripe → utilisateur est enregistré par le serveur : le webhook s'y fie.
     await admin.from("profiles").upsert({ id: userId, stripe_customer_id: customerId, updated_at: new Date().toISOString() }, { onConflict: "id" });
   }
 
+  // Clé d'idempotence : deux clics (ou deux onglets) sur la même formule dans les mêmes 10 minutes obtiennent LA MÊME session
+  // de paiement, qui ne peut être payée qu'une fois. Formules ou fenêtres différentes : sessions distinctes (voir la doc).
+  const window10 = Math.floor(Date.now() / 600_000);
   const session = await stripe.checkout.sessions.create({
     // Décollage reste le vendeur : Managed Payments (Stripe vendeur à notre place, activé par défaut
     // sur les nouveaux comptes) exige une catégorie fiscale par produit et bloquerait le paiement.
@@ -92,7 +106,7 @@ async function openCheckout(userId: string, email: string | undefined, customerI
     allow_promotion_codes: true,
     success_url: `${appUrl()}/parametres?paiement=ok${retour}`,
     cancel_url: `${appUrl()}/parametres?paiement=annule${retour}`,
-  });
+  }, { idempotencyKey: `decollage-checkout-${userId}-${plan}-${priceId}-${shortHash(retour)}-${window10}` });
   if (!session.url) return Response.json({ error: "Paiement indisponible pour le moment." }, { status: 502 });
   return Response.json({ url: session.url });
 }
