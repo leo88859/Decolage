@@ -1,5 +1,7 @@
+import { EXISTING_SUBSCRIPTION_MESSAGE, SUBSCRIPTION_CHECK_FAILED_MESSAGE, subscriptionBlocksCheckout } from "@/lib/billing";
 import { appUrl, isPaymentConfigured, stripePrices } from "@/lib/env";
 import { checkPurchaseConsent, recordAcceptances } from "@/lib/legal-acceptance";
+import { originGuard } from "@/lib/origin";
 import { isPaidPlan, normalizePlan, PLANS } from "@/lib/plans";
 import { getStripe } from "@/lib/stripe";
 import { stripeErrorMessage } from "@/lib/stripe-errors";
@@ -10,6 +12,8 @@ import { createAdminClient, getUser } from "@/lib/supabase/server";
  * le prix est choisi côté serveur dans la liste autorisée.
  */
 export async function POST(req: Request) {
+  const refused = originGuard(req);
+  if (refused) return refused;
   if (!isPaymentConfigured()) return Response.json({ error: "Le paiement n'est pas encore activé." }, { status: 503 });
   const { user } = await getUser();
   if (!user) return Response.json({ error: "Connecte-toi pour t'abonner." }, { status: 401 });
@@ -27,10 +31,25 @@ export async function POST(req: Request) {
   if (!consent.ok) return Response.json({ error: consent.error }, { status: consent.status });
 
   const admin = createAdminClient();
-  const { data: profile } = await admin.from("profiles").select("plan, stripe_customer_id").eq("id", user.id).maybeSingle();
+  const { data: profile, error: profileError } = await admin.from("profiles").select("plan, stripe_customer_id, stripe_subscription_id, subscription_status").eq("id", user.id).maybeSingle();
+  if (profileError) return Response.json({ error: SUBSCRIPTION_CHECK_FAILED_MESSAGE, code: "verification_impossible" }, { status: 503 });
   // Un seul abonnement à la fois : les changements de formule passent par le portail Stripe (prorata géré par Stripe).
-  if (normalizePlan(profile?.plan) !== "gratuit") {
-    return Response.json({ error: "Tu as déjà un abonnement : utilise « Changer d'offre » pour passer à une autre formule." }, { status: 400 });
+  // Refus dans le doute : seul un abonnement PROUVÉ terminé (canceled / incomplete_expired) autorise un nouveau paiement.
+  const existing = { error: EXISTING_SUBSCRIPTION_MESSAGE, code: "abonnement_existant" };
+  if (normalizePlan(profile?.plan) !== "gratuit") return Response.json(existing, { status: 409 });
+  if (profile?.stripe_subscription_id && subscriptionBlocksCheckout(profile.subscription_status as string | null)) return Response.json(existing, { status: 409 });
+  const knownCustomer = (profile?.stripe_customer_id as string | null) ?? null;
+  if (knownCustomer) {
+    // Stripe est la source de vérité : la base peut être en retard sur un webhook. Une erreur de lecture ne prouve jamais l'absence.
+    let subs: { data?: { status?: string }[]; has_more?: boolean };
+    try {
+      subs = await getStripe().subscriptions.list({ customer: knownCustomer, status: "all", limit: 100 });
+    } catch (err) {
+      console.error("[stripe/checkout] lecture des abonnements impossible", (err as { type?: string }).type);
+      return Response.json({ error: SUBSCRIPTION_CHECK_FAILED_MESSAGE, code: "verification_impossible" }, { status: 503 });
+    }
+    if (!Array.isArray(subs?.data) || subs.has_more) return Response.json({ error: SUBSCRIPTION_CHECK_FAILED_MESSAGE, code: "verification_impossible" }, { status: 503 });
+    if (subs.data.some((s) => subscriptionBlocksCheckout(s.status))) return Response.json(existing, { status: 409 });
   }
 
   const saved = await recordAcceptances(admin, [
@@ -39,7 +58,7 @@ export async function POST(req: Request) {
   if (!saved) return Response.json({ error: "Nous n'avons pas pu enregistrer ta confirmation de commande, donc le paiement n'a pas été ouvert. Rien n'a été débité : réessaie dans un instant." }, { status: 500 });
 
   try {
-    return await openCheckout(user.id, user.email, profile?.stripe_customer_id as string | null, priceId, body.plan, retour, admin);
+    return await openCheckout(user.id, user.email, knownCustomer, priceId, body.plan, retour, admin);
   } catch (err) {
     // Détail complet dans les journaux serveur (Vercel), message neutre pour le navigateur.
     const e = err as { type?: string; code?: string; message?: string };

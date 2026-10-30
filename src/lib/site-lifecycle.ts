@@ -56,14 +56,30 @@ export function splitPublications(pubs: Publication[], maxSites: number): { keep
   return { keep: sorted.slice(0, n), suspend: sorted.slice(n) };
 }
 
-/** Applique la formule aux sites et aux boutiques publiés d'un utilisateur. Ne lève jamais d'erreur (journalise sans donnée personnelle). */
+/** Vrai si l'erreur de base signifie « table ou colonne absente » (migration pas encore exécutée), pas une panne passagère. */
+export function isMissingSchema(e: { code?: string; message?: string } | null | undefined): boolean {
+  if (!e) return false;
+  if (e.code && ["42P01", "42703", "PGRST204", "PGRST205"].includes(e.code)) return true;
+  return /does not exist|schema cache|n'existe pas/i.test(e.message ?? "");
+}
+
+/**
+ * Applique la formule aux sites et aux boutiques publiés d'un utilisateur. Ne lève jamais d'erreur : l'échec est
+ * signalé par `ok: false` (journalisé sans donnée personnelle) et l'APPELANT doit en tenir compte — le webhook Stripe
+ * répond alors une erreur pour que Stripe rejoue l'événement (la synchronisation est idempotente : un rejeu complète
+ * la suspension manquante).
+ */
 export async function syncPublicationsWithPlan(admin: SupabaseClient, userId: string, plan: Plan): Promise<{ ok: boolean; suspended: number; restored: number }> {
   try {
     const sites = await admin.from("sites").select("slug, published_at").eq("user_id", userId);
     if (sites.error || !sites.data) throw new Error(sites.error?.message ?? "lecture des sites impossible");
     // Boutiques : migration 0005/0006 peut manquer ; on continue alors avec les sites seuls.
     const shops = await admin.from("boutiques").select("id, published_at").eq("proprietaire_id", userId).eq("statut", "publiee");
-    if (shops.error) console.error(`[boutiques] lecture impossible pour la synchronisation (migrations 0005/0006 exécutées ?) : ${shops.error.message}`);
+    if (shops.error) {
+      // Migration absente : on continue avec les sites seuls. Toute autre erreur (panne passagère) : échec, pour ne jamais laisser une boutique en ligne par erreur.
+      if (!isMissingSchema(shops.error)) throw new Error(`lecture des boutiques impossible : ${shops.error.message}`);
+      console.error(`[boutiques] table absente pour la synchronisation (migrations 0005/0006 exécutées ?) : ${shops.error.message}`);
+    }
     const pubs: Publication[] = [
       ...(sites.data as SiteRef[]).map((s) => ({ kind: "site" as const, key: s.slug, published_at: s.published_at })),
       ...((shops.error ? [] : (shops.data ?? [])) as { id: string; published_at: string | null }[]).map((b) => ({ kind: "boutique" as const, key: b.id, published_at: b.published_at ?? "9999" })),

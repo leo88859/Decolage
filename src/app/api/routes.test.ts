@@ -15,6 +15,7 @@ const h = vi.hoisted(() => {
       sessionsCreate: vi.fn(),
       eventRetrieve: vi.fn(),
       constructEvent: vi.fn(),
+      list: vi.fn(),
     },
     deleteUser: vi.fn(async () => ({ error: null as { message: string } | null })),
   };
@@ -32,7 +33,7 @@ vi.mock("@/lib/env", () => ({
 }));
 vi.mock("@/lib/stripe", () => ({
   getStripe: () => ({
-    subscriptions: { cancel: h.stripe.cancel, retrieve: h.stripe.retrieve },
+    subscriptions: { cancel: h.stripe.cancel, retrieve: h.stripe.retrieve, list: h.stripe.list },
     customers: { create: h.stripe.customersCreate },
     checkout: { sessions: { create: h.stripe.sessionsCreate } },
     webhooks: { constructEvent: h.stripe.constructEvent },
@@ -45,6 +46,7 @@ function fakeTable(name: string) {
   q.select = self;
   q.eq = self;
   q.in = self;
+  q.is = self;
   q.update = (v: unknown) => { h.log.push([name, "update", v]); return q; };
   q.upsert = (v: unknown) => { h.log.push([name, "upsert", v]); return Promise.resolve({ error: null }); };
   q.insert = (v: unknown) => { h.log.push([name, "insert", v]); return Promise.resolve({ error: h.failInsert ? { message: "x" } : null }); };
@@ -71,7 +73,8 @@ import { POST as publish } from "@/app/api/sites/route";
 import { newProject } from "@/lib/project";
 import { siteData } from "@/lib/publish";
 
-const post = (url: string, body: unknown, headers: Record<string, string> = {}) => new Request(`https://decollage.test${url}`, { method: "POST", headers: { "content-type": "application/json", ...headers }, body: typeof body === "string" ? body : JSON.stringify(body) });
+const post = (url: string, body: unknown, headers: Record<string, string> = {}) => new Request(`https://decollage.test${url}`, { method: "POST", headers: { "content-type": "application/json", origin: "https://decollage.test", ...headers }, body: typeof body === "string" ? body : JSON.stringify(body) });
+const del = (headers: Record<string, string> = { origin: "https://decollage.test" }) => new Request("https://decollage.test/api/account", { method: "DELETE", headers });
 const CONSENT = { acceptCgv: true, renonciation: true, cgvVersion: VERSIONS.cgv };
 
 beforeEach(() => {
@@ -80,6 +83,7 @@ beforeEach(() => {
   h.failInsert = false;
   h.log = [];
   Object.values(h.stripe).forEach((f) => f.mockReset());
+  h.stripe.list.mockResolvedValue({ data: [], has_more: false });
   h.deleteUser.mockReset().mockResolvedValue({ error: null });
 });
 
@@ -136,7 +140,7 @@ describe("DELETE /api/account : ordre sûr", () => {
     h.rows.profiles = [{ stripe_subscription_id: "sub_1", subscription_status: "active" }];
     h.stripe.cancel.mockRejectedValue(new Error("réseau"));
     h.stripe.retrieve.mockRejectedValue(new Error("réseau"));
-    const r = await deleteAccount();
+    const r = await deleteAccount(del());
     expect(r.status).toBe(502);
     expect((await r.json()).error).toMatch(/n'a PAS été supprimé/);
     expect(h.deleteUser).not.toHaveBeenCalled();
@@ -146,21 +150,21 @@ describe("DELETE /api/account : ordre sûr", () => {
     h.rows.profiles = [{ stripe_subscription_id: "sub_1", subscription_status: "past_due" }];
     h.stripe.cancel.mockRejectedValue(new Error("non annulable"));
     h.stripe.retrieve.mockResolvedValue({ status: "incomplete_expired" });
-    expect((await deleteAccount()).status).toBe(200);
+    expect((await deleteAccount(del())).status).toBe(200);
     expect(h.deleteUser).toHaveBeenCalledWith("u-a");
   });
 
   it("résilie puis supprime, sans jamais toucher au client ni aux factures Stripe", async () => {
     h.rows.profiles = [{ stripe_subscription_id: "sub_1", subscription_status: "active" }];
     h.stripe.cancel.mockResolvedValue({});
-    expect((await deleteAccount()).status).toBe(200);
+    expect((await deleteAccount(del())).status).toBe(200);
     expect(h.stripe.cancel).toHaveBeenCalledWith("sub_1");
     expect(h.deleteUser).toHaveBeenCalledWith("u-a");
   });
 
   it("refuse sans connexion", async () => {
     h.user = null;
-    expect((await deleteAccount()).status).toBe(401);
+    expect((await deleteAccount(del())).status).toBe(401);
     expect(h.deleteUser).not.toHaveBeenCalled();
   });
 });

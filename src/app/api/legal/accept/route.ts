@@ -1,5 +1,6 @@
 import { isCloudConfigured } from "@/lib/env";
 import { checkAcceptance, hasAcceptedSignupDocs, recordAcceptances, SIGNUP_DOCS, type AcceptanceRow, type LegalReader } from "@/lib/legal-acceptance";
+import { originGuard } from "@/lib/origin";
 import { createAdminClient, getUser } from "@/lib/supabase/server";
 
 const json = (body: unknown, status = 200) => Response.json(body, { status, headers: { "cache-control": "no-store" } });
@@ -18,6 +19,8 @@ export async function GET() {
  * Le serveur vérifie que les versions envoyées sont celles en vigueur ; l'identité vient de la session, jamais du corps.
  */
 export async function POST(req: Request) {
+  const refused = originGuard(req);
+  if (refused) return refused;
   if (!isCloudConfigured()) return json({ error: "Non disponible." }, 503);
   const { user } = await getUser();
   if (!user) return json({ error: "Connecte-toi." }, 401);

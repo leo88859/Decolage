@@ -1,5 +1,6 @@
 import { isCloudConfigured } from "@/lib/env";
 import { normalizePlan, PLANS, prixCourt } from "@/lib/plans";
+import { originGuard } from "@/lib/origin";
 import { slugError, validateSiteData } from "@/lib/publish";
 import { createAdminClient, getUser } from "@/lib/supabase/server";
 
@@ -17,6 +18,8 @@ const json = (body: unknown, status = 200) => Response.json(body, { status, head
 
 /** Publie (ou met à jour) le site d'un projet. */
 export async function POST(req: Request) {
+  const refused = originGuard(req);
+  if (refused) return refused;
   if (!isCloudConfigured()) return json({ error: "La mise en ligne n'est pas encore activée sur ce site." }, 503);
   const { supabase, user } = await getUser();
   if (!user) return json({ error: "Connecte-toi pour publier." }, 401);
@@ -39,9 +42,9 @@ export async function POST(req: Request) {
   // La formule est lue côté serveur dans profiles (jamais depuis le navigateur). La base refuse aussi (migration 0006).
   const [{ data: profile }, { data: mine }, { data: shops }] = await Promise.all([
     supabase.from("profiles").select("plan").eq("id", user.id).maybeSingle(),
-    supabase.from("sites").select("slug, project_id").eq("user_id", user.id),
+    supabase.from("sites").select("slug, project_id, suspended_at").eq("user_id", user.id),
     // Les boutiques publiées comptent dans la même limite (erreur de lecture ignorée : migration 0005 absente).
-    supabase.from("boutiques").select("id").eq("proprietaire_id", user.id).eq("statut", "publiee"),
+    supabase.from("boutiques").select("id").eq("proprietaire_id", user.id).eq("statut", "publiee").is("suspended_at", null),
   ]);
   const plan = normalizePlan(profile?.plan);
   const existing = (mine ?? []).find((s) => s.project_id === projectId);
@@ -51,7 +54,11 @@ export async function POST(req: Request) {
       code: "publication_formule",
     }, 403);
   }
-  if (!existing && (mine ?? []).length + (shops ?? []).length >= PLANS[plan].maxSites) {
+  // Seuls les éléments EN LIGNE comptent : un site suspendu (hors limite après une rétrogradation) ne bloque pas
+  // la publication d'un nouveau site dans la limite. Il ne peut pas être réactivé ici (suspended_at n'est jamais écrit
+  // par cette route : seule la synchronisation avec la formule le lève, dans la limite).
+  const online = (mine ?? []).filter((s) => !s.suspended_at).length;
+  if (!existing && online + (shops ?? []).length >= PLANS[plan].maxSites) {
     return json({
       error: `Ta formule ${PLANS[plan].nom} permet ${PLANS[plan].maxSites} site${PLANS[plan].maxSites > 1 ? "s" : ""} en ligne (boutiques comprises). Dépublie un site ou choisis une offre supérieure.`,
       code: "limite_sites",
@@ -71,7 +78,7 @@ export async function POST(req: Request) {
     if (res.error.code === "P0001") return json({ error: "Ta formule ne permet pas de publier plus. Passe à une offre supérieure ou dépublie un site.", code: "limite_sites" }, 403);
     return json({ error: "Publication impossible pour le moment." }, 500);
   }
-  return json({ slug, url: `/s/${slug}`, updatedAt: now });
+  return json({ slug, url: `/s/${slug}`, updatedAt: now, ...(existing?.suspended_at ? { suspended: true } : {}) });
 }
 
 /** Statut de publication d'un projet. */
@@ -86,6 +93,8 @@ export async function GET(req: Request) {
 
 /** Retire un site de la publication (ses inscrits sont supprimés avec lui). */
 export async function DELETE(req: Request) {
+  const refused = originGuard(req);
+  if (refused) return refused;
   if (!isCloudConfigured()) return json({ error: "Non disponible." }, 503);
   const { user } = await getUser();
   if (!user) return json({ error: "Connecte-toi." }, 401);

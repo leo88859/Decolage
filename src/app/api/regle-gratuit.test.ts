@@ -27,7 +27,7 @@ function fakeTable(name: string) {
   let w = false; // après update/insert : l'erreur simulée est celle de l'ÉCRITURE (clé « table:write »)
   const err = () => h.errors[w ? name + ":write" : name] ?? null;
   const res = () => ({ data: h.rows[name] ?? [], error: err() });
-  for (const m of ["select", "eq", "in", "order", "limit"]) q[m] = self;
+  for (const m of ["select", "eq", "in", "is", "order", "limit"]) q[m] = self;
   q.update = (v: unknown) => { w = true; h.log.push([name, "update", v]); return q; };
   q.insert = (v: unknown) => { w = true; h.log.push([name, "insert", v]); return q; };
   q.delete = () => { h.log.push([name, "delete", null]); return q; };
@@ -51,7 +51,7 @@ import { newProject } from "@/lib/project";
 import { siteData } from "@/lib/publish";
 
 const post = (url: string, body: unknown, headers: Record<string, string> = {}) =>
-  new Request(`https://app.test${url}`, { method: "POST", headers: { "content-type": "application/json", ...headers }, body: typeof body === "string" ? body : JSON.stringify(body) });
+  new Request(`https://app.test${url}`, { method: "POST", headers: { "content-type": "application/json", origin: "https://app.test", ...headers }, body: typeof body === "string" ? body : JSON.stringify(body) });
 const publishBody = (projectId = "proja1", slug = "mon-site") => ({ projectId, slug, data: siteData(newProject("crm")) });
 const writes = (table: string, op?: string) => h.log.filter(([t, o]) => t === table && (op ? o === op : o === "insert" || o === "update"));
 const ID = "11111111-1111-4111-8111-111111111111";

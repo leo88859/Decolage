@@ -1,5 +1,6 @@
 import { CANCEL_FAILED_MESSAGE, cancelSubscriptionForDeletion } from "@/lib/account-deletion";
 import { isCloudConfigured, isPaymentConfigured } from "@/lib/env";
+import { originGuard } from "@/lib/origin";
 import { getStripe } from "@/lib/stripe";
 import { createAdminClient, getUser } from "@/lib/supabase/server";
 
@@ -8,7 +9,9 @@ import { createAdminClient, getUser } from "@/lib/supabase/server";
  * sites publiés, listes d'attente, preuves d'acceptation). Conservés volontairement : le client Stripe et
  * ses factures (obligation comptable) et les éventuelles sauvegardes de l'hébergeur.
  */
-export async function DELETE() {
+export async function DELETE(req: Request) {
+  const refused = originGuard(req);
+  if (refused) return refused;
   if (!isCloudConfigured()) return Response.json({ error: "Non disponible." }, { status: 503 });
   const { user } = await getUser();
   if (!user) return Response.json({ error: "Connecte-toi." }, { status: 401 });

@@ -2,7 +2,7 @@ import type Stripe from "stripe";
 import { analyzeSubscription, HANDLED_EVENTS, isActiveStatus, resolvePlan, subscriptionIdOf } from "@/lib/billing";
 import { isPaymentConfigured, stripeBrandPrice, stripePrices, stripeWebhookSecret } from "@/lib/env";
 import { normalizePlan } from "@/lib/plans";
-import { syncPublicationsWithPlan } from "@/lib/site-lifecycle";
+import { isMissingSchema, syncPublicationsWithPlan } from "@/lib/site-lifecycle";
 import { getStripe } from "@/lib/stripe";
 import { createAdminClient } from "@/lib/supabase/server";
 
@@ -33,7 +33,9 @@ export async function POST(req: Request) {
     const customerId = typeof sub.customer === "string" ? sub.customer : sub.customer.id;
     const admin = createAdminClient();
     // L'utilisateur est retrouvé grâce au lien enregistré par NOTRE serveur au moment du paiement.
-    const { data: profile } = await admin.from("profiles").select("id, plan, stripe_subscription_id").eq("stripe_customer_id", customerId).maybeSingle();
+    const { data: profile, error: profileError } = await admin.from("profiles").select("id, plan, stripe_subscription_id").eq("stripe_customer_id", customerId).maybeSingle();
+    // Lecture impossible ≠ client inconnu : on ne répond JAMAIS 200 sur une panne de base (Stripe doit rejouer).
+    if (profileError) throw new Error(profileError.message);
     // Client inconnu : compte supprimé entre-temps (la suppression résilie l'abonnement, ce qui déclenche
     // cet événement après l'effacement du profil). Ce n'est pas une erreur : on répond 200 pour que Stripe
     // n'insiste pas. Journal sans donnée personnelle (ni identifiant client, ni e-mail).
@@ -68,7 +70,10 @@ export async function POST(req: Request) {
     // Option marque blanche : droit SÉPARÉ de la formule (ne modifie jamais profiles.plan).
     await syncBrandOption(admin, profile.id, analysis.brandOption && isActiveStatus(sub.status));
     // Résiliation / changement de formule : suspend (ou réactive) sites ET boutiques selon la nouvelle limite. Rien n’est supprimé.
-    await syncPublicationsWithPlan(admin, profile.id, newPlan);
+    // Si cette étape échoue, la formule est déjà écrite mais des sites pourraient rester en ligne : on remonte l'erreur (500)
+    // pour que Stripe rejoue l'événement. Le rejeu relit l'abonnement chez Stripe et refait exactement les mêmes écritures.
+    const sync = await syncPublicationsWithPlan(admin, profile.id, newPlan);
+    if (!sync.ok) throw new Error("synchronisation des publications non appliquée");
     return Response.json({ received: true });
   } catch (e) {
     console.error(`[stripe] échec du traitement de ${event.id} (${event.type}) : ${(e as Error).message}`);
@@ -99,6 +104,9 @@ async function syncBrandOption(admin: ReturnType<typeof createAdminClient>, user
       if (r.error) throw new Error(r.error.message);
     }
   } catch (e) {
-    console.error(`[stripe] option marque blanche non synchronisée (migration 0006 exécutée ?) : ${(e as Error).message}`);
+    const err = e as Error & { code?: string };
+    // Migration 0006 absente : on journalise et on continue. Toute autre erreur remonte (500) pour que Stripe rejoue l'événement.
+    if (!isMissingSchema(err)) throw err;
+    console.error(`[stripe] option marque blanche non synchronisée (migration 0006 exécutée ?) : ${err.message}`);
   }
 }

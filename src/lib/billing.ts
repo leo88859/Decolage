@@ -64,6 +64,15 @@ export function resolvePlan(a: SubscriptionAnalysis, previous: { plan: Plan; sub
   return previous.subscriptionId === subscriptionId ? previous.plan : "gratuit";
 }
 
+/** Seuls statuts qui prouvent qu'un abonnement est terminé. Tout autre statut, y compris inconnu ou absent, compte comme « abonnement existant ». */
+const ENDED = new Set(["canceled", "incomplete_expired"]);
+export const subscriptionBlocksCheckout = (status: string | null | undefined): boolean => !(typeof status === "string" && ENDED.has(status));
+
+export const EXISTING_SUBSCRIPTION_MESSAGE =
+  "Un abonnement existe déjà sur ton compte : pour changer d'offre ou le gérer, ouvre le portail de gestion (« Gérer mon abonnement »). Si tu ne le retrouves pas, contacte-nous : aucun second abonnement n'a été créé et rien n'a été débité.";
+export const SUBSCRIPTION_CHECK_FAILED_MESSAGE =
+  "Nous n'avons pas pu vérifier ton abonnement actuel (Stripe ne répond pas). Par précaution, le paiement n'a pas été ouvert et rien n'a été débité : réessaie dans quelques minutes, ou ouvre le portail de gestion si tu as déjà un abonnement.";
+
 export const HANDLED_EVENTS = new Set([
   "checkout.session.completed",
   "customer.subscription.created",
