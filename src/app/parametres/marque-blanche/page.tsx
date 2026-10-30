@@ -6,6 +6,7 @@ import { BrandPreview, type Device } from "@/components/brand/BrandPreview";
 import { useFeatures } from "@/components/CloudSync";
 import { Confirm, toast } from "@/components/ui";
 import { useCloud } from "@/lib/cloud";
+import { brandOptionLabel, brandOptionTotalLabel } from "@/lib/plans";
 import { brandContrast } from "@/lib/brand/contrast";
 import { COLOR_KEYS, DEFAULT_BRAND, FAVICON_MAX_BYTES, LOGO_MAX_BYTES, NAME_MAX, type Brand, type BrandState, type ColorKey } from "@/lib/brand/types";
 import { COLOR_LABELS, validateBrand, validateColor, validateFavicon, validateLogo, type FieldErrors } from "@/lib/brand/validate";
@@ -166,7 +167,7 @@ export default function Page() {
         {access === "anon" && <div className="alert alert-info bw-alert bw-alert-info" role="status"><span>Connecte-toi pour utiliser la marque blanche. <Link href="/connexion?next=/parametres/marque-blanche" style={{ textDecoration: "underline" }}>Se connecter</Link></span></div>}
         {access === "denied" && (
           <div className="alert alert-warn bw-alert bw-alert-warn" role="status">
-            <span><b>Fonction non activée sur ton compte.</b> La marque blanche n&apos;est pas comprise dans les formules : elle est activée à la demande, par nous. Rien ne peut être enregistré tant qu&apos;elle n&apos;est pas activée.</span>
+            <span><b>Fonction non activée sur ton compte.</b> La marque blanche est incluse dans Pro et Illimité, proposée en option pour Solo à {brandOptionLabel()} ({brandOptionTotalLabel()}), et non comprise dans Découverte. L&apos;option Solo n&apos;est pas encore achetable en ligne : <Link href="/contact" style={{ textDecoration: "underline" }}>contacte-nous</Link> si elle t&apos;intéresse. Rien ne peut être enregistré tant que la marque blanche n&apos;est pas disponible sur ton compte.</span>
           </div>
         )}
         {access === "error" && <div className="alert alert-bad bw-alert bw-alert-bad" role="alert"><span>Impossible de charger ta marque pour le moment. Réessaie plus tard.</span></div>}

@@ -200,6 +200,7 @@ function Parametres() {
             if (k === plan) return <button className="btn" disabled={busy} onClick={() => go("/api/stripe/portal")}>Gérer mon abonnement</button>;
             return <button className="btn btn-ghost" disabled={busy} onClick={() => go("/api/stripe/portal")}>{k === "gratuit" ? "Résilier" : "Changer pour celle-ci"}</button>;
           }} />
+          <p className="tiny mut">Entreprise : sur devis, sans tarif affiché ni engagement ; <Link href="/contact" style={{ textDecoration: "underline" }}>contacte-nous</Link>. L&apos;option marque blanche de Solo n&apos;est pas encore achetable en ligne.</p>
           {payments && <p className="tiny mut">Paiement sécurisé par Stripe. Sans engagement : tu changes d&apos;offre ou tu résilies en ligne, à tout moment. Avant de commander, tu confirmes avoir lu les <Link href="/cgv" style={{ textDecoration: "underline" }}>conditions générales de vente</Link> et ta demande d&apos;accès immédiat (voir <Link href="/remboursement" style={{ textDecoration: "underline" }}>Remboursement</Link>).</p>}
         </section>
 

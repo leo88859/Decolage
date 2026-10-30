@@ -2,7 +2,7 @@ import { createHash, timingSafeEqual } from "node:crypto";
 import { adminClient, fonctionAbsente, json } from "@/lib/boutique/api";
 import { isCloudConfigured } from "@/lib/env";
 
-// Expiration des commandes « nouvelle » trop anciennes (stock remis une seule fois par la base, migration 0007).
+// Expiration des commandes « nouvelle » trop anciennes (stock remis une seule fois par la base : fonction créée par la migration 0007 ; le marqueur d'annulation et le filtre « non payée » viennent de la migration 0008).
 // Route NON planifiée par défaut. Elle n'existe que si la variable d'environnement OPTIONNELLE CRON_SECRET est définie
 // (sans elle : 404, rien n'est exécutable). Appel : Authorization: Bearer <CRON_SECRET>. Paramètre facultatif ?heures=72
 // (entier de 1 à 720, 72 par défaut). GET est accepté pour les planificateurs qui n'envoient que GET (Vercel Cron envoie
@@ -29,7 +29,8 @@ async function run(req: Request) {
   if (!admin) return json({ error: "Non configuré.", code: "server" }, 503);
   const { data, error } = await admin.rpc("boutique_expirer_commandes_nouvelles", { p_age: `${heures} hours` });
   if (error) {
-    if (fonctionAbsente(error)) return json({ error: "Migration 0007 pas encore exécutée.", code: "migration" }, 503);
+    // La fonction existe dès 0007 ; 0008 la remplace (marqueur d'annulation). Absente = 0007 jamais exécutée.
+    if (fonctionAbsente(error)) return json({ error: "Migrations 0007 et 0008 pas encore exécutées.", code: "migration" }, 503);
     return json({ error: "Expiration impossible pour le moment.", code: "server" }, 500);
   }
   return json({ annulees: typeof data === "number" ? data : 0, heures });

@@ -38,7 +38,7 @@ export async function POST(req: Request) {
   const v = validateSiteData(body.data);
   if (!v.ok) return json({ error: v.error }, 400);
 
-  // Publication : formule payante requise (le Gratuit ne publie jamais), puis limite de sites publiés selon la formule.
+  // Publication : formule payante requise (la formule Découverte (identifiant « gratuit ») ne publie jamais), puis limite de sites publiés selon la formule.
   // La formule est lue côté serveur dans profiles (jamais depuis le navigateur). La base refuse aussi (migration 0006).
   const [{ data: profile }, { data: mine }, { data: shops }] = await Promise.all([
     supabase.from("profiles").select("plan").eq("id", user.id).maybeSingle(),

@@ -17,6 +17,7 @@ vi.mock("@/lib/env", () => ({
   isPaymentConfigured: () => true,
   stripePrices: () => ({ solo: "price_solo", pro: "price_pro", illimite: "price_ill" }),
   stripeBrandPrice: () => "price_brand",
+  stripeLegacyPrices: () => ({}), // aucun ancien prix dans ces tests (la fonction existe désormais côté webhook)
   stripeWebhookSecret: () => "whsec_test",
   appUrl: () => "https://app.test",
 }));

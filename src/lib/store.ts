@@ -71,7 +71,7 @@ export type CreateResult = { ok: true; id: string } | { ok: false; error: string
 export function limitMessage(plan: Plan): string {
   if (PLANS[plan].maxProjets === 0) return `Pour générer ton SaaS, choisis une offre (dès ${PLANS.solo.prix.toLocaleString("fr-FR")} €/mois) dans Paramètres.`;
   const n = PLANS[plan].maxProjets;
-  if (plan === "gratuit") return `Le Gratuit permet ${n} projet. Supprime-le ou choisis une offre supérieure pour en avoir davantage.`;
+  if (plan === "gratuit") return `La formule Découverte permet ${n} projet. Supprime-le ou choisis une offre supérieure pour en avoir davantage.`;
   return `Ta formule ${PLANS[plan].nom} permet ${n} projet${n > 1 ? "s" : ""}. Supprime un projet ou choisis une offre supérieure.`;
 }
 

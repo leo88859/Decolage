@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { LegalPage, Mail } from "@/components/Legal";
 import { LEGAL } from "@/data/legal";
-import { PAID_PLANS, PLANS, prixLabel } from "@/lib/plans";
+import { brandOptionLabel, brandOptionTotalLabel, PAID_PLANS, PLANS, prixLabel, USAGE_RAISONNABLE } from "@/lib/plans";
 
 export const metadata: Metadata = { title: "Conditions générales de vente" };
 
@@ -20,13 +20,16 @@ export default function Cgv() {
       <p>Elles s&apos;appliquent à la souscription d&apos;une formule payante de {LEGAL.marque}. Les passages marqués « consommateur » (rétractation, médiation) concernent une personne qui achète pour un usage en dehors de son activité professionnelle. Si tu achètes pour ton activité professionnelle, ces droits ne s&apos;appliquent pas, sauf si la loi en dispose autrement ; le reste des conditions s&apos;applique aux deux.</p>
 
       <h2>3. Les formules et leurs prix</h2>
-      <p>Les formules payantes ont les mêmes fonctions de création ; les quantités (projets, sites publiés) changent. La publication en ligne est réservée aux formules payantes.</p>
+      <p>Les formules payantes donnent accès aux mêmes fonctions de création (modèles, personnalisation avancée, exports, duplication) ; elles diffèrent par les quantités (projets, sites publiés) et par la marque blanche (voir ci-dessous). La publication en ligne est réservée aux formules payantes.</p>
       <ul>
-        <li>{PLANS.gratuit.nom} : {prixLabel("gratuit")}, pour découvrir : 1 projet créé, enregistré et prévisualisé, sans publication en ligne (pas de site publié ni de boutique publiée).</li>
+        <li>{PLANS.gratuit.nom} : {prixLabel("gratuit")} (c&apos;est la formule gratuite), pour découvrir : 1 projet créé, enregistré et prévisualisé, sans publication en ligne (pas de site publié ni de boutique publiée).</li>
         {PAID_PLANS.map((p) => (
-          <li key={p}>{PLANS[p].nom} : {prixLabel(p)}, {limite(PLANS[p].maxProjets)} projet(s) et {limite(PLANS[p].maxSites)} site(s) publié(s) en même temps.</li>
+          <li key={p}>{PLANS[p].nom} : {prixLabel(p)}, {limite(PLANS[p].maxProjets)} projet(s) et {limite(PLANS[p].maxSites)} site(s) publié(s) en même temps{p === "illimite" ? " (dans le cadre d'un usage raisonnable, voir ci-dessous)" : ""}{p === "pro" || p === "illimite" ? ", marque blanche incluse" : ""}.</li>
         ))}
+        <li>Entreprise : sur devis. Aucun tarif n&apos;est affiché, aucune souscription n&apos;est possible en ligne et rien n&apos;est facturé ni engagé tant qu&apos;un devis écrit n&apos;a pas été accepté ; pour une demande, écris-nous via la page <Link href="/contact">Contact</Link>.</li>
       </ul>
+      <p><b>Marque blanche.</b> Elle est incluse dans Pro et Illimité, proposée en option pour Solo ({brandOptionLabel()}, soit {brandOptionTotalLabel()} avec Solo), et n&apos;est pas comprise dans {PLANS.gratuit.nom}. Elle permet de retirer la mention « Créé avec Décollage » sur les boutiques publiées couvertes par la fonction ; le périmètre exact est indiqué sur la page Marque blanche des Paramètres. Elle n&apos;autorise pas à revendre {LEGAL.marque} lui-même ni à le présenter comme ton propre outil de création. L&apos;option de Solo n&apos;est pas encore achetable en ligne : tant que c&apos;est le cas, elle n&apos;est ni facturée ni accordée automatiquement.</p>
+      <p><b>Usage raisonnable (Illimité).</b> {USAGE_RAISONNABLE} À titre d&apos;exemple, des plafonds techniques existent : 500 produits par boutique et 2 000 par compte, 5 000 inscrits par liste d&apos;attente, 100 commandes par heure et par boutique. Aucun nom de domaine personnalisé n&apos;est inclus dans les formules.</p>
       <p>Prix en euros, payés chaque mois. {LEGAL.tva ? <>TVA : {LEGAL.tva}. </> : null} Le prix applicable est celui affiché au moment de ta commande, sur la page de paiement.</p>
 
       <h2>4. Commander</h2>
@@ -36,7 +39,7 @@ export default function Cgv() {
       <p>L&apos;abonnement est <b>mensuel</b> : le premier paiement a lieu à la commande, puis chaque mois à la même date. Il <b>se renouvelle automatiquement</b> chaque mois tant que tu ne résilies pas. Le paiement se fait par carte (ou autre moyen proposé par Stripe) ; nous n&apos;avons jamais accès à ta carte. Une facture est disponible dans l&apos;espace de gestion de l&apos;abonnement.</p>
 
       <h2>6. Pas d&apos;essai gratuit, codes promotionnels</h2>
-      <p>Il n&apos;y a pas de période d&apos;essai gratuite : la formule Gratuite sert à découvrir. Un code promotionnel peut parfois être communiqué ; si tu en as un, tu le saisis sur la page de paiement et la réduction s&apos;affiche avant que tu paies. Sauf code valable affiché sur cette page, les prix de l&apos;article 3 s&apos;appliquent.</p>
+      <p>Il n&apos;y a pas de période d&apos;essai gratuite : la formule Découverte (gratuite) sert à découvrir. Un code promotionnel peut parfois être communiqué ; si tu en as un, tu le saisis sur la page de paiement et la réduction s&apos;affiche avant que tu paies. Sauf code valable affiché sur cette page, les prix de l&apos;article 3 s&apos;appliquent.</p>
 
       <h2>7. Résilier ou changer de formule, en ligne</h2>
       <p>La résiliation est aussi simple que la souscription et se fait en ligne, à tout moment : Paramètres, « Gérer mon abonnement », puis le portail de Stripe (changement de formule, moyen de paiement, factures, résiliation). Les conditions exactes de prise d&apos;effet (fin de la période déjà payée ou immédiate) et de calcul au prorata dépendent des réglages du portail de Stripe, où elles sont affichées avant que tu valides. Supprimer ton compte résilie immédiatement l&apos;abonnement. Sauf droit légal de rétractation ou erreur de notre part, le mois commencé n&apos;est pas remboursé.</p>

@@ -43,6 +43,25 @@ describe("analyzeSubscription : tous les éléments, formule principale distinct
   });
 });
 
+describe("anciens prix (STRIPE_PRICE_*_LEGACY) : reconnus comme la même formule, sans rien accorder de plus", () => {
+  const legacy = { pro: ["price_pro_990", "price_pro_autre"] };
+  it("un abonné Pro à l'ancien prix reste Pro (au lieu de tomber en Gratuit)", () => {
+    expect(analyzeSubscription("active", ["price_pro_990"], prices, BRAND, legacy)).toMatchObject({ plan: "pro", unknownPrices: [] });
+    expect(resolvePlan(analyzeSubscription("active", ["price_pro_990"], prices, BRAND, legacy), { plan: "gratuit", subscriptionId: null }, "sub_1")).toBe("pro");
+  });
+  it("sans liste (comportement actuel) : l'ancien prix reste un prix inconnu, jamais une formule", () => {
+    expect(analyzeSubscription("active", ["price_pro_990"], prices, BRAND)).toMatchObject({ plan: null, unknownPrices: ["price_pro_990"] });
+    expect(analyzeSubscription("active", ["price_pro_990"], prices, BRAND, {})).toMatchObject({ plan: null });
+  });
+  it("un ancien prix Pro n'accorde que Pro ; un prix qui n'est dans aucune liste reste inconnu ; abonnement inactif : Gratuit", () => {
+    expect(analyzeSubscription("active", ["price_ill_ancien"], prices, BRAND, legacy)).toMatchObject({ plan: null, unknownPrices: ["price_ill_ancien"] });
+    expect(analyzeSubscription("canceled", ["price_pro_990"], prices, BRAND, legacy)).toMatchObject({ plan: "gratuit" });
+  });
+  it("ancien et nouveau prix Pro ensemble : une seule formule (Pro), pas d'ambiguïté inventée", () => {
+    expect(analyzeSubscription("active", ["price_pro_990", "price_pro"], prices, BRAND, legacy)).toMatchObject({ plan: "pro", ambiguous: false });
+  });
+});
+
 describe("resolvePlan : formule inconnue = jamais de montée en gamme", () => {
   const inconnu = analyzeSubscription("active", ["price_inconnu"], prices, BRAND);
   it("nouvel abonnement inconnu : Gratuit", () => {

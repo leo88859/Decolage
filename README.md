@@ -22,7 +22,7 @@ Aucune variable d'environnement n'est nécessaire.
 | `src/lib/` | Logique pure et testée : dépendances des briques, validation, prix, landing, prototype, export, ZIP |
 | `src/components/builder/` | Constructeur (trois zones, historique, aperçu en direct) |
 | `src/components/project/` | Onglets du projet |
-| `src/lib/plans.ts` | **Tous** les prix et limites des formules (Gratuit, Solo 2,99 €, Pro 9,99 €, Illimité 29,99 €) |
+| `src/lib/plans.ts` | **Tous** les prix et limites des formules (Découverte, Solo 2,99 €, Pro 12,99 €, Illimité 29,99 €) |
 | `src/lib/codegen/` | Générateur de projets Next.js : kit de composants écrit à l'avance (`kit-*.ts`) + configuration du projet |
 | `docs/FORMAT.md` | Format d'export JSON |
 

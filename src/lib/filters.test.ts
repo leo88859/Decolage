@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { IDEAS } from "@/data/ideas";
 import { projectFiles } from "@/lib/export";
 import { filterIdeas, NO_FILTERS } from "@/lib/filters";
-import { can, canCreateProject, normalizePlan, PAID_PLANS, planForProjects, PLANS, prixLabel } from "@/lib/plans";
+import { BRAND_OPTION_PRIX, brandOptionTotalSolo, can, canCreateProject, normalizePlan, PAID_PLANS, planForProjects, PLANS, prixLabel } from "@/lib/plans";
 import { newProject } from "@/lib/project";
 import { zip } from "@/lib/zip";
 
@@ -27,7 +27,10 @@ describe("filtres du catalogue", () => {
 
 describe("formules", () => {
   it("applique les prix et limites demandés", () => {
-    expect([PLANS.solo.prix, PLANS.pro.prix, PLANS.illimite.prix]).toEqual([2.99, 9.99, 29.99]);
+    expect([PLANS.solo.prix, PLANS.pro.prix, PLANS.illimite.prix]).toEqual([2.99, 12.99, 29.99]); // grille d'octobre 2026 (Pro passe de 9,99 à 12,99)
+    expect(PLANS.gratuit.nom).toBe("Découverte"); // libellé seulement : l'identifiant interne reste 'gratuit'
+    expect([BRAND_OPTION_PRIX, brandOptionTotalSolo()]).toEqual([4.99, 7.98]);
+    expect(PLANS.illimite.accroche).toMatch(/usage raisonnable/);
     expect([PLANS.gratuit.maxProjets, PLANS.solo.maxProjets, PLANS.pro.maxProjets]).toEqual([1, 1, 5]);
     // Règle du patron (octobre 2026) : le Gratuit a 1 projet (créer, enregistrer, prévisualiser) mais ne publie pas (maxSites 0).
     // Ancienne valeur : 0 projet. Changée volontairement avec supabase/0006_regle_gratuit.sql.
@@ -54,7 +57,7 @@ describe("formules", () => {
     expect(planForProjects(1)).toBe("solo");
     expect(planForProjects(3)).toBe("pro");
     expect(planForProjects(12)).toBe("illimite");
-    expect(prixLabel("pro")).toBe("9,99 € / mois");
+    expect(prixLabel("pro")).toBe("12,99 € / mois");
   });
 });
 

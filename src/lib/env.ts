@@ -25,6 +25,13 @@ export const stripeWebhookSecret = () => required("STRIPE_WEBHOOK_SECRET");
 /** Identifiants des prix Stripe de chaque formule payante (seule liste autorisée). */
 export const stripePrices = () => ({ solo: read("STRIPE_PRICE_SOLO"), pro: read("STRIPE_PRICE_PRO"), illimite: read("STRIPE_PRICE_ILLIMITE") });
 
+/**
+ * Anciens prix encore utilisés par des abonnés (facultatif, listes séparées par des virgules : STRIPE_PRICE_SOLO_LEGACY, _PRO_LEGACY, _ILLIMITE_LEGACY).
+ * Reconnus par le webhook (la formule est conservée), jamais utilisés par le paiement. Absent = comportement inchangé.
+ */
+const list = (name: string) => (read(name) ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+export const stripeLegacyPrices = () => ({ solo: list("STRIPE_PRICE_SOLO_LEGACY"), pro: list("STRIPE_PRICE_PRO_LEGACY"), illimite: list("STRIPE_PRICE_ILLIMITE_LEGACY") });
+
 /** Prix Stripe de l'option marque blanche Solo (facultatif : absent = l'option n'est pas vendue, rien ne change). */
 export const stripeBrandPrice = () => read("STRIPE_PRICE_BRAND");
 

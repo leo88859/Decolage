@@ -18,7 +18,7 @@ export function mapApiError(status: number, body: unknown): { code: string; mess
     demo: "La boutique n'est pas disponible en mode démonstration (compte en ligne requis).",
     limite_boutiques: "Ta formule ne permet pas de créer une boutique. Passe à une formule supérieure.",
     limite_sites: "Ta formule ne permet pas de publier un site de plus. Passe à une formule supérieure ou dépublie un site.",
-    publication_formule: "La publication en ligne n'est pas incluse dans la formule Gratuit. Ta boutique reste enregistrée en brouillon et tu peux la préparer : passe à Solo pour la publier.",
+    publication_formule: "La publication en ligne n'est pas incluse dans la formule Découverte. Ta boutique reste enregistrée en brouillon et tu peux la préparer : passe à Solo pour la publier.",
     duplicate: "Ce nom ou cette adresse est déjà utilisé.",
     statut_invalide: "Ce changement de statut n'est pas possible.",
     not_found: "Élément introuvable (il a peut-être été supprimé).",

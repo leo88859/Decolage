@@ -4,14 +4,14 @@ Ce guide active les fonctions en ligne de Décollage : comptes, sauvegarde des p
 
 | Formule | Prix | Projets | Sites en ligne |
 |---|---|---|---|
-| Gratuit | 0 € | 1 (créer, enregistrer, prévisualiser ; **ne publie pas**) | 0 |
+| Découverte (identifiant interne « gratuit ») | 0 € | 1 (créer, enregistrer, prévisualiser ; **ne publie pas**) | 0 |
 | Solo | 2,99 € / mois | 1 | 1 |
-| Pro | 9,99 € / mois | 5 | 5 |
-| Illimité | 29,99 € / mois | illimités | illimités |
+| Pro | 12,99 € / mois | 5 | 5 |
+| Illimité | 29,99 € / mois | illimités (usage raisonnable) | illimités (usage raisonnable) |
 
-Toutes les limites sont définies dans `src/lib/plans.ts`. Marque blanche : option Solo (+1,99 €), incluse en Pro et Illimité (voir `docs/MARQUE-BLANCHE.md` : pas encore appliquée aux pages publiées). Entreprise : sur devis, rien n'est facturé ni activé.
+Toutes les limites sont définies dans `src/lib/plans.ts`. Marque blanche : option Solo (+4,99 €/mois, soit 7,98 €/mois au total ; pas encore achetable en ligne), incluse en Pro et Illimité, non comprise dans Découverte (voir `docs/MARQUE-BLANCHE.md`). **Ces prix sont ceux AFFICHÉS (`src/lib/plans.ts`) : la facturation réelle suit les prix Stripe (`STRIPE_PRICE_*`), voir `docs/ADAPTATION-FACTURATION.md`. Ne pas afficher 12,99 € tant que le prix Pro à 12,99 € n'existe pas dans Stripe.** Entreprise : sur devis, rien n'est facturé ni activé.
 
-**Migrations Supabase à exécuter à la main, dans l'ordre : 0001, 0002, 0003, 0004, 0005, puis 0006** (`0006_regle_gratuit.sql` : Gratuit = 1 projet, publication réservée aux formules payantes, suspension des boutiques ; voir `docs/LIMITES-SERVEUR.md`). Variable facultative : `STRIPE_PRICE_BRAND` (prix de l'option marque blanche que tu crées toi-même dans Stripe ; laisse-la vide tant qu'elle n'est pas vendue).
+**Migrations Supabase à exécuter à la main, dans l'ordre : 0001, 0002, 0003, 0004, 0005, 0006, 0007, puis 0008** (`0006_regle_gratuit.sql` : Découverte = 1 projet, publication réservée aux formules payantes, suspension des boutiques ; `0007_durcissement.sql` : sécurité, plafonds ; `0008_suspendus_et_expiration.sql` : les suspendus ne comptent plus dans la limite, marqueur d'annulation des commandes expirées ; voir `docs/LIMITES-SERVEUR.md`). Ordre conseillé : déployer d'abord le code, puis exécuter 0007, puis 0008. Variable facultative : `STRIPE_PRICE_BRAND` (prix de l'option marque blanche que tu crées toi-même dans Stripe ; laisse-la vide tant qu'elle n'est pas vendue).
 
 Sans ces étapes, le site fonctionne quand même, en mode local : les projets restent dans le navigateur, et chaque formule s'active en mode test.
 
@@ -40,7 +40,7 @@ Avec les deux premières variables seulement, les comptes, la synchronisation et
    | Produit | Prix | Variable |
    |---|---|---|
    | Décollage Solo | 2,99 € / mois | `STRIPE_PRICE_SOLO` |
-   | Décollage Pro | 9,99 € / mois | `STRIPE_PRICE_PRO` |
+   | Décollage Pro | 12,99 € / mois (nouveau prix ; l'ancien à 9,99 € n'est ni modifié ni archivé tant que des abonnés l'utilisent) | `STRIPE_PRICE_PRO` |
    | Décollage Illimité | 29,99 € / mois | `STRIPE_PRICE_ILLIMITE` |
 
    Copie l'identifiant `price_…` de chaque prix dans la variable correspondante.
@@ -60,7 +60,7 @@ Avec les deux premières variables seulement, les comptes, la synchronisation et
 
 Le paiement s'active quand **toutes** les variables sont présentes : les deux Supabase publiques, `SUPABASE_SERVICE_ROLE_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` et les trois `STRIPE_PRICE_…`.
 
-La formule de chaque compte est déduite du prix de son abonnement. Un abonnement actif à un prix inconnu (un ancien tarif par exemple) donne Illimité, pour ne jamais retirer l'accès à un client qui paie.
+La formule de chaque compte est déduite du prix de son abonnement. Un abonnement actif à un prix inconnu (un ancien tarif par exemple) n'accorde JAMAIS de formule payante : Gratuit pour un nouvel abonnement, ou la formule déjà connue si c'est le même abonnement (`src/lib/billing.ts`). Pour que les abonnés d'un ancien prix restent reconnus, liste-le dans la variable facultative `STRIPE_PRICE_PRO_LEGACY` (voir `docs/ADAPTATION-FACTURATION.md`).
 
 ## 3. Vercel : mise en ligne (15 min)
 

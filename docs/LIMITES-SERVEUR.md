@@ -6,14 +6,14 @@ Source des valeurs : `src/lib/plans.ts` (miroir SQL : `supabase/0004_limites_ser
 
 ## Droits par formule (règle du patron, octobre 2026)
 
-| | Gratuit | Solo (2,99 €) | Pro (9,99 €) | Illimité (29,99 €) | Entreprise |
+| | Découverte (id. interne « gratuit », 0 €) | Solo (2,99 €) | Pro (12,99 €) | Illimité (29,99 €, usage raisonnable) | Entreprise |
 |---|---|---|---|---|---|
 | Projets (maxProjets) | **1** | 1 | 5 | illimité | sur devis, rien d'activé |
 | Créer, modifier, enregistrer, retrouver, prévisualiser | oui | oui | oui | oui | |
 | **Publier sur Internet** (sites ET boutiques) | **non** | oui | oui | oui | |
 | Sites + boutiques publiés en même temps (maxSites) | 0 | 1 | 5 | illimité | |
 | Modèles premium, export, duplication, personnalisation avancée, plans détaillés | non | oui | oui | oui | |
-| Marque blanche | non | option (+1,99 €/mois, 4,98 € au total) | incluse | incluse | |
+| Marque blanche | non | option (+4,99 €/mois, 7,98 € au total ; pas encore achetable en ligne) | incluse | incluse | |
 
 Entreprise n'existe ni dans `plans.ts` ni dans la contrainte `profiles.plan` : aucune facturation, aucune activation. Le prix « sur devis » n'est rattaché à aucun prix Stripe.
 

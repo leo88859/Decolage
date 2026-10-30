@@ -6,15 +6,15 @@ Audit en lecture seule : aucun code, aucun prix Stripe n'a été modifié. Seul 
 
 | Formule | Prix / mois | Marque blanche |
 |---|---|---|
-| Gratuit | 0 € | non |
-| Solo | 2,99 € | option +1,99 € (total 4,98 €) |
-| Pro | 9,99 € | incluse |
+| Découverte (ancien « Gratuit », id. interne « gratuit ») | 0 € | non |
+| Solo | 2,99 € | option +4,99 € (total 7,98 €) |
+| Pro | 12,99 € (ancien 9,99 € : ne plus afficher) | incluse |
 | Illimité | 29,99 € | incluse |
 | Entreprise | sur devis | incluse |
 
 ## Ce qui est déjà cohérent
 
-- Solo 2,99 / Pro 9,99 / Illimité 29,99 : identiques dans `plans.ts`, `.env.example`, `MISE-EN-LIGNE.md`, `LIMITES-SERVEUR.md`, README et test `legal-pages.test.ts`.
+- Solo 2,99 / Pro 12,99 / Illimité 29,99 : identiques dans `plans.ts`, `.env.example`, `MISE-EN-LIGNE.md`, `LIMITES-SERVEUR.md`, README et test `legal-pages.test.ts`.
 - Les cartes d'offres (`OfferCards.tsx`), le dialogue de paiement (`CheckoutDialog.tsx`), la CGV (`cgv/page.tsx`), l'accueil et les paramètres lisent les prix dans `PLANS` : un seul endroit à changer.
 - La règle de marque blanche du code (`whiteLabelAllowed` dans `plans.ts`, `my_white_label_allowed()` dans `0004_limites_serveur.sql`) correspond déjà au voulu : Pro et Illimité inclus, Solo seulement avec l'option, Gratuit jamais.
 - Il n'y a pas de page « tarifs » dédiée : les offres s'affichent sur l'accueil (`app/page.tsx`, Solo/Pro/Illimité sans la carte Gratuit) et dans Paramètres, section Formule (4 cartes).
@@ -28,17 +28,17 @@ Audit en lecture seule : aucun code, aucun prix Stripe n'a été modifié. Seul 
 | 1b | `src/lib/plans.ts` (gratuit.maxProjets = 0), `0004_limites_serveur.sql` (else 0), `cgv/page.tsx` (« pas de projet enregistré »), `LIMITES-SERVEUR.md` (0), `OfferCards.tsx` (« Générer et garder ton SaaS » barré) | Gratuit : 0 projet, 0 site | Cohérent entre eux, mais contredit le doc ci-dessus | Moyenne |
 | 2 | `src/lib/plans.ts` | Pas de formule Entreprise (type `Plan` = gratuit/solo/pro/illimite) | Entreprise sur devis, marque blanche incluse | Moyenne |
 | 3 | `supabase/0001_schema.sql` (contrainte `profiles.plan`), `0002_conformite.sql` (`formule`) | Contrainte limitée à 4 valeurs | Pas d'ajout nécessaire si Entreprise reste hors ligne (traitée à la main) | Basse |
-| 4 | Accueil `app/page.tsx` et Paramètres (`OfferCards`) | Aucune carte Entreprise, aucune mention de l'option +1,99 € | Carte « Entreprise : sur devis » (bouton Contact) ; mention « Marque blanche : +1,99 € » sur Solo, « incluse » sur Pro/Illimité/Entreprise | Moyenne |
+| 4 | Accueil `app/page.tsx` et Paramètres (`OfferCards`) | Aucune carte Entreprise, aucune mention de l'option +4,99 € | Carte « Entreprise : sur devis » (bouton Contact) ; mention « Marque blanche : +4,99 € » sur Solo, « incluse » sur Pro/Illimité/Entreprise | Moyenne |
 | 5 | `OfferCards.tsx` (liste de fonctions) | Ne parle jamais de la marque blanche | Ligne marque blanche par formule | Moyenne |
-| 6 | `app/api/stripe/checkout/route.ts` | Un seul `line_items` (le prix de la formule) ; `isPaidPlan` n'accepte que solo/pro/illimite | Solo + option = 2 lignes (2,99 + 1,99 = 4,98 €) | Haute |
+| 6 | `app/api/stripe/checkout/route.ts` | Un seul `line_items` (le prix de la formule) ; `isPaidPlan` n'accepte que solo/pro/illimite | Solo + option = 2 lignes (2,99 + 4,99 = 7,98 €) | Haute |
 | 7 | `src/lib/env.ts` (`stripePrices`, `isPaymentConfigured`), `.env.example` | 3 variables de prix | Une 4e variable pour le prix de l'option (ex. `STRIPE_PRICE_MARQUE_BLANCHE`) | Haute |
-| 8 | `app/api/stripe/webhook/route.ts` + `lib/billing.ts` | Lit `sub.items.data[0]` seulement ; un prix inconnu donne **Illimité** | Avec l'option sur le même abonnement, l'élément n°0 peut être l'option : un abonné Solo+option passerait Illimité (29,99 € d'accès pour 4,98 €) | **Critique** si l'option est ajoutée sans correction |
+| 8 | `app/api/stripe/webhook/route.ts` + `lib/billing.ts` | Lit `sub.items.data[0]` seulement ; un prix inconnu donne **Illimité** | Avec l'option sur le même abonnement, l'élément n°0 peut être l'option : un abonné Solo+option passerait Illimité (29,99 € d'accès pour 7,98 €) | **Critique** si l'option est ajoutée sans correction |
 | 9 | Webhook | N'écrit jamais `brand_entitlements.enabled` | L'option payée doit activer le droit ; sa résiliation doit le retirer. Aujourd'hui : activation manuelle par SQL (`LIMITES-SERVEUR.md`) | Haute |
 | 10 | `docs/MARQUE-BLANCHE.md` (« n'est dans aucune formule »), `app/parametres/marque-blanche/page.tsx` ligne 169 (« n'est pas comprise dans les formules : activée à la demande, par nous ») | Texte faux pour Pro/Illimité (inclus) et pour Solo (option payante) | Texte aligné sur la règle voulue | Moyenne |
 | 11 | `cgv/page.tsx` §3 | « Toutes les formules payantes ont toutes les fonctions ; seules les quantités changent » | Faux dès que la marque blanche est une option sur Solo. Prix de l'option et Entreprise absents de la CGV | Haute (juridique) |
 | 12 | `cgv/page.tsx` §3 | « illimités » (projets, sites) pour Illimité, sans nuance | Ajouter usage raisonnable (stockage, trafic, publication) | Moyenne |
 | 13 | `OfferCards.tsx` (« SaaS illimités », « sites illimités »), `nouveau/page.tsx` (« · illimité ») | Promesse sans plafond | Même nuance, par renvoi à la CGV | Moyenne |
-| 14 | `CheckoutDialog.tsx` | Affiche un seul prix (`prixCourt(plan)`) ; texte d'engagement sur un seul montant | Total 4,98 € avec option, détail 2,99 + 1,99 | Haute (obligation d'information avant paiement) |
+| 14 | `CheckoutDialog.tsx` | Affiche un seul prix (`prixCourt(plan)`) ; texte d'engagement sur un seul montant | Total 7,98 € avec option, détail 2,99 + 4,99 | Haute (obligation d'information avant paiement) |
 | 15 | `docs/MISE-EN-LIGNE.md` §2 | « trois produits » ; portail : « ajoute les trois produits » | Quatrième prix (option) à créer et à déclarer au portail | Haute |
 | 16 | `LIMITES-SERVEUR.md` | Décrit déjà l'écart (Entreprise absente, option manuelle) | À mettre à jour après correction | Basse |
 
@@ -50,7 +50,7 @@ Audit en lecture seule : aucun code, aucun prix Stripe n'a été modifié. Seul 
 
 ## Risques de facturation (option marque blanche)
 
-1. **Double facturation.** Si l'option est ajoutée sur un abonnement Pro ou Illimité (qui l'inclut déjà), le client paie 1,99 € pour rien. Il faut : (a) ne proposer l'option qu'aux abonnés Solo ; (b) quand un Solo+option passe à Pro/Illimité, retirer la ligne option dans la même opération.
+1. **Double facturation.** Si l'option est ajoutée sur un abonnement Pro ou Illimité (qui l'inclut déjà), le client paie 4,99 € pour rien. Il faut : (a) ne proposer l'option qu'aux abonnés Solo ; (b) quand un Solo+option passe à Pro/Illimité, retirer la ligne option dans la même opération.
 2. **Deux abonnements séparés.** Si l'option est un abonnement à part, le webhook ne gère qu'un `stripe_subscription_id` par profil et `checkout` refuse déjà un second achat (`plan !== gratuit`). Choisir **un seul abonnement à deux lignes** (formule + option) : une facture, un renouvellement, un prorata.
 3. **Prix inconnu = Illimité** (`billing.ts`). Cette protection sert aux anciens tarifs. Avec l'option, le webhook doit parcourir **tous** les éléments : le prix de formule détermine le plan, le prix de l'option active `brand_entitlements`, et l'option seule ne doit jamais donner Illimité.
 4. **Option sans formule Solo.** Option sur Pro/Illimité : inutile (déjà incluse), à ignorer côté droit et à signaler au support.
@@ -58,7 +58,7 @@ Audit en lecture seule : aucun code, aucun prix Stripe n'a été modifié. Seul 
 
 ## Ce qu'il faut créer côté Stripe (par le patron, rien n'a été touché)
 
-- Un nouveau produit « Décollage Marque blanche (option Solo) » avec un **prix récurrent mensuel de 1,99 € TTC/HT selon votre réglage actuel** (même choix que les trois prix existants). Noter son identifiant `price_…`.
+- Un nouveau produit « Décollage Marque blanche (option Solo) » avec un **prix récurrent mensuel de 4,99 € TTC/HT selon votre réglage actuel** (même choix que les trois prix existants). Noter son identifiant `price_…`.
 - Ne PAS modifier les trois prix existants (Solo, Pro, Illimité) : des abonnés actifs y sont rattachés. Un prix Stripe ne se modifie pas ; changer un montant = créer un nouveau prix.
 - Portail client (Paramètres → Portail client → Abonnements) : ajouter le nouveau produit pour que l'abonné puisse ajouter ou retirer l'option, et vérifier que le changement Solo → Pro/Illimité reste autorisé.
 - Entreprise : pas de produit Stripe pour l'instant (devis, facture ou abonnement créé à la main).
@@ -89,19 +89,19 @@ Audit en lecture seule : aucun code, aucun prix Stripe n'a été modifié. Seul 
 
 **P1 (ce que voit l'acheteur)**
 4. `checkout/route.ts` : paramètre `marqueBlanche` accepté seulement pour Solo ; deux lignes ; prix toujours choisi côté serveur.
-5. `CheckoutDialog.tsx` : case « Marque blanche +1,99 € » (Solo uniquement), total 4,98 €, texte d'engagement au bon montant.
+5. `CheckoutDialog.tsx` : case « Marque blanche +4,99 € » (Solo uniquement), total 7,98 €, texte d'engagement au bon montant.
 6. CGV §3 : option, Entreprise sur devis, retrait de « toutes les fonctions », usage raisonnable ; nouvelle version de la CGV.
 7. Parcours de passage Solo+option vers Pro/Illimité (retrait de la ligne option, via portail ou route dédiée).
 
 **P2 (affichage et documentation)**
-8. `plans.ts` : champ d'affichage pour l'option (prix 1,99) et Entreprise (sans prix, hors `PAID_PLANS`) ; `OfferCards` : carte Entreprise, ligne marque blanche, mention usage raisonnable.
+8. `plans.ts` : champ d'affichage pour l'option (prix 4,99) et Entreprise (sans prix, hors `PAID_PLANS`) ; `OfferCards` : carte Entreprise, ligne marque blanche, mention usage raisonnable.
 9. Textes de `app/parametres/marque-blanche/page.tsx` et `docs/MARQUE-BLANCHE.md`.
 10. `MISE-EN-LIGNE.md` (4e prix, portail), `LIMITES-SERVEUR.md`, README, tests (`legal-pages.test.ts`).
 
 ## Actions pour le patron
 
 1. Trancher : Gratuit = 0 projet (recommandé) ou 1.
-2. Créer dans Stripe le prix récurrent mensuel de 1,99 € (option marque blanche) et me transmettre son `price_…` (ou le mettre directement dans les variables Vercel).
+2. Créer dans Stripe le prix récurrent mensuel de 4,99 € (option marque blanche) et me transmettre son `price_…` (ou le mettre directement dans les variables Vercel).
 3. L'ajouter au portail client Stripe.
 4. Décider du contenu d'Entreprise (ce qui est inclus, adresse de contact pour les devis) et si elle apparaît dans les paramètres.
 5. Décider des plafonds d'usage raisonnable (stockage, trafic) à écrire dans la CGV, après vérification des coûts réels.
@@ -109,7 +109,14 @@ Audit en lecture seule : aucun code, aucun prix Stripe n'a été modifié. Seul 
 7. Valider le choix « un seul abonnement à deux lignes » pour l'option.
 8. Tester en mode test Stripe avant de passer en production.
 
-## Mise à jour du 30/10/2026 (décision du patron : Gratuit = 1 projet, sans publication)
+## Mise à jour du 30/10/2026 (nouvelle grille du patron)
+
+Grille : Découverte 0 € (ancien « Gratuit », libellé seulement : l'identifiant interne reste `gratuit`), Solo 2,99 € (1 projet), option marque blanche Solo +4,99 € (7,98 € au total), Pro 12,99 € (5 projets, marque blanche incluse ; l'ancien 9,99 € n'est plus affiché), Illimité 29,99 € (usage raisonnable, marque blanche incluse), Entreprise sur devis.
+- Fait (affichage) : `plans.ts` (source unique, option et clause d'usage raisonnable), `OfferCards.tsx` (ligne marque blanche par formule, clause sur Illimité), accueil, Paramètres (mention Entreprise et option), `nouveau/page.tsx`, CGV (écarts 4, 5, 11, 12, 13), page marque blanche (écart 10), docs. Le prix de l'option est affiché comme « bientôt disponible à l'achat ».
+- Pas fait volontairement : checkout à deux lignes et dialogue de paiement avec option (écarts 6 et 14), voir `docs/ADAPTATION-FACTURATION.md`. Le webhook, lui, lit déjà l'option (`STRIPE_PRICE_BRAND`) et le piège « prix inconnu = Illimité » est corrigé depuis octobre.
+- **Attention** : les prix de `plans.ts` ne pilotent PAS la facturation. Tant que `STRIPE_PRICE_PRO` pointe sur l'ancien prix à 9,99 €, afficher 12,99 € ferait payer 9,99 €.
+
+## Mise à jour précédente du 30/10/2026 (décision du patron : Gratuit = 1 projet, sans publication)
 
 - Écarts 1 et 1b tranchés dans l'autre sens que la recommandation initiale : le Gratuit passe à 1 projet (`plans.ts`, `0006_regle_gratuit.sql`, `MISE-EN-LIGNE.md`, CGV, accueil, page Créer) et reste sans publication (maxSites 0), avec garde serveur et base.
 - Écart 8 (prix inconnu = Illimité, premier élément seulement) : corrigé (`billing.ts`, webhook).

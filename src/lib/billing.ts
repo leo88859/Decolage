@@ -39,6 +39,8 @@ export function analyzeSubscription(
   priceIds: readonly (string | null | undefined)[],
   prices: Partial<Record<PaidPlan, string>>,
   brandPriceId?: string | null,
+  /** Anciens prix encore portés par des abonnés (ex. Pro à 9,99 €) : reconnus comme la même formule, jamais proposés à l'achat. */
+  legacyPrices: Partial<Record<PaidPlan, readonly string[]>> = {},
 ): SubscriptionAnalysis {
   if (!isActiveStatus(status)) return { plan: "gratuit", brandOption: false, unknownPrices: [], ambiguous: false };
   const found = new Set<PaidPlan>();
@@ -46,7 +48,7 @@ export function analyzeSubscription(
   let brandOption = false;
   for (const id of priceIds) {
     if (!id) continue;
-    const plan = PAID_PLANS.find((p) => prices[p] && prices[p] === id);
+    const plan = PAID_PLANS.find((p) => (prices[p] && prices[p] === id) || legacyPrices[p]?.includes(id));
     if (plan) found.add(plan);
     else if (brandPriceId && id === brandPriceId) brandOption = true;
     else unknownPrices.push(id);

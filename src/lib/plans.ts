@@ -1,5 +1,6 @@
 import type { Plan } from "@/lib/types";
 
+// Libellé affiché de l'identifiant interne 'gratuit' : « Découverte » (l'identifiant ne change jamais : base, SQL, API).
 // Toutes les limites et tous les prix des formules sont ici, et nulle part ailleurs.
 // Sans Stripe configuré, les formules s'activent localement pour tester. Avec Stripe,
 // la formule vient du compte (table profiles, mise à jour par le webhook).
@@ -20,11 +21,21 @@ export type PlanDef = {
 const PAYANT = { modelesPremium: true, exportFichiers: true, duplication: true, personnalisationAvancee: true, plansDetailles: true };
 
 export const PLANS: Record<Plan, PlanDef> = {
-  gratuit: { nom: "Gratuit", prix: 0, maxProjets: 1, maxSites: 0, modelesPremium: false, exportFichiers: false, duplication: false, personnalisationAvancee: false, plansDetailles: false, accroche: "Pour découvrir : 1 projet à créer, enregistrer et prévisualiser, sans publication en ligne." },
+  gratuit: { nom: "Découverte", prix: 0, maxProjets: 1, maxSites: 0, modelesPremium: false, exportFichiers: false, duplication: false, personnalisationAvancee: false, plansDetailles: false, accroche: "Pour découvrir : 1 projet à créer, enregistrer et prévisualiser, sans publication en ligne." },
   solo: { nom: "Solo", prix: 2.99, maxProjets: 1, maxSites: 1, ...PAYANT, accroche: "Ton premier SaaS, en ligne." },
-  pro: { nom: "Pro", prix: 9.99, maxProjets: 5, maxSites: 5, ...PAYANT, accroche: "Pour tester plusieurs idées en parallèle." },
-  illimite: { nom: "Illimité", prix: 29.99, maxProjets: Infinity, maxSites: Infinity, ...PAYANT, accroche: "Projets et sites sans limite." },
+  pro: { nom: "Pro", prix: 12.99, maxProjets: 5, maxSites: 5, ...PAYANT, accroche: "Pour tester plusieurs idées en parallèle." },
+  illimite: { nom: "Illimité", prix: 29.99, maxProjets: Infinity, maxSites: Infinity, ...PAYANT, accroche: "Projets et sites illimités, dans le cadre d'un usage raisonnable." },
 };
+
+/** Option marque blanche pour Solo (en plus de la formule). Incluse dans Pro et Illimité. Affichage seulement : la facturation réelle vient de Stripe. */
+export const BRAND_OPTION_PRIX = 4.99;
+const eur2 = (n: number) => `${n.toLocaleString("fr-FR", { minimumFractionDigits: 2 })} €`;
+export const brandOptionTotalSolo = () => Math.round((PLANS.solo.prix + BRAND_OPTION_PRIX) * 100) / 100;
+export const brandOptionLabel = () => `+${eur2(BRAND_OPTION_PRIX)}/mois`;
+export const brandOptionTotalLabel = () => `${eur2(brandOptionTotalSolo())}/mois au total`;
+
+/** Clause d'usage raisonnable de la formule Illimité (OfferCards, accueil, création, CGV) : un seul texte, ici. */
+export const USAGE_RAISONNABLE = "Illimité s'entend dans le cadre d'un usage raisonnable : des limites techniques (stockage, trafic, nombre de produits, de commandes, d'inscrits) et des protections anti-abus s'appliquent.";
 
 /** Formules payantes, dans l'ordre d'affichage. */
 export const PAID_PLANS = ["solo", "pro", "illimite"] as const satisfies readonly Plan[];

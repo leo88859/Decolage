@@ -69,7 +69,7 @@ function GratuitPublish() {
       <button className="btn btn-coral btn-lg" onClick={() => setAsked(true)} aria-expanded={asked}>Publier mon SaaS</button>
       {asked && (
         <div className="alert alert-warn" role="alert" style={{ margin: "18px auto 0", maxWidth: 560, textAlign: "left" }}>
-          <p style={{ margin: 0 }}><b>La publication n&apos;est pas incluse dans la formule Gratuit.</b></p>
+          <p style={{ margin: 0 }}><b>La publication n&apos;est pas incluse dans la formule Découverte.</b></p>
           <p style={{ margin: "6px 0 12px" }}>
             Avec Solo ({prixCourt("solo")} par mois), ton projet obtient son adresse publique et une vraie liste d&apos;attente. Rien n&apos;est perdu : ton projet reste tel quel.
           </p>

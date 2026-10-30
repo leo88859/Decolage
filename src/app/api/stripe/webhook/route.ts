@@ -1,6 +1,6 @@
 import type Stripe from "stripe";
 import { analyzeSubscription, HANDLED_EVENTS, isActiveStatus, resolvePlan, subscriptionIdOf } from "@/lib/billing";
-import { isPaymentConfigured, stripeBrandPrice, stripePrices, stripeWebhookSecret } from "@/lib/env";
+import { isPaymentConfigured, stripeBrandPrice, stripeLegacyPrices, stripePrices, stripeWebhookSecret } from "@/lib/env";
 import { normalizePlan } from "@/lib/plans";
 import { isMissingSchema, syncPublicationsWithPlan } from "@/lib/site-lifecycle";
 import { getStripe } from "@/lib/stripe";
@@ -57,7 +57,7 @@ export async function POST(req: Request) {
       console.error(`[stripe] ALERTE double abonnement : ${sub.id} est actif alors que ${profile.stripe_subscription_id} l'est aussi. Vérifier dans Stripe et résilier/rembourser l'un des deux.`);
     }
     // TOUS les éléments de l’abonnement sont analysés (formule principale + option marque blanche + inconnus).
-    const analysis = analyzeSubscription(sub.status, sub.items.data.map((i) => i.price?.id), stripePrices(), stripeBrandPrice());
+    const analysis = analyzeSubscription(sub.status, sub.items.data.map((i) => i.price?.id), stripePrices(), stripeBrandPrice(), stripeLegacyPrices());
     if (analysis.unknownPrices.length) {
       // Aucun identifiant client ni e-mail dans le journal : seulement l’abonnement et les prix inconnus.
       console.error(`[stripe] prix inconnu(s) sur ${sub.id} : ${analysis.unknownPrices.join(", ")} (aucune formule accordée pour eux)`);

@@ -58,7 +58,7 @@ function Nouveau() {
         }
       />
       <div className="container">
-        {hydrated && limit > 0 && <p className="tiny mut" style={{ marginBottom: 14 }}>{limit === Infinity ? `${data.projects.length} projet${data.projects.length > 1 ? "s" : ""} · illimité` : `${data.projects.length} / ${limit} projet${limit > 1 ? "s" : ""}`} · formule {PLANS[data.plan].nom}</p>}
+        {hydrated && limit > 0 && <p className="tiny mut" style={{ marginBottom: 14 }}>{limit === Infinity ? `${data.projects.length} projet${data.projects.length > 1 ? "s" : ""} · illimité` : `${data.projects.length} / ${limit} projet${limit > 1 ? "s" : ""}`} · formule {PLANS[data.plan].nom}{limit === Infinity ? " · usage raisonnable" : ""}</p>}
 
         {full && limit === 0 && (
           <div className="alert alert-warn" style={{ marginBottom: 20 }}>

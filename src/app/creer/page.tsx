@@ -67,7 +67,7 @@ function Creer() {
   const fkey = fonctions.join(",");
   const template = TEMPLATE_BY_ID[type];
   const chosen = DESIGNS.find((d) => d.id === design) ?? DESIGNS[0]!;
-  // Tout s'essaie gratuitement. Le Gratuit garde 1 projet (enregistré, modifiable, en aperçu) ; le publier en ligne demande une offre payante.
+  // Tout s'essaie gratuitement. La formule Découverte garde 1 projet (enregistré, modifiable, en aperçu) ; le publier en ligne demande une offre payante.
   const free = plan === "gratuit";
   const full = !canCreateProject(plan, projects.length);
   const locked = full;
@@ -210,7 +210,7 @@ function Creer() {
                   <p className="tiny mut">
                     {full
                       ? `Ta formule ${PLANS[plan].nom} permet ${PLANS[plan].maxProjets} projet${PLANS[plan].maxProjets > 1 ? "s" : ""}. Supprime un projet ou passe à ${PLANS[planForProjects(projects.length + 1)].nom}.`
-                      : `${template.nom} · ${secteur.nom} · design ${chosen.nom}${fonctions.length ? ` · ${fonctions.length} fonction${fonctions.length > 1 ? "s" : ""}` : ""}. Tout reste modifiable ensuite.${free ? ` Le Gratuit ne publie pas en ligne : dès ${PLANS.solo.prix.toLocaleString("fr-FR")} €/mois avec Solo.` : ""}`}
+                      : `${template.nom} · ${secteur.nom} · design ${chosen.nom}${fonctions.length ? ` · ${fonctions.length} fonction${fonctions.length > 1 ? "s" : ""}` : ""}. Tout reste modifiable ensuite.${free ? ` La formule Découverte ne publie pas en ligne : dès ${PLANS.solo.prix.toLocaleString("fr-FR")} €/mois avec Solo.` : ""}`}
                   </p>
                 </div>
                 {locked ? (

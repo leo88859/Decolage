@@ -63,10 +63,11 @@ describe("CGV : prix et offres", () => {
     expect(cgv).not.toMatch(/\d+\s*[.,]\s*\d{2}\s*(€|euros?)/);
     expect(cgv).not.toMatch(/\b\d+\s*€/);
   });
-  it("les prix réels (Solo 2,99 / Pro 9,99 / Illimité 29,99) sortent bien de PLANS", () => {
-    expect(PAID_PLANS.map((p) => PLANS[p].prix)).toEqual([2.99, 9.99, 29.99]);
+  it("les prix réels (Solo 2,99 / Pro 12,99 / Illimité 29,99, grille d'octobre 2026) sortent bien de PLANS", () => {
+    expect(PAID_PLANS.map((p) => PLANS[p].prix)).toEqual([2.99, 12.99, 29.99]);
     expect(prixLabel("solo")).toContain("2,99");
-    expect(prixLabel("pro")).toContain("9,99");
+    expect(prixLabel("pro")).toContain("12,99");
+    expect(prixLabel("pro")).not.toContain("9,99"); // ancien prix : ne doit plus s'afficher
     expect(prixLabel("illimite")).toContain("29,99");
   });
   it("mentionne rétractation de 14 jours, renonciation, renouvellement et résiliation en ligne", () => {
