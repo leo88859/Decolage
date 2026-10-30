@@ -27,7 +27,7 @@ export default function Confidentialite() {
 
       <h2>Qui est responsable de tes données ?</h2>
       <p>
-        {LEGAL.editeur ? <>{LEGAL.editeur} </> : null}({LEGAL.marque}), joignable {LEGAL.email ? <>à <Mail /> ou </> : null}via la page <Link href="/contact">Contact</Link>.
+        {LEGAL.editeur ? <>{LEGAL.editeur} ({LEGAL.marque})</> : LEGAL.marque}, joignable {LEGAL.email ? <>à <Mail /> ou </> : null}via la page <Link href="/contact">Contact</Link>.
         Il n&apos;y a pas de délégué à la protection des données désigné à ce jour.
       </p>
 

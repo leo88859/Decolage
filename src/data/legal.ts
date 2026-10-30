@@ -7,13 +7,13 @@ export const LEGAL = {
   /** Nom commercial du service. */
   marque: "Décollage",
   /** Éditeur : prénom et nom de l'entrepreneur individuel (ou raison sociale). */
-  editeur: "Léoedition",
+  editeur: "",
   /** Statut juridique, par ex. « Entrepreneur individuel (EI) ». */
   statut: "",
   /** Numéro SIRET (ou SIREN) ; laisser vide tant que l'immatriculation n'est pas confirmée. */
   siret: "",
   /** Adresse postale (domicile ou domiciliation commerciale). */
-  adresse: "123 Rue de l'Exemple, 75000 Paris, France",
+  adresse: "",
   /** Adresse e-mail de contact dédiée. */
   email: "leo2roub@gmail.com",
   /** Numéro de téléphone (à vérifier : semble requis pour un éditeur professionnel). */

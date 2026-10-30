@@ -13,7 +13,7 @@ export default function Cgv() {
     <LegalPage title="Conditions générales de vente" doc="cgv">
       <h2>1. Qui vend ?</h2>
       <p>
-        Le vendeur est {LEGAL.editeur ? <>{LEGAL.editeur} </> : null}({LEGAL.marque}){LEGAL.statut ? <>, {LEGAL.statut}</> : null}{LEGAL.siret ? <>, SIRET {LEGAL.siret}</> : null}{LEGAL.adresse ? <>, {LEGAL.adresse}</> : null}{LEGAL.email ? <>, e-mail <Mail /></> : null}. Voir les <Link href="/mentions-legales">mentions légales</Link>.
+        Le vendeur est {LEGAL.editeur ? <>{LEGAL.editeur} ({LEGAL.marque})</> : LEGAL.marque}{LEGAL.statut ? <>, {LEGAL.statut}</> : null}{LEGAL.siret ? <>, SIRET {LEGAL.siret}</> : null}{LEGAL.adresse ? <>, {LEGAL.adresse}</> : null}{LEGAL.email ? <>, e-mail <Mail /></> : null}. Voir les <Link href="/mentions-legales">mentions légales</Link>.
       </p>
 
       <h2>2. À qui s&apos;adressent ces conditions ?</h2>
