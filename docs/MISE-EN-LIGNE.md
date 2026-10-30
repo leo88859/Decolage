@@ -4,12 +4,14 @@ Ce guide active les fonctions en ligne de Décollage : comptes, sauvegarde des p
 
 | Formule | Prix | Projets | Sites en ligne |
 |---|---|---|---|
-| Gratuit | 0 € | 1 (aperçu) | 0 |
+| Gratuit | 0 € | 1 (créer, enregistrer, prévisualiser ; **ne publie pas**) | 0 |
 | Solo | 2,99 € / mois | 1 | 1 |
 | Pro | 9,99 € / mois | 5 | 5 |
 | Illimité | 29,99 € / mois | illimités | illimités |
 
-Toutes les limites sont définies dans `src/lib/plans.ts`.
+Toutes les limites sont définies dans `src/lib/plans.ts`. Marque blanche : option Solo (+1,99 €), incluse en Pro et Illimité (voir `docs/MARQUE-BLANCHE.md` : pas encore appliquée aux pages publiées). Entreprise : sur devis, rien n'est facturé ni activé.
+
+**Migrations Supabase à exécuter à la main, dans l'ordre : 0001, 0002, 0003, 0004, 0005, puis 0006** (`0006_regle_gratuit.sql` : Gratuit = 1 projet, publication réservée aux formules payantes, suspension des boutiques ; voir `docs/LIMITES-SERVEUR.md`). Variable facultative : `STRIPE_PRICE_BRAND` (prix de l'option marque blanche que tu crées toi-même dans Stripe ; laisse-la vide tant qu'elle n'est pas vendue).
 
 Sans ces étapes, le site fonctionne quand même, en mode local : les projets restent dans le navigateur, et chaque formule s'active en mode test.
 

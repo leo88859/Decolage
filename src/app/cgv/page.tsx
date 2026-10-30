@@ -20,9 +20,9 @@ export default function Cgv() {
       <p>Elles s&apos;appliquent à la souscription d&apos;une formule payante de {LEGAL.marque}. Les passages marqués « consommateur » (rétractation, médiation) concernent une personne qui achète pour un usage en dehors de son activité professionnelle. Si tu achètes pour ton activité professionnelle, ces droits ne s&apos;appliquent pas, sauf si la loi en dispose autrement ; le reste des conditions s&apos;applique aux deux.</p>
 
       <h2>3. Les formules et leurs prix</h2>
-      <p>Toutes les formules payantes ont toutes les fonctions ; seules les quantités changent.</p>
+      <p>Les formules payantes ont les mêmes fonctions de création ; les quantités (projets, sites publiés) changent. La publication en ligne est réservée aux formules payantes.</p>
       <ul>
-        <li>{PLANS.gratuit.nom} : {prixLabel("gratuit")}, pour découvrir en aperçu (pas de projet enregistré ni de site publié).</li>
+        <li>{PLANS.gratuit.nom} : {prixLabel("gratuit")}, pour découvrir : 1 projet créé, enregistré et prévisualisé, sans publication en ligne (pas de site publié ni de boutique publiée).</li>
         {PAID_PLANS.map((p) => (
           <li key={p}>{PLANS[p].nom} : {prixLabel(p)}, {limite(PLANS[p].maxProjets)} projet(s) et {limite(PLANS[p].maxSites)} site(s) publié(s) en même temps.</li>
         ))}

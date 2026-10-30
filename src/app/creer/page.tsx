@@ -67,10 +67,10 @@ function Creer() {
   const fkey = fonctions.join(",");
   const template = TEMPLATE_BY_ID[type];
   const chosen = DESIGNS.find((d) => d.id === design) ?? DESIGNS[0]!;
-  // Tout s'essaie gratuitement ; générer (et garder) le SaaS demande une offre payante.
+  // Tout s'essaie gratuitement. Le Gratuit garde 1 projet (enregistré, modifiable, en aperçu) ; le publier en ligne demande une offre payante.
   const free = plan === "gratuit";
-  const full = !free && !canCreateProject(plan, projects.length);
-  const locked = free || full;
+  const full = !canCreateProject(plan, projects.length);
+  const locked = full;
   const retour = `/parametres?retour=${encodeURIComponent(`/creer?q=${idee}`)}#formule`;
 
   const input = (d: string): IdeeInput => ({ idee: idee || "Mon SaaS", type, secteur: secteur.id, nom: deferredNom || "Mon SaaS", design: d, fonctions });
@@ -206,18 +206,16 @@ function Creer() {
             {/* Toujours visible en bas d'écran : un clic suffit, les étapes 2 et 3 sont facultatives. */}
               <div className="cr-go">
                 <div>
-                  <b>{free ? "Ton SaaS te plaît ? Garde-le." : full ? "Limite de projets atteinte" : "Tout est prêt à être généré"}</b>
+                  <b>{full ? "Limite de projets atteinte" : "Tout est prêt à être généré"}</b>
                   <p className="tiny mut">
-                    {free
-                      ? `Dès ${PLANS.solo.prix.toLocaleString("fr-FR")} €/mois : ton SaaS généré, modifiable et publiable en ligne avec une vraie liste d'attente. Sans engagement.`
-                      : full
-                        ? `Ta formule ${PLANS[plan].nom} permet ${PLANS[plan].maxProjets} projet${PLANS[plan].maxProjets > 1 ? "s" : ""}. Supprime un projet ou passe à ${PLANS[planForProjects(projects.length + 1)].nom}.`
-                        : `${template.nom} · ${secteur.nom} · design ${chosen.nom}${fonctions.length ? ` · ${fonctions.length} fonction${fonctions.length > 1 ? "s" : ""}` : ""}. Tout reste modifiable ensuite.`}
+                    {full
+                      ? `Ta formule ${PLANS[plan].nom} permet ${PLANS[plan].maxProjets} projet${PLANS[plan].maxProjets > 1 ? "s" : ""}. Supprime un projet ou passe à ${PLANS[planForProjects(projects.length + 1)].nom}.`
+                      : `${template.nom} · ${secteur.nom} · design ${chosen.nom}${fonctions.length ? ` · ${fonctions.length} fonction${fonctions.length > 1 ? "s" : ""}` : ""}. Tout reste modifiable ensuite.${free ? ` Le Gratuit ne publie pas en ligne : dès ${PLANS.solo.prix.toLocaleString("fr-FR")} €/mois avec Solo.` : ""}`}
                   </p>
                 </div>
                 {locked ? (
                   <Link href={retour} className="btn btn-coral btn-lg">
-                    {free ? "Choisir mon offre et générer" : `Passer à ${PLANS[planForProjects(projects.length + 1)].nom}`} <span className="arrow">→</span>
+                    {`Passer à ${PLANS[planForProjects(projects.length + 1)].nom}`} <span className="arrow">→</span>
                   </Link>
                 ) : (
                   <button className="btn btn-coral btn-lg" onClick={generate} disabled={busy}>

@@ -11,7 +11,7 @@ function features(k: Plan): { ok: boolean; t: string }[] {
   return [
     ...(k === "gratuit" ? [{ ok: true, t: "Aperçu de ton SaaS dans les 10 designs" }] : []),
     { ok: true, t: `Catalogue de ${IDEAS.length} idées` },
-    { ok: p.maxProjets > 0, t: p.maxProjets === 0 ? "Générer et garder ton SaaS" : p.maxProjets === Infinity ? "SaaS illimités" : limiteLabel(p.maxProjets, "SaaS généré", "SaaS générés") },
+    { ok: p.maxProjets > 0, t: p.maxProjets === Infinity ? "SaaS illimités" : limiteLabel(p.maxProjets, "SaaS généré", "SaaS générés") },
     { ok: p.maxSites > 0, t: p.maxSites === 0 ? "Mise en ligne" : `Mise en ligne : ${limiteLabel(p.maxSites, "site", "sites")}` },
     { ok: p.maxSites > 0, t: "Vraie liste d'attente" },
     { ok: p.modelesPremium, t: "Les 16 modèles" },

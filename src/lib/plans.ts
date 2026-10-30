@@ -20,7 +20,7 @@ export type PlanDef = {
 const PAYANT = { modelesPremium: true, exportFichiers: true, duplication: true, personnalisationAvancee: true, plansDetailles: true };
 
 export const PLANS: Record<Plan, PlanDef> = {
-  gratuit: { nom: "Gratuit", prix: 0, maxProjets: 0, maxSites: 0, modelesPremium: false, exportFichiers: false, duplication: false, personnalisationAvancee: false, plansDetailles: false, accroche: "Pour découvrir : décris ton idée et essaie les 10 designs en aperçu." },
+  gratuit: { nom: "Gratuit", prix: 0, maxProjets: 1, maxSites: 0, modelesPremium: false, exportFichiers: false, duplication: false, personnalisationAvancee: false, plansDetailles: false, accroche: "Pour découvrir : 1 projet à créer, enregistrer et prévisualiser, sans publication en ligne." },
   solo: { nom: "Solo", prix: 2.99, maxProjets: 1, maxSites: 1, ...PAYANT, accroche: "Ton premier SaaS, en ligne." },
   pro: { nom: "Pro", prix: 9.99, maxProjets: 5, maxSites: 5, ...PAYANT, accroche: "Pour tester plusieurs idées en parallèle." },
   illimite: { nom: "Illimité", prix: 29.99, maxProjets: Infinity, maxSites: Infinity, ...PAYANT, accroche: "Projets et sites sans limite." },

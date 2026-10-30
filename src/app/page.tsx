@@ -22,7 +22,7 @@ const STEPS = [
 
 const FAQ = [
   ["Décollage utilise-t-il une intelligence artificielle ?", "Non. Tout repose sur des modèles, des textes et des briques écrits à l'avance, et sur des règles programmées. Le résultat est instantané, et la même idée donne toujours le même SaaS."],
-  ["Que puis-je faire sans payer ?", `Décrire ton idée, voir ton SaaS dans les 10 designs et l'essayer en aperçu interactif, et parcourir le catalogue d'idées. Pour générer ton SaaS, le garder, le modifier et le publier, il faut une offre payante, dès ${prixCourt("solo")} par mois`],
+  ["Que puis-je faire sans payer ?", `Décrire ton idée, voir ton SaaS dans les 10 designs et l'essayer en aperçu interactif, et parcourir le catalogue d'idées. Le Gratuit te laisse créer, modifier et enregistrer 1 projet, et le prévisualiser. Pour le publier en ligne, il faut une offre payante, dès ${prixCourt("solo")} par mois`],
   ["Mon SaaS est-il vraiment en ligne ?", "Avec une offre payante, tu publies en un clic ta page de vente et ta démo sur une adresse publique, avec une vraie liste d'attente. Pour une application complète (comptes, base de données, paiements de tes clients), le guide de mise en production t'accompagne étape par étape."],
   ["Puis-je créer n'importe quelle application ?", "Non, et on préfère être clairs : ton produit est assemblé à partir de 16 types de SaaS et de 17 briques réellement programmées. C'est ce qui rend le résultat fiable."],
   ["Puis-je résilier quand je veux ?", "Oui. Sans engagement : tu changes d'offre ou tu résilies en ligne, à tout moment. Tes projets restent exportables."],
@@ -164,7 +164,7 @@ export default function Home() {
           <Reveal className="sec-head center center">
             <span className="eyebrow">Offres</span>
             <h2>Ton premier SaaS dès <span className="serif" style={{ whiteSpace: "nowrap" }}>{euros(PLANS.solo.prix)} €</span> par&nbsp;mois.</h2>
-            <p>Essaie gratuitement ton SaaS dans les 10 designs. Pour le générer, le garder et le publier, choisis ton offre : toutes donnent accès à toutes les fonctions, seule change la quantité.</p>
+            <p>Essaie gratuitement ton SaaS dans les 10 designs : le Gratuit garde 1 projet en aperçu. Pour le publier en ligne, choisis une offre payante ; les quantités (projets, sites publiés) changent selon la formule.</p>
           </Reveal>
           <Reveal>
             <OfferCards

@@ -45,8 +45,9 @@ const count = async (uid: string) => (await db.query<{ n: number }>("select coun
 beforeAll(async () => {
   db = new PGlite();
   await db.exec(SUPABASE_STUB);
-  for (const f of ["0001_schema.sql", "0002_conformite.sql", "0003_marque_blanche.sql", "0004_limites_serveur.sql"]) await db.exec(sql(f));
+  for (const f of ["0001_schema.sql", "0002_conformite.sql", "0003_marque_blanche.sql", "0004_limites_serveur.sql", "0005_boutique.sql", "0006_regle_gratuit.sql"]) await db.exec(sql(f));
   await db.exec(sql("0004_limites_serveur.sql")); // rejouable sans erreur
+  await db.exec(sql("0006_regle_gratuit.sql")); // rejouable sans erreur (0006 remplace 0004 pour plan_max_projects : on la rejoue en dernier)
   await db.query("insert into auth.users (id) values ($1), ($2)", [A, B]);
 });
 
@@ -58,9 +59,12 @@ beforeEach(async () => {
 });
 
 describe("nombre de projets : insertion directe refusée au-delà de la limite", () => {
-  it("Gratuit : aucune création directe (comportement actuel de plans.ts : 0 projet)", async () => {
-    await limited(add(A, "projet1"));
-    expect(await count(A)).toBe(0);
+  it("Gratuit : 1 projet (règle du patron, 0006) ; le deuxième est refusé en insertion directe, copie comprise", async () => {
+    // Ancien test : « aucune création directe (0 projet) » ; Gratuit passe à 1 projet avec la migration 0006.
+    await add(A, "projet1");
+    await limited(add(A, "projet2"));
+    await limited(add(A, "copie-de-projet1"));
+    expect(await count(A)).toBe(1);
   });
 
   it("Solo : 1 projet, le second est refusé (une duplication est une insertion : refusée aussi)", async () => {
@@ -168,8 +172,10 @@ describe("formule : impossible de se l'attribuer depuis le navigateur", () => {
   });
 
   it("la formule ne peut pas être détournée pour créer des projets", async () => {
+    // Le Gratuit a 1 projet (0006) : le deuxième reste refusé même après une tentative de s'attribuer Illimité.
+    await add(A, "projet1");
     await refused(as("authenticated", A, "update public.profiles set plan = 'illimite' where id = $1", [A]));
-    await limited(add(A, "projet1"));
+    await limited(add(A, "projet2"));
   });
 });
 

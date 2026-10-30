@@ -28,9 +28,12 @@ describe("filtres du catalogue", () => {
 describe("formules", () => {
   it("applique les prix et limites demandés", () => {
     expect([PLANS.solo.prix, PLANS.pro.prix, PLANS.illimite.prix]).toEqual([2.99, 9.99, 29.99]);
-    expect([PLANS.gratuit.maxProjets, PLANS.solo.maxProjets, PLANS.pro.maxProjets]).toEqual([0, 1, 5]);
-    // Sans offre, on essaie en aperçu mais on ne génère aucun SaaS.
-    expect(canCreateProject("gratuit", 0)).toBe(false);
+    expect([PLANS.gratuit.maxProjets, PLANS.solo.maxProjets, PLANS.pro.maxProjets]).toEqual([1, 1, 5]);
+    // Règle du patron (octobre 2026) : le Gratuit a 1 projet (créer, enregistrer, prévisualiser) mais ne publie pas (maxSites 0).
+    // Ancienne valeur : 0 projet. Changée volontairement avec supabase/0006_regle_gratuit.sql.
+    expect(PLANS.gratuit.maxSites).toBe(0);
+    expect(canCreateProject("gratuit", 0)).toBe(true);
+    expect(canCreateProject("gratuit", 1)).toBe(false);
     expect(canCreateProject("solo", 0)).toBe(true);
     expect(canCreateProject("illimite", 10_000)).toBe(true);
     expect(canCreateProject("pro", 4)).toBe(true);

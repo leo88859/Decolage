@@ -108,3 +108,10 @@ Audit en lecture seule : aucun code, aucun prix Stripe n'a été modifié. Seul 
 6. Faire relire la CGV modifiée (changement de conditions pour les abonnés actifs).
 7. Valider le choix « un seul abonnement à deux lignes » pour l'option.
 8. Tester en mode test Stripe avant de passer en production.
+
+## Mise à jour du 30/10/2026 (décision du patron : Gratuit = 1 projet, sans publication)
+
+- Écarts 1 et 1b tranchés dans l'autre sens que la recommandation initiale : le Gratuit passe à 1 projet (`plans.ts`, `0006_regle_gratuit.sql`, `MISE-EN-LIGNE.md`, CGV, accueil, page Créer) et reste sans publication (maxSites 0), avec garde serveur et base.
+- Écart 8 (prix inconnu = Illimité, premier élément seulement) : corrigé (`billing.ts`, webhook).
+- Écart 7 : variable facultative `STRIPE_PRICE_BRAND` ajoutée (`.env.example`, `env.ts`).
+- Écarts 4, 5, 6, 11, 14 (carte Entreprise, ligne marque blanche, checkout à deux lignes, CGV option et Entreprise) : non traités ici.
