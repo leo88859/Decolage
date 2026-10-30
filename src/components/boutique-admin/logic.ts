@@ -18,6 +18,7 @@ export function mapApiError(status: number, body: unknown): { code: string; mess
     demo: "La boutique n'est pas disponible en mode démonstration (compte en ligne requis).",
     limite_boutiques: "Ta formule ne permet pas de créer une boutique. Passe à une formule supérieure.",
     limite_sites: "Ta formule ne permet pas de publier un site de plus. Passe à une formule supérieure ou dépublie un site.",
+    publication_formule: "La publication en ligne n'est pas incluse dans la formule Gratuit. Ta boutique reste enregistrée en brouillon et tu peux la préparer : passe à Solo pour la publier.",
     duplicate: "Ce nom ou cette adresse est déjà utilisé.",
     statut_invalide: "Ce changement de statut n'est pas possible.",
     not_found: "Élément introuvable (il a peut-être été supprimé).",
@@ -27,7 +28,7 @@ export function mapApiError(status: number, body: unknown): { code: string; mess
   return { code, message, errors };
 }
 
-export const isPlanLimit = (code: string) => code === "limite_boutiques" || code === "limite_sites";
+export const isPlanLimit = (code: string) => code === "limite_boutiques" || code === "limite_sites" || code === "publication_formule";
 
 /** Appel d'API : n'annonce un succès que si le serveur répond 2xx avec un JSON lisible. */
 export async function api<T>(path: string, init?: { method?: string; body?: unknown }, f: typeof fetch = fetch): Promise<ApiResult<T>> {

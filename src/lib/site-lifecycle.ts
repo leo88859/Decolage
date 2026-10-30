@@ -39,3 +39,53 @@ export async function syncSitesWithPlan(admin: SupabaseClient, userId: string, p
     return { ok: false, suspended: 0, restored: 0 };
   }
 }
+
+// ─── Sites ET boutiques : une seule limite (maxSites) pour les deux ───────────────────────────
+// Comportement choisi (documenté dans docs/LIMITES-SERVEUR.md) : à la rétrogradation ou la résiliation,
+// on ne supprime RIEN. Parmi les sites publiés et les boutiques publiées, les plus anciennement publiés restent
+// en ligne dans la limite de la formule ; les autres sont SUSPENDUS (suspended_at) : introuvables publiquement
+// (404), contenu et commandes conservés, republication possible après réabonnement. Gratuit : tout est suspendu.
+// Au réabonnement, les éléments suspendus qui rentrent dans la nouvelle limite sont réactivés (même règle que les
+// sites depuis la migration 0002) ; un brouillon, lui, ne devient jamais public tout seul.
+
+export type Publication = { kind: "site" | "boutique"; key: string; published_at: string };
+
+export function splitPublications(pubs: Publication[], maxSites: number): { keep: Publication[]; suspend: Publication[] } {
+  const sorted = [...pubs].sort((a, b) => a.published_at.localeCompare(b.published_at) || a.kind.localeCompare(b.kind) || a.key.localeCompare(b.key));
+  const n = Number.isFinite(maxSites) ? Math.max(0, maxSites) : sorted.length;
+  return { keep: sorted.slice(0, n), suspend: sorted.slice(n) };
+}
+
+/** Applique la formule aux sites et aux boutiques publiés d'un utilisateur. Ne lève jamais d'erreur (journalise sans donnée personnelle). */
+export async function syncPublicationsWithPlan(admin: SupabaseClient, userId: string, plan: Plan): Promise<{ ok: boolean; suspended: number; restored: number }> {
+  try {
+    const sites = await admin.from("sites").select("slug, published_at").eq("user_id", userId);
+    if (sites.error || !sites.data) throw new Error(sites.error?.message ?? "lecture des sites impossible");
+    // Boutiques : migration 0005/0006 peut manquer ; on continue alors avec les sites seuls.
+    const shops = await admin.from("boutiques").select("id, published_at").eq("proprietaire_id", userId).eq("statut", "publiee");
+    if (shops.error) console.error(`[boutiques] lecture impossible pour la synchronisation (migrations 0005/0006 exécutées ?) : ${shops.error.message}`);
+    const pubs: Publication[] = [
+      ...(sites.data as SiteRef[]).map((s) => ({ kind: "site" as const, key: s.slug, published_at: s.published_at })),
+      ...((shops.error ? [] : (shops.data ?? [])) as { id: string; published_at: string | null }[]).map((b) => ({ kind: "boutique" as const, key: b.id, published_at: b.published_at ?? "9999" })),
+    ];
+    const { keep, suspend } = splitPublications(pubs, PLANS[plan].maxSites);
+    const now = new Date().toISOString();
+    const set = async (kind: Publication["kind"], list: Publication[], value: string | null) => {
+      if (!list.length) return;
+      const keys = list.filter((p) => p.kind === kind).map((p) => p.key);
+      if (!keys.length) return;
+      const r = kind === "site"
+        ? await admin.from("sites").update({ suspended_at: value }).eq("user_id", userId).in("slug", keys)
+        : await admin.from("boutiques").update({ suspended_at: value }).eq("proprietaire_id", userId).in("id", keys);
+      if (r.error) throw new Error(r.error.message);
+    };
+    for (const kind of ["site", "boutique"] as const) {
+      await set(kind, suspend, now);
+      await set(kind, keep, null);
+    }
+    return { ok: true, suspended: suspend.length, restored: keep.length };
+  } catch (e) {
+    console.error(`[publications] synchronisation avec la formule non appliquée (migrations 0002/0006 exécutées ?) : ${(e as Error).message}`);
+    return { ok: false, suspended: 0, restored: 0 };
+  }
+}

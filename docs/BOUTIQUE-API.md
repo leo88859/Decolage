@@ -37,7 +37,7 @@ Boutique : `modes` ⊂ `["retrait","livraison","contact"]` (au moins 1), `whatsa
 
 Statuts de commande : `nouvelle → confirmee → prete → terminee` ; `annulee` possible depuis nouvelle, confirmee, prete. `terminee` et `annulee` sont définitifs. Un autre passage : 409 `statut_invalide`. Une annulation remet le stock. Seul le statut est modifiable.
 
-Erreurs propres au commerçant : 403 `limite_boutiques` / `limite_sites` (formule : Gratuit 0, Solo 1, Pro 5, Illimité sans limite ; créer une boutique ou en publier une compte avec les sites publiés), 409 `duplicate` (slug pris, nom de catégorie ou de variante déjà utilisé), 400 `invalid` + `errors`, 404 `not_found`.
+Erreurs propres au commerçant : 403 `limite_boutiques` / `limite_sites` / `publication_formule` (formule, migration 0006 : Gratuit 1 boutique en brouillon et AUCUNE publication ; Solo 1, Pro 5, Illimité sans limite ; publier une boutique compte avec les sites publiés. Une boutique dont le propriétaire repasse en Gratuit ou dont l'abonnement est résilié est suspendue : 404 pour le public, données conservées, voir `docs/LIMITES-SERVEUR.md`), 409 `duplicate` (slug pris, nom de catégorie ou de variante déjà utilisé), 400 `invalid` + `errors`, 404 `not_found`.
 
 ## Public (sans connexion)
 

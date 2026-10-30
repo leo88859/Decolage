@@ -35,18 +35,26 @@ export async function POST(req: Request) {
   const v = validateSiteData(body.data);
   if (!v.ok) return json({ error: v.error }, 400);
 
-  // Limite de sites publiés selon la formule (lue côté serveur, jamais depuis le navigateur).
-  const [{ data: profile }, { data: mine }] = await Promise.all([
+  // Publication : formule payante requise (le Gratuit ne publie jamais), puis limite de sites publiés selon la formule.
+  // La formule est lue côté serveur dans profiles (jamais depuis le navigateur). La base refuse aussi (migration 0006).
+  const [{ data: profile }, { data: mine }, { data: shops }] = await Promise.all([
     supabase.from("profiles").select("plan").eq("id", user.id).maybeSingle(),
     supabase.from("sites").select("slug, project_id").eq("user_id", user.id),
+    // Les boutiques publiées comptent dans la même limite (erreur de lecture ignorée : migration 0005 absente).
+    supabase.from("boutiques").select("id").eq("proprietaire_id", user.id).eq("statut", "publiee"),
   ]);
   const plan = normalizePlan(profile?.plan);
   const existing = (mine ?? []).find((s) => s.project_id === projectId);
-  if ((!existing && (mine ?? []).length >= PLANS[plan].maxSites) || PLANS[plan].maxSites === 0) {
+  if (PLANS[plan].maxSites === 0) {
     return json({
-      error: PLANS[plan].maxSites === 0
-        ? `La mise en ligne est incluse dans les offres payantes (à partir de ${prixCourt("solo")}/mois).`
-        : `Ta formule ${PLANS[plan].nom} permet ${PLANS[plan].maxSites} site${PLANS[plan].maxSites > 1 ? "s" : ""} en ligne. Dépublie un site ou choisis une offre supérieure.`,
+      error: `La mise en ligne est incluse dans les offres payantes (à partir de ${prixCourt("solo")}/mois). Ton projet reste enregistré et tu peux le prévisualiser.`,
+      code: "publication_formule",
+    }, 403);
+  }
+  if (!existing && (mine ?? []).length + (shops ?? []).length >= PLANS[plan].maxSites) {
+    return json({
+      error: `Ta formule ${PLANS[plan].nom} permet ${PLANS[plan].maxSites} site${PLANS[plan].maxSites > 1 ? "s" : ""} en ligne (boutiques comprises). Dépublie un site ou choisis une offre supérieure.`,
+      code: "limite_sites",
     }, 403);
   }
 
@@ -59,6 +67,8 @@ export async function POST(req: Request) {
     : await admin.from("sites").insert({ ...row, published_at: now });
   if (res.error) {
     if (res.error.code === "23505") return json({ error: "Cette adresse est déjà prise. Choisis-en une autre." }, 409);
+    // Garde de la base (migration 0006) : même refus que ci-dessus, si la règle a été contournée en amont.
+    if (res.error.code === "P0001") return json({ error: "Ta formule ne permet pas de publier plus. Passe à une offre supérieure ou dépublie un site.", code: "limite_sites" }, 403);
     return json({ error: "Publication impossible pour le moment." }, 500);
   }
   return json({ slug, url: `/s/${slug}`, updatedAt: now });
@@ -70,7 +80,7 @@ export async function GET(req: Request) {
   const { supabase, user } = await getUser();
   if (!user) return json({ site: null });
   const projectId = new URL(req.url).searchParams.get("projectId") ?? "";
-  const { data } = await supabase.from("sites").select("slug, published_at, updated_at").eq("user_id", user.id).eq("project_id", projectId).maybeSingle();
+  const { data } = await supabase.from("sites").select("slug, published_at, updated_at, suspended_at").eq("user_id", user.id).eq("project_id", projectId).maybeSingle();
   return json({ site: data ?? null });
 }
 

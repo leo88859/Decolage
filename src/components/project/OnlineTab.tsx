@@ -12,7 +12,7 @@ import { PLANS, prixCourt } from "@/lib/plans";
 import { updateProject, useData } from "@/lib/store";
 import type { Project } from "@/lib/types";
 
-type Site = { slug: string; published_at: string; updated_at: string } | null;
+type Site = { slug: string; published_at: string; updated_at: string; suspended_at?: string | null } | null;
 type Entry = { id: number; email: string; created_at: string };
 
 const fetchSite = (projectId: string): Promise<Site> =>
@@ -53,18 +53,31 @@ export function OnlineTab({ project: p }: { project: Project }) {
       </div>
     );
   }
-  if (PLANS[plan].maxSites === 0) {
-    return (
-      <div className="empty">
-        <h2 className="h-sec">Mets ton SaaS en ligne dès {prixCourt("solo")} par mois</h2>
-        <p className="mut" style={{ margin: "8px auto 18px", maxWidth: 540 }}>
-          La formule gratuite permet de créer et d&apos;essayer ton projet. Avec une offre payante, il obtient son adresse publique et une vraie liste d&apos;attente, et tu débloques toutes les fonctions.
-        </p>
-        <Link href="/parametres#formule" className="btn btn-coral">Voir les offres</Link>
-      </div>
-    );
-  }
+  if (PLANS[plan].maxSites === 0) return <GratuitPublish />;
   return <Publish p={p} />;
+}
+
+/** Formule Gratuit : le projet se crée, s'enregistre et se prévisualise ; « Publier » explique et propose Solo (le serveur refuse de toute façon). */
+function GratuitPublish() {
+  const [asked, setAsked] = useState(false);
+  return (
+    <div className="empty">
+      <h2 className="h-sec">Publier ton SaaS en ligne</h2>
+      <p className="mut" style={{ margin: "8px auto 18px", maxWidth: 540 }}>
+        Ton projet est enregistré et tu peux le prévisualiser autant que tu veux, sans qu&apos;il soit accessible sur Internet.
+      </p>
+      <button className="btn btn-coral btn-lg" onClick={() => setAsked(true)} aria-expanded={asked}>Publier mon SaaS</button>
+      {asked && (
+        <div className="alert alert-warn" role="alert" style={{ margin: "18px auto 0", maxWidth: 560, textAlign: "left" }}>
+          <p style={{ margin: 0 }}><b>La publication n&apos;est pas incluse dans la formule Gratuit.</b></p>
+          <p style={{ margin: "6px 0 12px" }}>
+            Avec Solo ({prixCourt("solo")} par mois), ton projet obtient son adresse publique et une vraie liste d&apos;attente. Rien n&apos;est perdu : ton projet reste tel quel.
+          </p>
+          <Link href="/parametres#formule" className="btn btn-coral">Passer à Solo</Link>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function Publish({ p }: { p: Project }) {
@@ -114,7 +127,7 @@ function Publish({ p }: { p: Project }) {
       <section className={`panel on-card ${site ? "live" : ""}`}>
         <div className="row between" style={{ alignItems: "flex-start" }}>
           <div>
-            <span className={`badge ${site ? "badge-ok" : "badge-line"}`}>{site ? "● En ligne" : "Pas encore publié"}</span>
+            <span className={`badge ${site && !site.suspended_at ? "badge-ok" : "badge-line"}`}>{site ? (site.suspended_at ? "Suspendu" : "● En ligne") : "Pas encore publié"}</span>
             <h2 className="h-sec" style={{ margin: "10px 0 6px" }}>{site ? "Ton SaaS est en ligne" : "Publier ton SaaS"}</h2>
             <p className="mut small">{site ? `Publié le ${fmt(site.published_at)} · dernière mise à jour ${fmt(site.updated_at)}` : "Ta page de vente et la démo de ton application auront une adresse publique, à partager partout."}</p>
           </div>
@@ -130,6 +143,7 @@ function Publish({ p }: { p: Project }) {
           <span className="hint">Lettres minuscules, chiffres et tirets. Un nom de domaine personnalisé (ex. monsaas.fr) se branche à l&apos;étape « Mise en production ».</span>
         </div>
         {error && <div className="alert alert-bad" style={{ marginTop: 12 }} role="alert">{error}</div>}
+        {site?.suspended_at && <div className="alert alert-warn" style={{ marginTop: 12 }} role="status">Ce site est suspendu : ta formule actuelle ne permet pas de le garder en ligne. Il n&apos;est plus accessible publiquement, mais il est conservé tel quel. Il sera de nouveau en ligne si tu reprends une formule qui le permet.</div>}
         {outdated && <div className="alert alert-warn" style={{ marginTop: 12 }}>Tu as modifié ton projet depuis la dernière publication : mets le site à jour pour que les visiteurs voient la nouvelle version.</div>}
 
         <div className="row" style={{ marginTop: 16 }}>

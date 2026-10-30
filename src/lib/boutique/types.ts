@@ -39,6 +39,8 @@ export type Boutique = {
   modes: Mode[];
   statut: StatutBoutique;
   published_at: string | null;
+  /** Posé par le serveur quand la formule ne permet plus de garder la boutique en ligne (migration 0006). */
+  suspended_at?: string | null;
   created_at: string;
   updated_at: string;
 };

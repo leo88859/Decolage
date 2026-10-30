@@ -66,6 +66,7 @@ type PgError = { code?: string; message?: string; hint?: string } | null;
 
 /** Traduit une erreur Postgres en réponse claire (sans jamais renvoyer le texte brut de la base). */
 export function dbError(e: NonNullable<PgError>): Response {
+  if (e.hint === "publication_formule") return json({ error: "La publication en ligne n'est pas incluse dans la formule Gratuit. Ta boutique reste enregistrée en brouillon et tu peux la préparer : passe à Solo pour la publier.", code: "publication_formule" }, 403);
   if (e.hint === "limite_boutiques" || e.hint === "limite_sites") return json({ error: "Ta formule ne permet pas d'aller plus loin. Passe à une offre supérieure ou dépublie un site.", code: e.hint }, 403);
   if (e.hint === "statut_invalide") return json({ error: "Ce changement de statut n'est pas possible.", code: "statut_invalide" }, 409);
   if (e.code === "23505") return json({ error: "Cet élément existe déjà (adresse ou nom déjà utilisé).", code: "duplicate" }, 409);

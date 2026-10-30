@@ -48,7 +48,8 @@ export function ErrorBox({ code, message, onRetry }: { code?: string; message: s
       <p style={{ margin: 0 }}><strong>{message}</strong></p>
       <div className="row" style={{ marginTop: 10 }}>
         {code === "auth" && <Link href="/connexion?next=/boutique" className="btn btn-sm btn-dark">Me connecter</Link>}
-        {code && isPlanLimit(code) && <Link href="/parametres" className="btn btn-sm btn-coral">Voir les formules</Link>}
+        {code === "publication_formule" && <Link href="/parametres#formule" className="btn btn-sm btn-coral">Passer à Solo</Link>}
+        {code && code !== "publication_formule" && isPlanLimit(code) && <Link href="/parametres#formule" className="btn btn-sm btn-coral">Voir les formules</Link>}
         {onRetry && code !== "auth" && <button className="btn btn-sm btn-ghost" onClick={onRetry}>Réessayer</button>}
       </div>
     </div>

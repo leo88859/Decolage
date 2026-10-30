@@ -98,13 +98,14 @@ function Apercu({ boutique: b, nbProduits, nbCategories, reload }: { boutique: B
   const [fail, setFail] = useState<Fail>(null);
   const [edit, setEdit] = useState(false);
   const [del, setDel] = useState(false);
-  const publiee = b.statut === "publiee";
+  const suspendue = b.statut === "publiee" && Boolean(b.suspended_at);
+  const publiee = b.statut === "publiee" && !suspendue;
   const lien = `/b/${b.slug}`;
 
   async function basculer() {
     setBusy(true);
     setFail(null);
-    const r = await api<{ boutique: Boutique }>(`/${b.id}`, { method: "PATCH", body: { statut: publiee ? "brouillon" : "publiee" } });
+    const r = await api<{ boutique: Boutique }>(`/${b.id}`, { method: "PATCH", body: { statut: b.statut === "publiee" ? "brouillon" : "publiee" } });
     if (!r.ok) {
       setBusy(false);
       return setFail({ code: r.code, message: r.message });
@@ -130,15 +131,16 @@ function Apercu({ boutique: b, nbProduits, nbCategories, reload }: { boutique: B
             <h2 id="b-nom" className="h-sec" style={{ margin: 0 }}>{b.nom}</h2>
             <p className="mut" style={{ margin: "6px 0 0" }}>{b.description || "Pas encore de description."}</p>
           </div>
-          <span className={`badge ${publiee ? "badge-ok" : "badge-warn"}`} data-testid="statut">{publiee ? "Publiée" : "Brouillon"}</span>
+          <span className={`badge ${publiee ? "badge-ok" : "badge-warn"}`} data-testid="statut">{publiee ? "Publiée" : suspendue ? "Suspendue" : "Brouillon"}</span>
         </div>
         <p style={{ margin: "16px 0 0" }}>
           Lien public :{" "}
           {publiee ? <Link href={lien} target="_blank" rel="noopener"><strong>{lien}</strong></Link> : <span><strong>{lien}</strong> <span className="mut">(visible par tes clients seulement une fois publiée)</span></span>}
         </p>
+        {suspendue && <p className="mut" role="status" style={{ marginBottom: 0 }}>Ta boutique est suspendue : ta formule actuelle ne permet pas de la garder en ligne. Elle n&apos;est plus accessible aux clients, mais tes produits et tes commandes sont conservés. Reprends une formule qui le permet, ou repasse-la en brouillon pour la préparer.</p>}
         <div className="row" style={{ marginTop: 18 }}>
           <button className={`btn ${publiee ? "btn-ghost" : "btn-coral"}`} onClick={() => void basculer()} disabled={busy}>
-            {busy ? "Un instant…" : publiee ? "Dépublier" : "Publier la boutique"}
+            {busy ? "Un instant…" : b.statut === "publiee" ? "Dépublier" : "Publier la boutique"}
           </button>
           <button className="btn btn-ghost" onClick={() => setEdit(true)}>Modifier les infos</button>
         </div>
