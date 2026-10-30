@@ -65,6 +65,7 @@ export default function Dashboard() {
         aside={projects.length ? <HeroFacts facts={[[max === Infinity ? projects.length : `${projects.length}/${max}`, "projets"], [tasksDone, "tâches terminées"], [favorites.length, "idées en favori"], [PLANS[plan].nom, "formule"]]} /> : undefined}
       >
         <Link href="/creer" className="btn btn-dark">+ Nouveau SaaS</Link>
+        <Link href="/boutique" className="btn btn-ghost">Ma boutique</Link>
         <Link href="/nouveau" className="btn btn-ghost">Pas à pas</Link>
       </PageHero>
 
