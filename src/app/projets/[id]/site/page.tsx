@@ -107,7 +107,7 @@ function Site({ p, fresh }: { p: Project; fresh: boolean }) {
         <div className="st-head fade">
           <div>
             {fresh && <span className="badge badge-ok" style={{ marginBottom: 10 }}>✓ Généré</span>}
-            <h1 className="h-page">Ton SaaS <span className="serif" style={{ color: "var(--coral-ink)" }}>{p.config.nom}</span> est prêt</h1>
+            <h1 className="h-page">Ton SaaS <span className="serif" style={{ color: "var(--coral-ink)" }}>{p.config.nom}</span> est généré</h1>
             <p className="mut" style={{ marginTop: 8, maxWidth: 640 }}>{p.config.description}</p>
           </div>
           <div className="row">

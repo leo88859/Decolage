@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { cloneElement, isValidElement, useEffect, useId, useMemo, useRef, useState } from "react";
 import { useAppDataBridge } from "@/components/AppDataBridge";
 import { useHistory } from "@/components/builder/useHistory";
 import { LivePreview } from "@/components/LivePreview";
@@ -345,7 +345,7 @@ export function Builder({ project, initialStep = "perso" }: { project: Project; 
                       </div>
                     </div>
                   </div>
-                  {errors.logo && <span className="err">{errors.logo}</span>}
+                  {errors.logo && <span className="err" role="alert">{errors.logo}</span>}
                   <div className="field">
                     <span className="label">Générer un logo</span>
                     <div className="bz-logos">
@@ -369,7 +369,7 @@ export function Builder({ project, initialStep = "perso" }: { project: Project; 
                 <Section title="Couleurs et typographie">
                   <ColorField label="Couleur principale" value={cfg.couleurs.primaire} onChange={(c) => set({ couleurs: { ...cfg.couleurs, primaire: c } }, "c1")} />
                   <ColorField label="Couleur d'accent" value={cfg.couleurs.accent} onChange={(c) => set({ couleurs: { ...cfg.couleurs, accent: c } }, "c2")} />
-                  {errors.couleurs && <span className="err">{errors.couleurs}</span>}
+                  {errors.couleurs && <span className="err" role="alert">{errors.couleurs}</span>}
                   <div className="field">
                     <span className="label">Police</span>
                     <div className="bz-fonts">
@@ -445,7 +445,7 @@ export function Builder({ project, initialStep = "perso" }: { project: Project; 
                         <button className="icon-btn" disabled={cfg.roles.length <= 1} onClick={() => set({ roles: cfg.roles.filter((_, j) => j !== i) })} aria-label={`Supprimer le rôle ${r}`}>✕</button>
                       </div>
                     ))}
-                    {errors.roles && <span className="err">{errors.roles}</span>}
+                    {errors.roles && <span className="err" role="alert">{errors.roles}</span>}
                     <button className="btn btn-ghost btn-sm" style={{ alignSelf: "flex-start" }} disabled={cfg.roles.length >= 6} onClick={() => set({ roles: [...cfg.roles, "Nouveau rôle"] })}>+ Ajouter un rôle</button>
                   </div>
                 </Section>
@@ -620,11 +620,16 @@ function RecapRow({ label, value, go }: { label: string; value: React.ReactNode;
 }
 
 function Field({ label, error, hint, children }: { label: string; error?: string; hint?: string; children: React.ReactNode }) {
+  // Le libellé est relié au champ (htmlFor/id), et l'erreur ou l'aide est lue avec lui (aria-describedby).
+  const id = useId();
+  const noteId = error ? `${id}-err` : hint ? `${id}-hint` : undefined;
+  const isControl = isValidElement(children) && (children.type === "input" || children.type === "select" || children.type === "textarea");
+  const control = isControl ? cloneElement(children as React.ReactElement<Record<string, unknown>>, { id, "aria-describedby": noteId, ...(error ? { "aria-invalid": true } : {}) }) : children;
   return (
     <div className="field" style={{ flex: 1 }}>
-      <label>{label}</label>
-      {children}
-      {error ? <span className="err" role="alert">{error}</span> : hint ? <span className="hint">{hint}</span> : null}
+      <label htmlFor={isControl ? id : undefined}>{label}</label>
+      {control}
+      {error ? <span id={noteId} className="err" role="alert">{error}</span> : hint ? <span id={noteId} className="hint">{hint}</span> : null}
     </div>
   );
 }

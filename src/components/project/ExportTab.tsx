@@ -4,7 +4,7 @@ import Link from "next/link";
 import { download, toast } from "@/components/ui";
 import { generateNextProject, generationPlan } from "@/lib/codegen";
 import { projectFiles, projectJson, slug } from "@/lib/export";
-import { can } from "@/lib/plans";
+import { can, prixCourt } from "@/lib/plans";
 import { updateProject, useData } from "@/lib/store";
 import type { Project } from "@/lib/types";
 import { zip } from "@/lib/zip";
@@ -46,7 +46,7 @@ export function ExportTab({ project: p }: { project: Project }) {
           <h2 className="h-sec" style={{ marginTop: 8 }}>Projet Next.js prêt à lancer</h2>
           <p className="mut small" style={{ marginTop: 6, maxWidth: 620 }}>
             Une vraie application React / Next.js, générée à partir de composants écrits à l&apos;avance : tes pages, ton design, tes couleurs et tes données de départ.
-            Ajouter, modifier, supprimer, rechercher, importer et exporter en CSV fonctionnent. Les données sont enregistrées dans le navigateur de chaque utilisateur.
+            Ajouter, modifier, supprimer, rechercher, trier, importer et exporter en CSV fonctionnent, avec des saisies vérifiées (dates, montants, e-mails, créneaux de réservation). Les données sont enregistrées dans le navigateur de chaque utilisateur : rien n&apos;est partagé entre visiteurs.
           </p>
           <div className="row" style={{ marginTop: 14 }}>
             <button className="btn btn-coral" onClick={zipNext} disabled={!allowed}>Télécharger le projet Next.js (.zip){allowed ? "" : " · offre payante"}</button>
@@ -62,7 +62,7 @@ export function ExportTab({ project: p }: { project: Project }) {
             <b>Pas inclus dans le code</b>
             <ul>
               <li>Comptes utilisateurs réels (pas de connexion)</li>
-              <li>Base de données partagée entre appareils</li>
+              <li>Base de données partagée entre appareils et visiteurs (une liste d&apos;attente ou des réservations de clients ne te parviennent pas sans elle)</li>
               <li>Paiements (offres affichées à titre indicatif)</li>
               {skipped.map((s) => <li key={s}>Page « {s} » (reste dans le prototype)</li>)}
             </ul>
@@ -80,7 +80,7 @@ export function ExportTab({ project: p }: { project: Project }) {
             <button className="btn" onClick={zipAll} disabled={!allowed}>Télécharger l&apos;archive .zip{allowed ? "" : " · offre payante"}</button>
             <button className="btn btn-ghost" onClick={() => { download(`${name}.decollage.json`, projectJson(p), "application/json"); toast("Configuration exportée"); }}>Configuration JSON seule</button>
           </div>
-          {!allowed && <p className="hint">Les exports de fichiers sont inclus dans les offres payantes (dès 2,99 €/mois). La configuration JSON reste toujours exportable gratuitement : tes données t&apos;appartiennent. <Link href="/parametres" style={{ textDecoration: "underline" }}>Voir les offres</Link></p>}
+          {!allowed && <p className="hint">Les exports de fichiers sont inclus dans les offres payantes (dès {prixCourt("solo")}/mois). La configuration JSON reste toujours exportable gratuitement : tes données t&apos;appartiennent. <Link href="/parametres" style={{ textDecoration: "underline" }}>Voir les offres</Link></p>}
         </section>
 
         <section className="panel">

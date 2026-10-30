@@ -1,0 +1,116 @@
+/* Pages légales, pied de page et panneau cookies.
+   Palette existante uniquement (globals.css + a11y.css). Aucune couleur ne porte seule une information. */
+
+/* ─── Pages légales ─── */
+.legal { max-width: 780px; }
+.legal h1 { font-size: clamp(30px, 6vw, 44px); margin: 22px 0 8px; text-wrap: balance; }
+.legal h2 { font-size: clamp(20px, 3.4vw, 23px); margin: 38px 0 10px; padding-top: 22px; border-top: 1px solid var(--line-2); }
+.legal h3 { font-size: 17.5px; margin: 24px 0 6px; letter-spacing: -0.02em; }
+.legal p, .legal li { line-height: 1.75; font-size: 16px; color: var(--ink); overflow-wrap: anywhere; }
+.legal p { margin: 0 0 14px; }
+.legal p.mut, .legal p.small { color: var(--mut); }
+.legal p.small, .legal .small { font-size: 14px; }
+.legal ul, .legal ol { margin: 0 0 16px; padding-left: 22px; display: grid; gap: 6px; }
+.legal li::marker { color: var(--ink-2); }
+.legal strong, .legal b { font-weight: 650; }
+.legal a { color: var(--blue-ink); text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1.5px; }
+.legal a:hover { color: var(--navy); }
+
+/* Navigation entre les pages légales */
+.legal-nav { display: flex; flex-wrap: wrap; gap: 8px; font-size: 14px; padding-bottom: 6px; }
+.legal-nav a {
+  display: inline-flex; align-items: center; min-height: 40px; padding: 6px 14px; border-radius: 99px;
+  border: 1.5px solid var(--ui-line); background: var(--paper); color: var(--ink); text-decoration: none;
+  transition: background 0.15s, border-color 0.15s;
+}
+.legal-nav a:hover { background: #fff; border-color: var(--ink-2); color: var(--ink); }
+.legal-nav a[aria-current="page"] {
+  background: var(--navy); color: #fff; border-color: var(--navy); font-weight: 700; text-decoration: none;
+}
+.legal-nav a[aria-current="page"]::before { content: "\2713"; margin-right: 6px; font-weight: 700; }
+
+/* Éléments à compléter (repère en ligne + bandeau) */
+.legal-todo {
+  background: #fde68a; color: #7c2d12; padding: 1px 5px; border-radius: 4px;
+  border-bottom: 2px dashed #7c2d12; font-weight: 600; overflow-wrap: anywhere;
+}
+.legal-banner {
+  margin: 20px 0 8px; padding: 16px 18px 14px; border: 2px solid var(--warn-ink); border-left-width: 8px;
+  border-radius: var(--r); background: var(--warn-soft); color: var(--ink);
+}
+.legal-banner > b { display: block; font: 700 16px var(--display); letter-spacing: -0.01em; color: var(--ink); }
+.legal-banner > b::before { content: "Attention : "; font-weight: 600; color: var(--warn-ink); }
+.legal-banner p { margin: 6px 0 8px; font-size: 15px; line-height: 1.6; }
+.legal-banner ul { font-size: 14.5px; margin: 0; padding-left: 20px; gap: 4px; }
+.legal-banner li { font-size: 14.5px; line-height: 1.55; }
+.legal-where { color: var(--ink-2); }
+
+/* Tableaux */
+.legal .tablewrap {
+  overflow-x: auto; margin: 12px 0 18px; border: 1.5px solid var(--ui-line); border-radius: var(--r-sm);
+  background: var(--paper); -webkit-overflow-scrolling: touch;
+}
+.legal table { width: 100%; min-width: 560px; border-collapse: collapse; font-size: 14.5px; margin: 0; }
+.legal th, .legal td { text-align: left; vertical-align: top; padding: 10px 12px; border-bottom: 1px solid var(--line-2); line-height: 1.55; color: var(--ink); }
+.legal th { background: var(--cream-2); font-weight: 700; font-size: 13.5px; }
+.legal tr:last-child td { border-bottom: 0; }
+.legal > table { border: 1.5px solid var(--ui-line); }
+
+/* Encarts */
+.legal .note {
+  padding: 14px 18px; border: 1px solid var(--line-2); border-left: 6px solid var(--blue-ink);
+  background: var(--blue-soft); border-radius: var(--r-sm); color: var(--ink);
+}
+.legal .note::before { content: "Note : "; font-weight: 700; color: var(--blue-ink); }
+
+/* Le bouton « Gérer mes cookies » de la page Cookies garde le style bouton */
+.legal .btn { text-decoration: none; }
+
+/* ─── Pied de page ─── */
+html #contenu:focus-visible { outline: 0 !important; }
+.site-footer { padding: 44px 0 28px; margin-top: 40px; color: #d3d5da; font-size: 14.5px; }
+.sf-grid { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 32px 28px; }
+.sf-name { color: #fff; font: 700 21px var(--display); letter-spacing: -0.02em; }
+.sf-brand p { margin: 8px 0 0; max-width: 36ch; line-height: 1.6; color: #d3d5da; }
+.sf-h { font: 600 12.5px var(--body); text-transform: uppercase; letter-spacing: 0.08em; color: #fff; margin: 0 0 10px; line-height: 1.3; }
+.site-footer ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.site-footer a, .site-footer .linklike {
+  display: inline-block; padding: 5px 0; color: #d3d5da; text-decoration: underline;
+  text-underline-offset: 3px; text-decoration-thickness: 1px;
+}
+.site-footer .linklike { background: none; border: 0; font: inherit; cursor: pointer; text-align: left; }
+.site-footer a:hover, .site-footer .linklike:hover { color: #fff; text-decoration-thickness: 2px; }
+.sf-copy { margin-top: 26px; padding-top: 16px; border-top: 1px solid rgba(255, 255, 255, 0.22); color: #d3d5da; font-size: 13.5px; }
+@media (max-width: 720px) {
+  .sf-grid { grid-template-columns: 1fr; gap: 26px; }
+  .site-footer a, .site-footer .linklike { padding: 9px 0; min-height: 44px; }
+  .site-footer ul { gap: 0; }
+}
+
+/* ─── Panneau cookies ─── */
+dialog.consent { width: min(600px, calc(100vw - 24px)); overflow-y: auto; }
+dialog.consent .modal-body { font-size: 15.5px; line-height: 1.65; color: var(--ink); }
+dialog.consent .modal-body p { margin: 0; }
+dialog.consent .modal-body a { color: var(--blue-ink); text-underline-offset: 3px; }
+.consent-list { margin: 0; padding-left: 20px; display: grid; gap: 10px; font-size: 14.5px; line-height: 1.6; }
+.consent-fields { border: 1.5px solid var(--ui-line); border-radius: var(--r-sm); padding: 6px 14px 4px; display: grid; gap: 0; margin: 0; }
+.consent-fields legend { padding: 0 6px; }
+.consent-opt { display: flex; gap: 14px; align-items: flex-start; justify-content: space-between; cursor: pointer; padding: 12px 0; border-bottom: 1px solid var(--line-2); }
+.consent-opt:last-of-type { border-bottom: 0; }
+.consent-opt > span:first-child { flex: 1; min-width: 0; }
+.consent-switch { display: inline-flex; flex-direction: column; align-items: center; gap: 4px; min-width: 56px; font-size: 12.5px; font-weight: 700; color: var(--ink); }
+.consent-switch .switch { width: 44px; height: 26px; }
+.consent-switch .switch::after { top: 3px; left: 3px; width: 20px; height: 20px; }
+.consent-switch .switch:checked::after { transform: translateX(18px); }
+.consent-foot { flex-wrap: wrap; justify-content: stretch; position: sticky; bottom: 0; background: var(--paper); }
+/* Trois boutons strictement identiques : même taille, même contour, même fond. */
+.consent-foot .btn {
+  flex: 1 1 150px; justify-content: center; min-height: 46px; font-weight: 600;
+  background: #fff; color: var(--ink); border: 2px solid var(--navy); box-shadow: none;
+}
+.consent-foot .btn:hover { background: var(--cream-2); box-shadow: none; }
+@media (max-width: 480px) {
+  .consent-foot { padding: 14px 16px; }
+  .consent-foot .btn { flex-basis: 100%; }
+  dialog.consent .modal-body, dialog.consent .modal-head { padding-left: 16px; padding-right: 16px; }
+}

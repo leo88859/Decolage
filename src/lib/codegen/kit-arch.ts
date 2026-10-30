@@ -8,7 +8,9 @@ export const ARCH_KIT_TSX = String.raw`"use client";
 
 import { useState, useSyncExternalStore } from "react";
 import { SAAS } from "@/lib/config";
-import { actions, amount, tone, useStore } from "@/lib/store";
+import { notify } from "@/components/views";
+import { fmt, inputType, type FieldType } from "@/lib/rules";
+import { actions, amount, tone, useStore, type Result } from "@/lib/store";
 import type { ArchConfig, Item } from "@/lib/types";
 
 // Rôle de chaque colonne (titre, date, montant, groupe…) : défini dans lib/config.ts.
@@ -19,6 +21,11 @@ export const ST = SAAS.statut;
 const POS = /confirm|valid|gagn|pay|résolu|livr|termin|fait|actif/i;
 
 export const val = (i: Item, k: string) => { const j = R[k]; return typeof j === "number" ? i.values[j] ?? "" : ""; };
+export const typeOf = (j: number): FieldType => SAAS.types[j] ?? "text";
+/** Valeur affichée d'un rôle (date, montant…) au format lisible. */
+export const show = (i: Item, k: string) => { const j = R[k]; return typeof j === "number" ? fmt(i.values[j] ?? "", typeOf(j)) : ""; };
+/** Affiche l'erreur d'une écriture refusée ; renvoie vrai si elle a été enregistrée. */
+export const ok = (r: Result) => { if (!r.ok) notify(r.error, "bad"); return r.ok; };
 export const nameOf = (i: Item) => i.values[R.titre ?? 0] ?? "";
 export const isDone = (i: Item) => POS.test(i.values[ST] ?? "") || /termin|livr|résolu/i.test(i.values[ST] ?? "");
 export const firstStatus = () => SAAS.statuts[0] ?? "";
@@ -40,6 +47,8 @@ export function today() { const d = new Date(); d.setHours(0, 0, 0, 0); return d
 export function parseDate(s: string): Date | null {
   const t = s.toLowerCase().trim();
   const now = today();
+  const iso = t.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) return new Date(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]));
   if (!t || t === "—") return null;
   if (/aujourd/.test(t)) return now;
   if (/demain/.test(t)) return new Date(now.getTime() + 86400000);
@@ -50,6 +59,7 @@ export function parseDate(s: string): Date | null {
   if (j >= 0) { const d = new Date(now); d.setDate(d.getDate() + ((j - d.getDay() + 7) % 7 || 7)); return d; }
   return null;
 }
+export const todayIso = () => { const d = today(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); };
 export const fmtDate = (d: Date) => d.toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
 const soon = (i: Item) => { const d = parseDate(val(i, "date")); return !!d && d.getTime() - today().getTime() < 7 * 86400000 && !isDone(i); };
 /** Listes intelligentes de l'espace de travail. */
@@ -128,8 +138,8 @@ export function FieldInputs({ item }: { item: Item }) {
       {E.champs.map((c, j) => (
         <label key={c} className="kv"><span className="mut sm">{c}</span>
           {j === ST
-            ? <select value={item.values[j]} onChange={(e) => actions.setStatus(item.id, e.target.value)}>{SAAS.statuts.map((s) => <option key={s}>{s}</option>)}</select>
-            : <input defaultValue={item.values[j]} maxLength={500} onBlur={(e) => { if (e.target.value !== item.values[j]) actions.update(item.id, item.values.map((x, k) => (k === j ? e.target.value : x))); }} />}
+            ? <select value={item.values[j]} onChange={(e) => ok(actions.setStatus(item.id, e.target.value))}>{SAAS.statuts.map((s) => <option key={s}>{s}</option>)}</select>
+            : <input type={inputType(typeOf(j))} defaultValue={item.values[j]} maxLength={500} onBlur={(e) => { const el = e.target; if (el.value !== item.values[j] && !ok(actions.update(item.id, item.values.map((x, k) => (k === j ? el.value : x))))) el.value = item.values[j] ?? ""; }} />}
         </label>
       ))}
     </div>
@@ -156,7 +166,7 @@ export function Drawer() {
       <FieldInputs item={it} />
       <label className="kv"><span className="mut sm">Notes</span><NoteArea id={it.id} rows={5} placeholder="Ajoute une note…" /></label>
       <div className="row">
-        <button className="b primary" onClick={() => actions.setStatus(it.id, isDone(it) ? firstStatus() : doneStatus())}>{isDone(it) ? "Rouvrir" : "Marquer terminé"}</button>
+        <button className="b primary" onClick={() => ok(actions.setStatus(it.id, isDone(it) ? firstStatus() : doneStatus()))}>{isDone(it) ? "Rouvrir" : "Marquer terminé"}</button>
         {confirm
           ? <button className="b danger" onClick={() => { actions.remove(it.id); setUi({ drawer: false }); setConfirm(false); }}>Confirmer la suppression</button>
           : <button className="b danger" onClick={() => setConfirm(true)}>Supprimer</button>}
@@ -173,7 +183,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { A, Badge, E, Icon, Logo, nameOf } from "@/components/arch-kit";
-import { PricingView } from "@/components/views";
+import { PricingView, Toasts } from "@/components/views";
 import { SAAS } from "@/lib/config";
 import { actions, useStore } from "@/lib/store";
 
@@ -198,6 +208,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
         <div><b>{SAAS.nom}</b><p className="mut sm">{SAAS.cible}</p></div>
         <div className="row">{A.site.map((p) => <Link key={p.id} href={p.href}>{p.titre}</Link>)}</div>
       </footer>
+      <Toasts />
     </div>
   );
 }
@@ -310,7 +321,7 @@ export function Auth({ signup }: { signup?: boolean }) {
     e.preventDefault();
     const f = new FormData(e.currentTarget);
     const email = String(f.get("email") ?? "");
-    if (signup) { actions.signup(String(f.get("nom") ?? ""), email); router.push("/app"); return; }
+    if (signup) { const refus = actions.signup(String(f.get("nom") ?? ""), email); if (refus) { setErr(refus); return; } router.push("/app"); return; }
     if (actions.login(email)) router.push("/app");
     else setErr("Aucun compte avec cet email dans ce navigateur. Crée-le d'abord.");
   }
@@ -339,6 +350,7 @@ export const FRAME_TSX = String.raw`"use client";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { A, Avatar, Drawer, E, filterList, groupKey, groupsOf, Icon, Logo, R, screenHref, setUi, useMounted, useUi, val } from "@/components/arch-kit";
+import { Toasts } from "@/components/views";
 import { SAAS } from "@/lib/config";
 import { storageError, useStore } from "@/lib/store";
 
@@ -425,6 +437,7 @@ export function AppFrame({ children }: { children: React.ReactNode }) {
     <div className={"mode-app frame-" + A.frame}>
       {body}
       <div className="badge-proto saved" title="Les données restent dans ce navigateur">● Données enregistrées dans ce navigateur</div>
+      <Toasts />
     </div>
   );
 }
@@ -436,7 +449,8 @@ export const SCREENS_TSX = String.raw`"use client";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { A, Avatar, Badge, doneStatus, Drawer, E, Empty, FieldInputs, filterList, firstStatus, fmtDate, groupKey, groupsOf, isDone, money, nameOf, NoteArea, num, parseDate, R, Ring, screenHref, setUi, ST, today, useSelected, useUi, val, words } from "@/components/arch-kit";
+import { A, Avatar, Badge, doneStatus, Drawer, E, Empty, FieldInputs, filterList, firstStatus, fmtDate, groupKey, groupsOf, isDone, money, nameOf, NoteArea, num, ok, parseDate, R, Ring, screenHref, setUi, show, ST, today, todayIso, typeOf, useSelected, useUi, val, words } from "@/components/arch-kit";
+import { inputType } from "@/lib/rules";
 import { GoalsView, KanbanView, SettingsView, TodoView, useEditor } from "@/components/views";
 import { SAAS } from "@/lib/config";
 import { actions, useStore } from "@/lib/store";
@@ -488,7 +502,7 @@ function WsList({ titre }: { titre: string }) {
         <label className="search"><input type="search" placeholder="Rechercher…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Rechercher" /></label>
         <button className="b primary" onClick={() => ed.open("new")}>+ {E.nom}</button>
       </Head>
-      <form className="quick" onSubmit={(e) => { e.preventDefault(); if (!t.trim()) return; actions.add(E.champs.map((_, j) => (j === (R.titre ?? 0) ? t : j === ST ? firstStatus() : ""))); setT(""); }}>
+      <form className="quick" onSubmit={(e) => { e.preventDefault(); if (!t.trim()) return; if (ok(actions.add(E.champs.map((_, j) => (j === (R.titre ?? 0) ? t : j === ST ? firstStatus() : ""))))) setT(""); }}>
         <input value={t} onChange={(e) => setT(e.target.value)} maxLength={500} placeholder={"+ Ajouter : " + E.nom.toLowerCase() + " (Entrée pour valider)"} aria-label="Ajout rapide" />
       </form>
       {rows.length ? (
@@ -497,11 +511,11 @@ function WsList({ titre }: { titre: string }) {
             const p = prog(i);
             return (
               <div key={i.id} className={"ws-row" + (isDone(i) ? " done" : "") + (ui.drawer && ui.sel === i.id ? " on" : "")}>
-                <input type="checkbox" checked={isDone(i)} onChange={(e) => actions.setStatus(i.id, e.target.checked ? doneStatus() : firstStatus())} aria-label={"Terminé : " + nameOf(i)} />
+                <input type="checkbox" checked={isDone(i)} onChange={(e) => ok(actions.setStatus(i.id, e.target.checked ? doneStatus() : firstStatus()))} aria-label={"Terminé : " + nameOf(i)} />
                 <button className="ws-t" onClick={() => setUi({ sel: i.id, drawer: true })}>{nameOf(i)}</button>
                 {p !== null && <Bar pct={p} />}
                 {val(i, gk) && <span className="chip-s">{val(i, gk)}</span>}
-                {val(i, "date") && <span className="mut sm">{val(i, "date")}</span>}
+                {val(i, "date") && <span className="mut sm">{show(i, "date")}</span>}
                 <Badge s={i.values[ST] ?? ""} />
               </div>
             );
@@ -601,7 +615,7 @@ function FiOverview() {
 function FiLedger({ titre }: { titre: string }) {
   const t = useTx().slice().sort((a, b) => time(b) - time(a));
   const ui = useUi();
-  const [form, setForm] = useState<string[]>(() => E.champs.map((_, j) => (j === R.date ? fmtDate(today()) : j === ST ? firstStatus() : "")));
+  const [form, setForm] = useState<string[]>(() => E.champs.map((_, j) => (j === R.date ? todayIso() : j === ST ? firstStatus() : "")));
   const set = (j: number, v: string) => setForm(form.map((x, k) => (k === j ? v : x)));
   const months: { k: string; list: Tx[] }[] = [];
   for (const x of t) {
@@ -613,10 +627,10 @@ function FiLedger({ titre }: { titre: string }) {
   return (
     <>
       <Head titre={titre} />
-      <form className="ledger-add card" onSubmit={(e) => { e.preventDefault(); if (!form[R.titre ?? 0]?.trim()) return; actions.add(form); setForm(form.map((x, j) => (j === R.date || j === ST ? x : ""))); }}>
+      <form className="ledger-add card" onSubmit={(e) => { e.preventDefault(); if (!ok(actions.add(form))) return; setForm(form.map((x, j) => (j === R.date || j === ST ? x : ""))); }}>
         {E.champs.map((c, j) => j === ST
           ? <select key={c} aria-label={c} value={form[j]} onChange={(e) => set(j, e.target.value)}>{SAAS.statuts.map((s) => <option key={s}>{s}</option>)}</select>
-          : <input key={c} aria-label={c} required={j === R.titre} maxLength={500} placeholder={c + (j === R.montant ? " (ex. −12 €)" : "")} value={form[j]} onChange={(e) => set(j, e.target.value)} />)}
+          : <input key={c} type={inputType(typeOf(j))} aria-label={c} maxLength={500} placeholder={c + (j === R.montant ? " (ex. −12 €)" : "")} value={form[j]} onChange={(e) => set(j, e.target.value)} />)}
         <button className="b primary">Ajouter</button>
       </form>
       {months.length ? months.map((m) => {
@@ -624,7 +638,7 @@ function FiLedger({ titre }: { titre: string }) {
         return (
           <section key={m.k} className="month">
             <div className="month-h"><b style={{ textTransform: "capitalize" }}>{m.k}</b><b className={s >= 0 ? "pos" : "neg"}>{money(s)}</b></div>
-            {m.list.map((x) => <button key={x.i.id} className="tx-row" onClick={() => setUi({ sel: x.i.id, drawer: true })}><span className="mut sm">{val(x.i, "date")}</span><b>{val(x.i, "titre")}</b><span className="chip-s">{val(x.i, "groupe")}</span><b className={x.a >= 0 ? "pos" : "neg"}>{val(x.i, "montant")}</b></button>)}
+            {m.list.map((x) => <button key={x.i.id} className="tx-row" onClick={() => setUi({ sel: x.i.id, drawer: true })}><span className="mut sm">{show(x.i, "date")}</span><b>{val(x.i, "titre")}</b><span className="chip-s">{val(x.i, "groupe")}</span><b className={x.a >= 0 ? "pos" : "neg"}>{show(x.i, "montant")}</b></button>)}
           </section>
         );
       }) : <Empty t="Aucune transaction" sub="Ajoute ta première ligne ci-dessus." />}
@@ -658,7 +672,7 @@ function FiAnalysis({ titre }: { titre: string }) {
         <div className="card">
           <b>Plus gros montants</b>
           <div className="mini-list">
-            {top.map((x) => <Link key={x.i.id} className="mini" href={screenHref("fi-ledger")} onClick={() => setUi({ sel: x.i.id, drawer: true })}><span className="grow"><b>{val(x.i, "titre")}</b><span className="mut sm">{val(x.i, "groupe")} · {val(x.i, "date")}</span></span><b className={x.a >= 0 ? "pos" : "neg"}>{money(x.a)}</b></Link>)}
+            {top.map((x) => <Link key={x.i.id} className="mini" href={screenHref("fi-ledger")} onClick={() => setUi({ sel: x.i.id, drawer: true })}><span className="grow"><b>{val(x.i, "titre")}</b><span className="mut sm">{val(x.i, "groupe")} · {show(x.i, "date")}</span></span><b className={x.a >= 0 ? "pos" : "neg"}>{money(x.a)}</b></Link>)}
           </div>
         </div>
       </div>
@@ -725,7 +739,7 @@ function LePlayer() {
         <label className="kv"><span className="mut sm">Contenu de la leçon</span><NoteArea id={r.id} rows={8} placeholder="Écris ici le contenu de la leçon…" /></label>
         <div className="row between">
           <button className="b" disabled={idx <= 0} onClick={() => setUi({ sel: items[idx - 1]!.id })}>← Précédente</button>
-          <button className="b primary" onClick={() => actions.setStatus(r.id, isDone(r) ? firstStatus() : doneStatus())}>{isDone(r) ? "Marquer à refaire" : "Marquer comme terminée ✓"}</button>
+          <button className="b primary" onClick={() => ok(actions.setStatus(r.id, isDone(r) ? firstStatus() : doneStatus()))}>{isDone(r) ? "Marquer à refaire" : "Marquer comme terminée ✓"}</button>
           <button className="b" disabled={idx >= items.length - 1} onClick={() => setUi({ sel: items[idx + 1]!.id })}>Suivante →</button>
         </div>
       </article>
@@ -793,7 +807,7 @@ function CrmSplit() {
           <div className="crm-sheet-h">
             <Avatar n={nameOf(r)} size={56} />
             <div><h1>{nameOf(r)}</h1><p className="mut">{val(r, "personne")}</p></div>
-            <div className="row r">{SAAS.statuts.map((s) => <button key={s} className={"chip" + (r.values[ST] === s ? " on" : "")} onClick={() => actions.setStatus(r.id, s)}>{s}</button>)}</div>
+            <div className="row r">{SAAS.statuts.map((s) => <button key={s} className={"chip" + (r.values[ST] === s ? " on" : "")} onClick={() => ok(actions.setStatus(r.id, s))}>{s}</button>)}</div>
           </div>
           <div className="crm-cols">
             <FieldInputs item={r} />
@@ -859,7 +873,7 @@ function StEditor() {
         <button className="b sm" onClick={() => ed.open("new")}>+ Nouveau</button>
       </aside>
       <div className="editor">
-        <input key={r.id} className="ed-title" defaultValue={nameOf(r)} maxLength={500} aria-label="Titre" onBlur={(e) => { const v = e.target.value.trim(); if (v && v !== nameOf(r)) actions.update(r.id, r.values.map((x, k) => (k === ti ? v : x))); }} />
+        <input key={r.id} className="ed-title" defaultValue={nameOf(r)} maxLength={500} aria-label="Titre" onBlur={(e) => { const v = e.target.value.trim(); if (v && v !== nameOf(r) && !ok(actions.update(r.id, r.values.map((x, k) => (k === ti ? v : x))))) e.target.value = nameOf(r); }} />
         <NoteArea id={r.id} className="ed-body" placeholder="Commence à écrire…" />
         <div className="row between mut xs"><span>{words(notes[r.id] ?? "")} mots</span><span>Enregistré automatiquement dans ce navigateur</span></div>
       </div>
@@ -894,7 +908,7 @@ function CoProducts({ titre }: { titre: string }) {
               <div key={i.id} className="prod">
                 <div className="prod-img" style={{ "--h": (k * 53 + 20) % 360 } as React.CSSProperties}><span>{initials(nameOf(i))}</span></div>
                 <b>{nameOf(i)}</b>
-                <div className="row between"><span className="price-s">{val(i, "prix")}</span><span className={"sm " + (s !== null && s <= 3 ? "neg" : "mut")}>{s === null ? val(i, "stock") : s + " en stock"}</span></div>
+                <div className="row between"><span className="price-s">{show(i, "prix")}</span><span className={"sm " + (s !== null && s <= 3 ? "neg" : "mut")}>{s === null ? val(i, "stock") : s + " en stock"}</span></div>
                 <div className="row between"><Badge s={i.values[ST] ?? ""} /><div className="row"><button className="b sm" onClick={() => ed.open(i)}>Modifier</button><button className="b sm primary" disabled={s === 0} onClick={() => setMsg(actions.order(i.id, 1, "Vente directe"))}>Vendre</button></div></div>
               </div>
             );
@@ -915,8 +929,8 @@ function CoOrders({ titre }: { titre: string }) {
   return (
     <>
       <Head titre={titre} />
-      <form className="card ledger-add" onSubmit={(e) => { e.preventDefault(); const id = p || items[0]?.id; if (!id) return; setMsg(actions.order(id, Math.max(1, Number(q) || 1), c.trim() || "Client")); setC(""); }}>
-        <select aria-label="Produit" value={p || items[0]?.id || ""} onChange={(e) => setP(e.target.value)}>{items.map((i) => <option key={i.id} value={i.id}>{nameOf(i)} — {val(i, "prix")}</option>)}</select>
+      <form className="card ledger-add" noValidate onSubmit={(e) => { e.preventDefault(); const id = p || items[0]?.id; if (!id) { setMsg("Ajoute d'abord un produit."); return; } const m = actions.order(id, Number(q), c); setMsg(m); if (m.startsWith("Commande")) setC(""); }}>
+        <select aria-label="Produit" value={p || items[0]?.id || ""} onChange={(e) => setP(e.target.value)}>{items.map((i) => <option key={i.id} value={i.id}>{nameOf(i)} — {show(i, "prix")}</option>)}</select>
         <input type="number" min={1} value={q} onChange={(e) => setQ(e.target.value)} aria-label="Quantité" />
         <input required maxLength={120} placeholder="Client" value={c} onChange={(e) => setC(e.target.value)} aria-label="Client" />
         <button className="b primary">Créer la commande</button>

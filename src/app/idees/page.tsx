@@ -7,6 +7,7 @@ import { HeroFacts, PageHero } from "@/components/PageHero";
 import { Dots, Modal, toast } from "@/components/ui";
 import { CATEGORIES, IDEA_BY_ID, IDEAS } from "@/data/ideas";
 import { TEMPLATE_BY_ID, TEMPLATES } from "@/data/templates";
+import { CAT_COLORS } from "@/lib/a11y/accents";
 import { filterIdeas, NO_FILTERS, type IdeaFilters } from "@/lib/filters";
 import { AUDIENCE_LABEL, BUDGET_LABEL, DIFFICULTY_LABEL, DURATION_LABEL, LEVEL_LABEL } from "@/lib/labels";
 import { REVENUE_LABEL } from "@/lib/modules";
@@ -14,8 +15,7 @@ import { toggleFavorite, useData } from "@/lib/store";
 import type { CategoryId, Idea } from "@/lib/types";
 
 const CAT_NAME = Object.fromEntries(CATEGORIES.map((c) => [c.id, c.nom])) as Record<CategoryId, string>;
-/** Une couleur par univers, déclinée de la palette Décollage. */
-const CAT_COLORS = ["#2f5bff", "#ff6b4a", "#0a1433", "#0f9d7a", "#7c3aed", "#c8401f", "#1f45e0", "#a8660a", "#db2777", "#0891b2", "#4d7c0f", "#6b21a8"];
+/** Une couleur par univers, déclinée de la palette Décollage (teintes foncées : lisibles en texte, voir lib/a11y/accents.ts). */
 const CAT_COLOR = Object.fromEntries(CATEGORIES.map((c, i) => [c.id, CAT_COLORS[i % CAT_COLORS.length]])) as Record<CategoryId, string>;
 const MAX_COMPARE = 3;
 

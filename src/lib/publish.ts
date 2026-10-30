@@ -25,6 +25,10 @@ export const siteData = (p: Project): SiteData => {
   return { config: p.config, landing: p.landing, pricing: p.pricing.offres.length ? p.pricing : null, ...(contenu ? { contenu } : {}) };
 };
 
+/** Périodes d'offre autorisées (liste blanche : la valeur finit dans une page publique). */
+export const PERIODES: readonly string[] = ["mois", "an", "unique"];
+const SECTION_TYPES: readonly string[] = ["hero", "features", "etapes", "avantages", "tarifs", "faq", "cta"];
+
 const isStr = (x: unknown, max: number) => typeof x === "string" && x.length <= max;
 const strs = (x: unknown, n: number, max: number): x is string[] => Array.isArray(x) && x.length <= n && x.every((s) => isStr(s, max));
 const pairs = (x: unknown, n: number, max: number): x is [string, string][] => Array.isArray(x) && x.length <= n && x.every((p) => strs(p, 2, max) && (p as string[]).length === 2);
@@ -54,6 +58,15 @@ export function cleanContenu(raw: unknown, templateId: TemplateId): Contenu | nu
 
 /** Vérifie des données envoyées par un navigateur avant de les rendre publiques. */
 export function validateSiteData(raw: unknown): { ok: true; data: SiteData } | { ok: false; error: string } {
+  // Données malformées (champ manquant, mauvais type) : refus propre plutôt qu'une erreur serveur.
+  try {
+    return validateSiteDataUnsafe(raw);
+  } catch {
+    return { ok: false, error: "Données invalides." };
+  }
+}
+
+function validateSiteDataUnsafe(raw: unknown): { ok: true; data: SiteData } | { ok: false; error: string } {
   const d = raw as SiteData;
   if (!d || typeof d !== "object" || !d.config || !d.landing) return { ok: false, error: "Données manquantes." };
   if (!TEMPLATE_BY_ID[d.config.templateId]) return { ok: false, error: "Modèle inconnu." };
@@ -64,13 +77,14 @@ export function validateSiteData(raw: unknown): { ok: true; data: SiteData } | {
   if (!["centre", "split", "editorial"].includes(l.layout) || !Array.isArray(l.sections) || l.sections.length > 12) return { ok: false, error: "Landing invalide." };
   if (!isStr(l.boutonPrincipal, 60) || !isStr(l.boutonSecondaire, 60)) return { ok: false, error: "Textes des boutons invalides." };
   for (const s of l.sections) {
+    if (!s || typeof s !== "object" || !isStr(s.id, 40) || !SECTION_TYPES.includes(s.type) || typeof s.visible !== "boolean") return { ok: false, error: "Section invalide." };
     if (!isStr(s.titre, 200) || !isStr(s.texte, 600) || !Array.isArray(s.items) || s.items.length > 12) return { ok: false, error: "Section invalide." };
-    if (s.items.some((i) => !isStr(i.titre, 200) || !isStr(i.texte, 600))) return { ok: false, error: "Élément de section invalide." };
+    if (s.items.some((i) => !i || typeof i !== "object" || !isStr(i.titre, 200) || !isStr(i.texte, 600))) return { ok: false, error: "Élément de section invalide." };
   }
   if (d.pricing) {
     const offres = d.pricing.offres;
     if (!Array.isArray(offres) || offres.length > 6) return { ok: false, error: "Offres invalides." };
-    if (offres.some((o) => !isStr(o.nom, 60) || typeof o.prix !== "number" || o.prix < 0 || o.prix > 100000 || !Array.isArray(o.features) || o.features.length > 20 || o.features.some((f) => !isStr(f, 200)))) {
+    if (offres.some((o) => !o || typeof o !== "object" || !isStr(o.id, 40) || !PERIODES.includes(o.periode) || !isStr(o.nom, 60) || typeof o.prix !== "number" || !Number.isFinite(o.prix) || o.prix < 0 || o.prix > 100000 || !Array.isArray(o.features) || o.features.length > 20 || o.features.some((f) => !isStr(f, 200)))) {
       return { ok: false, error: "Offre invalide." };
     }
   }

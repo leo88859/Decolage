@@ -71,6 +71,10 @@ export function moveSection(landing: Landing, index: number, dir: -1 | 1): Landi
 
 const esc = (s: unknown) => String(s ?? "").replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch]!);
 
+/** Période d'une offre : liste blanche, puis échappement. Toute autre valeur est ignorée (jamais insérée telle quelle). */
+const PERIODE_HTML: Record<string, string> = { mois: " / mois", an: " / an", unique: " une fois" };
+const periodeHtml = (p: unknown) => (typeof p === "string" && Object.hasOwn(PERIODE_HTML, p) ? esc(PERIODE_HTML[p]) : "");
+
 function styleCss(style: VisualStyle, p: string, a: string): string {
   const base = `*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;-webkit-font-smoothing:antialiased}img{max-width:100%}
 .wrap{max-width:1080px;margin:0 auto;padding:0 24px}section{padding:80px 0}
@@ -159,7 +163,8 @@ details summary{transition:color .2s}details summary:hover{color:${p}}details[op
 .wl{display:flex;gap:8px;flex-wrap:wrap;max-width:520px;margin:0 auto;justify-content:center}.wl input[type=email]{flex:1;min-width:220px;padding:14px 16px;border:1.5px solid #cbd5e1;border-radius:12px;font:inherit;background:#fff;color:#0f172a}.wl input[type=email]:focus{outline:none;border-color:${p};box-shadow:0 0 0 4px ${p}33}
 .wl-note{width:100%;font-size:13.5px;margin:6px 0 0;text-align:center}.hp{position:absolute;left:-9999px;width:1px;height:1px;opacity:0}
 .wl-banner{position:sticky;top:0;z-index:10;text-align:center;padding:12px;font-weight:600;font-family:system-ui,sans-serif}.wl-banner.ok{background:#dcfce7;color:#14532d}.wl-banner.bad{background:#ffe4e6;color:#881337}
-.split .wl{margin:0;justify-content:flex-start}.split .wl-note{text-align:left}
+.wl-rgpd{width:100%;font-size:12.5px;line-height:1.5;margin:2px 0 0;text-align:center}.wl-rgpd a{color:inherit;text-decoration:underline}
+.split .wl{margin:0;justify-content:flex-start}.split .wl-note,.split .wl-rgpd{text-align:left}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}.w,.fade-in{opacity:1;transform:none}}`;
 }
 
@@ -202,7 +207,7 @@ export type WaitlistOpts = { action: string | null; merci?: boolean; erreur?: bo
 export function renderLanding(cfg: Config, landing: Landing, pricing: Pricing | null, opts: { inlineCss: boolean; waitlist?: WaitlistOpts; contenu?: Contenu }): string {
   const wl = opts.waitlist;
   const form = (id: string) =>
-    `<form class="wl" id="${id}" method="post" ${wl!.action ? `action="${esc(wl!.action)}"` : `onsubmit="event.preventDefault();this.querySelector('.wl-note').textContent='Aperçu : rien n’est envoyé tant que le site n’est pas publié.'"`}><input type="email" name="email" required maxlength="254" placeholder="ton@email.fr" aria-label="Ton adresse email"><input type="text" name="site" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true"><button class="btn primary">${esc(landing.boutonPrincipal)}</button><p class="wl-note muted">Inscris-toi pour être prévenu·e du lancement.</p></form>`;
+    `<form class="wl" id="${id}" method="post" ${wl!.action ? `action="${esc(wl!.action)}"` : `onsubmit="event.preventDefault();this.querySelector('.wl-note').textContent='Aperçu : rien n’est envoyé tant que le site n’est pas publié.'"`}><input type="email" name="email" required maxlength="254" placeholder="ton@email.fr" aria-label="Ton adresse email"><input type="text" name="site" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true"><button class="btn primary">${esc(landing.boutonPrincipal)}</button><p class="wl-note muted">Inscris-toi pour être prévenu·e du lancement.</p><p class="wl-rgpd muted">Ton adresse e-mail sert uniquement à te prévenir du lancement de ${esc(cfg.nom)} : elle est collectée pour le compte de l’éditeur de ce site. Pour exercer tes droits (accès, suppression…), utilise le contact indiqué dans la <a href="/confidentialite" target="_blank" rel="noopener">politique de confidentialité</a> de Décollage, qui héberge ce site.</p></form>`;
   const t = TEMPLATE_BY_ID[cfg.templateId];
   const mark = cfg.logo ? `<img src="${esc(cfg.logo)}" alt="">` : esc(cfg.initiales);
   const head = `<div class="wrap top"><div class="brand"><span class="mark">${mark}</span>${esc(cfg.nom)}</div><a class="btn primary" href="#cta">${esc(landing.boutonPrincipal)}</a></div>`;
@@ -235,7 +240,7 @@ export function renderLanding(cfg: Config, landing: Landing, pricing: Pricing | 
       case "avantages":
         return `<section><div class="wrap ed"><h2 class="rv">${num()}${esc(s.titre)}</h2><ul class="ticks" style="font-size:19px">${s.items.map((x, i) => `<li class="rv" style="--i:${i}">${esc(x.titre)}</li>`).join("")}</ul></div></section>`;
       case "tarifs":
-        return `<section id="tarifs" class="tint"><div class="wrap ed"><h2 class="rv">${num()}${esc(s.titre)}</h2>${s.texte ? `<p class="lead muted rv" style="margin:-12px 0 28px">${esc(s.texte)}</p>` : ""}<div class="grid">${offres.map((o, i) => `<div class="card rv${i === Math.min(1, offres.length - 1) && offres.length > 1 ? " hl" : ""}" style="--i:${i}"><h3>${esc(o.nom)}</h3><div class="price">${o.prix === 0 ? "Gratuit" : `${esc(o.prix)} €<small>${o.periode === "unique" ? " une fois" : ` / ${o.periode}`}</small>`}</div><ul class="ticks">${o.features.filter((f) => f.trim()).map((f) => `<li>${esc(f)}</li>`).join("")}</ul></div>`).join("")}</div></div></section>`;
+        return `<section id="tarifs" class="tint"><div class="wrap ed"><h2 class="rv">${num()}${esc(s.titre)}</h2>${s.texte ? `<p class="lead muted rv" style="margin:-12px 0 28px">${esc(s.texte)}</p>` : ""}<div class="grid">${offres.map((o, i) => `<div class="card rv${i === Math.min(1, offres.length - 1) && offres.length > 1 ? " hl" : ""}" style="--i:${i}"><h3>${esc(o.nom)}</h3><div class="price">${o.prix === 0 ? "Gratuit" : `${esc(o.prix)} €<small>${periodeHtml(o.periode)}</small>`}</div><ul class="ticks">${o.features.filter((f) => f.trim()).map((f) => `<li>${esc(f)}</li>`).join("")}</ul></div>`).join("")}</div></div></section>`;
       case "faq":
         return `<section><div class="wrap ed" style="max-width:760px"><h2 class="rv">${num()}${esc(s.titre)}</h2>${s.items.map((x, i) => `<details class="rv" style="--i:${i}"><summary>${esc(x.titre)}</summary><p>${esc(x.texte)}</p></details>`).join("")}</div></section>`;
       case "cta":

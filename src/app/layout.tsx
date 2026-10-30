@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, Instrument_Serif, Space_Grotesk } from "next/font/google";
 import { CloudSync } from "@/components/CloudSync";
+import { ConsentManager } from "@/components/ConsentManager";
+import { Footer } from "@/components/Footer";
 import { Nav } from "@/components/Nav";
 import { PrefsApply } from "@/components/PrefsApply";
 import { Toasts } from "@/components/ui";
@@ -26,7 +28,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body>
         <a href="#contenu" className="sr-only">Aller au contenu</a>
         <Nav />
-        <div id="contenu">{children}</div>
+        <div id="contenu" tabIndex={-1}>{children}</div>
+        <Footer />
+        <ConsentManager />
         <Toasts />
         <CloudSync />
         <PrefsApply />

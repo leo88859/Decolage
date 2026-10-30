@@ -4,25 +4,25 @@ import { DesignThumb } from "@/components/DesignThumb";
 import { EXEMPLES } from "@/data/exemples";
 import { IdeaBox } from "@/components/IdeaBox";
 import { OfferCards } from "@/components/OfferCards";
-import { LogoMark, Reveal } from "@/components/ui";
+import { Reveal } from "@/components/ui";
 import { DESIGNS } from "@/data/designs";
 import { IDEAS } from "@/data/ideas";
 import { SECTEURS } from "@/data/secteurs";
 import { TEMPLATES } from "@/data/templates";
-import { PAID_PLANS, PLANS } from "@/lib/plans";
+import { PAID_PLANS, PLANS, prixCourt } from "@/lib/plans";
 import "./marketing.css";
 
 const STEPS = [
   ["Décris ton idée", "Une phrase suffit. Décollage reconnaît le type de produit et ton métier, et te propose un nom."],
   ["Choisis ton design", "10 designs complets, chacun avec son menu, son tableau de bord et ses animations. Tu vois ton SaaS dedans avant de choisir."],
-  ["Ton SaaS est prêt", "Application interactive, page de vente rédigée, données adaptées à ton métier. Tout reste modifiable."],
+  ["Ton projet est généré", "Application fonctionnelle, page de vente rédigée, données adaptées à ton métier, code exportable. Tout reste modifiable."],
   ["Lance-le", "Publication en un clic, vraie liste d'attente, guide pas à pas pour Stripe, Supabase et le nom de domaine."],
 ];
 
 
 const FAQ = [
   ["Décollage utilise-t-il une intelligence artificielle ?", "Non. Tout repose sur des modèles, des textes et des briques écrits à l'avance, et sur des règles programmées. Le résultat est instantané, et la même idée donne toujours le même SaaS."],
-  ["Que puis-je faire sans payer ?", "Décrire ton idée, voir ton SaaS dans les 10 designs et l'essayer en aperçu interactif, et parcourir le catalogue d'idées. Pour générer ton SaaS, le garder, le modifier et le publier, il faut une offre payante, dès 2,99 € par mois."],
+  ["Que puis-je faire sans payer ?", `Décrire ton idée, voir ton SaaS dans les 10 designs et l'essayer en aperçu interactif, et parcourir le catalogue d'idées. Pour générer ton SaaS, le garder, le modifier et le publier, il faut une offre payante, dès ${prixCourt("solo")} par mois`],
   ["Mon SaaS est-il vraiment en ligne ?", "Avec une offre payante, tu publies en un clic ta page de vente et ta démo sur une adresse publique, avec une vraie liste d'attente. Pour une application complète (comptes, base de données, paiements de tes clients), le guide de mise en production t'accompagne étape par étape."],
   ["Puis-je créer n'importe quelle application ?", "Non, et on préfère être clairs : ton produit est assemblé à partir de 16 types de SaaS et de 17 briques réellement programmées. C'est ce qui rend le résultat fiable."],
   ["Puis-je résilier quand je veux ?", "Oui. Sans engagement : tu changes d'offre ou tu résilies en ligne, à tout moment. Tes projets restent exportables."],
@@ -50,7 +50,7 @@ export default function Home() {
               <span className="word serif" style={{ "--w": 9 } as React.CSSProperties}>zéro.</span>
             </h1>
             <p className="lead">
-              Décollage transforme une phrase en SaaS complet : application interactive, tableau de bord, page de vente et plan de lancement,
+              Décollage transforme ton idée en projet SaaS : application fonctionnelle, tableau de bord, page de vente, code exportable et plan de lancement,
               dans le design de ton choix.
             </p>
             <IdeaBox />
@@ -227,20 +227,6 @@ export default function Home() {
           </Reveal>
         </div>
       </section>
-
-      <footer className="footer">
-        <div className="container row between">
-          <span className="logo" style={{ color: "#fff" }}><LogoMark /> Décollage</span>
-          <nav className="row" aria-label="Pied de page">
-            <Link href="/creer">Créer</Link>
-            <Link href="/#offres">Offres</Link>
-            <Link href="/idees">Idées</Link>
-            <Link href="/guide">Guide</Link>
-            <Link href="/tableau-de-bord">Mes projets</Link>
-          </nav>
-          <span>© {new Date().getFullYear()} Décollage</span>
-        </div>
-      </footer>
     </main>
   );
 }

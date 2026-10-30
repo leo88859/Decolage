@@ -5,9 +5,10 @@ import { useCallback, useEffect, useState } from "react";
 import { useFeatures } from "@/components/CloudSync";
 import { Confirm, CopyButton, download, toast } from "@/components/ui";
 import { useCloud } from "@/lib/cloud";
+import { waitlistCsv } from "@/lib/csv";
 import { siteData, slugError, suggestSlug } from "@/lib/publish";
 import { getBrowserClient } from "@/lib/supabase/browser";
-import { PLANS } from "@/lib/plans";
+import { PLANS, prixCourt } from "@/lib/plans";
 import { updateProject, useData } from "@/lib/store";
 import type { Project } from "@/lib/types";
 
@@ -55,7 +56,7 @@ export function OnlineTab({ project: p }: { project: Project }) {
   if (PLANS[plan].maxSites === 0) {
     return (
       <div className="empty">
-        <h2 className="h-sec">Mets ton SaaS en ligne dès 2,99 € par mois</h2>
+        <h2 className="h-sec">Mets ton SaaS en ligne dès {prixCourt("solo")} par mois</h2>
         <p className="mut" style={{ margin: "8px auto 18px", maxWidth: 540 }}>
           La formule gratuite permet de créer et d&apos;essayer ton projet. Avec une offre payante, il obtient son adresse publique et une vraie liste d&apos;attente, et tu débloques toutes les fonctions.
         </p>
@@ -188,7 +189,7 @@ function Waitlist({ slug, name }: { slug: string; name: string }) {
         <h2 className="h-sec">Liste d&apos;attente</h2>
         <div className="row">
           <button className="btn btn-ghost btn-sm" onClick={() => void load()}>Actualiser</button>
-          <button className="btn btn-sm" disabled={!rows?.length} onClick={() => download(`inscrits-${slug}.csv`, "﻿email;date\n" + (rows ?? []).map((r) => `${r.email};${r.created_at}`).join("\n"), "text/csv")}>Exporter CSV</button>
+          <button className="btn btn-sm" disabled={!rows?.length} onClick={() => download(`inscrits-${slug}.csv`, waitlistCsv(rows ?? []), "text/csv")}>Exporter CSV</button>
         </div>
       </div>
       {error && <div className="alert alert-bad" style={{ marginTop: 12 }}>{error}</div>}

@@ -118,7 +118,7 @@ export function Meter({ value, coral, label }: { value: number; coral?: boolean;
 }
 
 export function Ring({ value, label }: { value: number; label: string }) {
-  const c = value >= 70 ? "var(--ok)" : value >= 40 ? "var(--blue)" : "var(--coral)";
+  const c = value >= 70 ? "var(--ok)" : value >= 40 ? "var(--blue)" : "var(--coral-graph)";
   return (
     <div className="ring" style={{ "--v": value, "--c": c } as React.CSSProperties} role="img" aria-label={`${label} : ${value} sur 100`}>
       <span>{value}</span>

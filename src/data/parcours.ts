@@ -1,12 +1,13 @@
 // Parcours « Apprendre » : conseils et checklists pratiques, écrits à l'avance (aucune IA).
 // Les cases cochées sont enregistrées sous la clé `p:<parcours>.<case>`.
+import { PARCOURS_COLORS } from "@/lib/a11y/accents";
 
 export type Etape = { id: string; titre: string; pourquoi: string; conseils: string[]; checks: [string, string][] };
 export type Parcours = { id: string; titre: string; accroche: string; duree: string; couleur: string; etapes: Etape[]; outil?: { label: string; onglet: string } };
 
 export const PARCOURS: Parcours[] = [
   {
-    id: "valider", titre: "Valider une idée", accroche: "Savoir si des gens ont vraiment le problème, avant de construire.", duree: "1 à 2 semaines", couleur: "#2f5bff",
+    id: "valider", titre: "Valider une idée", accroche: "Savoir si des gens ont vraiment le problème, avant de construire.", duree: "1 à 2 semaines", couleur: PARCOURS_COLORS.valider,
     outil: { label: "Questionnaire de validation du projet", onglet: "validation" },
     etapes: [
       { id: "probleme", titre: "Écrire le problème en une phrase", pourquoi: "Si tu ne peux pas le dire simplement, personne ne le comprendra.", conseils: ["Parle du problème, pas de ta solution : « Les coiffeurs perdent du temps au téléphone » plutôt que « une appli de réservation ».", "Précise qui l'a et à quel moment il le gêne.", "Évite les mots vagues comme « simplifier » ou « optimiser »."], checks: [["phrase", "J'ai écrit le problème en une phrase, sans parler de ma solution"], ["qui", "Je sais exactement qui a ce problème (métier, âge, situation)"]] },
@@ -16,7 +17,7 @@ export const PARCOURS: Parcours[] = [
     ],
   },
   {
-    id: "mvp", titre: "Définir un MVP", accroche: "La plus petite version utile, livrable en quelques semaines.", duree: "2 à 6 semaines", couleur: "#ff6b4a",
+    id: "mvp", titre: "Définir un MVP", accroche: "La plus petite version utile, livrable en quelques semaines.", duree: "2 à 6 semaines", couleur: PARCOURS_COLORS.mvp,
     outil: { label: "Feuille de route du projet", onglet: "feuille" },
     etapes: [
       { id: "promesse", titre: "Choisir une seule promesse", pourquoi: "Un MVP qui fait tout ne fait rien de bien.", conseils: ["Termine la phrase : « Avec mon SaaS, tu peux enfin… ».", "Tout ce qui ne sert pas cette promesse attendra la version 2.", "Garde ta liste d'idées « plus tard » pour ne pas les perdre."], checks: [["phrase", "Ma promesse tient en une phrase"], ["plus-tard", "J'ai une liste « plus tard » pour les idées secondaires"]] },
@@ -26,7 +27,7 @@ export const PARCOURS: Parcours[] = [
     ],
   },
   {
-    id: "prix", titre: "Choisir un prix", accroche: "Un prix simple, justifié par la valeur, testé auprès de vrais clients.", duree: "quelques jours", couleur: "#0f9d7a",
+    id: "prix", titre: "Choisir un prix", accroche: "Un prix simple, justifié par la valeur, testé auprès de vrais clients.", duree: "quelques jours", couleur: PARCOURS_COLORS.prix,
     outil: { label: "Labo des prix du projet", onglet: "prix" },
     etapes: [
       { id: "valeur", titre: "Estimer la valeur pour le client", pourquoi: "On paie pour un gain, pas pour des fonctionnalités.", conseils: ["Combien de temps ou d'argent ton SaaS fait-il gagner par mois ?", "Un bon prix se situe souvent autour de 10 % de ce gain.", "Pour un particulier, compare à ce qu'il dépense déjà (abonnements, applis)."], checks: [["gain", "J'ai estimé le gain mensuel pour un client type"], ["calcul", "J'ai déduit une fourchette de prix"]] },
@@ -36,7 +37,7 @@ export const PARCOURS: Parcours[] = [
     ],
   },
   {
-    id: "lancer", titre: "Lancer son produit", accroche: "Trouver tes premiers utilisateurs et apprendre d'eux.", duree: "2 à 4 semaines", couleur: "#7c3aed",
+    id: "lancer", titre: "Lancer son produit", accroche: "Trouver tes premiers utilisateurs et apprendre d'eux.", duree: "2 à 4 semaines", couleur: PARCOURS_COLORS.lancer,
     outil: { label: "Plan de lancement du projet", onglet: "lancement" },
     etapes: [
       { id: "page", titre: "Préparer la page de vente", pourquoi: "C'est ta vitrine : elle doit dire en 5 secondes à qui tu t'adresses.", conseils: ["Un titre qui parle du résultat, pas de la technique.", "Reprends les mots entendus pendant tes entretiens.", "Un seul bouton principal, répété en bas de page."], checks: [["titre", "Mon titre parle du résultat pour le client"], ["publiee", "Ma page est publiée en ligne"]] },

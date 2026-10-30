@@ -13,7 +13,13 @@ import { ARCH_CSS } from "@/lib/arch-css";
 import type { ArchPageKind, PageKind, Project } from "@/lib/types";
 import { ARCH_KIT_TSX, ARCH_REACT_CSS, FRAME_TSX, SCREENS_TSX, SITE_TSX } from "./kit-arch";
 import { STORE_TS, TYPES_TS } from "./kit-data";
-import { REACT_CSS, SHELL_TSX, VIEWS_TSX } from "./kit-ui";
+import { RULES_TS } from "./kit-rules";
+import { inferTypes, toStored, type FieldType } from "./schema";
+
+type Booking = { date: number; ressource?: number; annule: string[]; debut: string; fin: string; duree: number; jours: number[] };
+import { REACT_CSS, SHELL_TSX } from "./kit-ui";
+import { VIEWS_TSX } from "./kit-views";
+import { CLOUD_TS, CLOUD_TSX, WAITLIST_SQL } from "./kit-cloud";
 
 /** Écrans d'architecture (rendus par components/screens.tsx). */
 const ARCH_VIEWS = new Set<string>(Object.values(ARCHETYPES).flatMap((a) => a.screens.map((s) => s.view)));
@@ -23,22 +29,22 @@ const ARCH_VIEWS = new Set<string>(Object.values(ARCHETYPES).flatMap((a) => a.sc
 // Le résultat est une vraie application : les données sont enregistrées dans le navigateur.
 
 export type GenFile = { name: string; content: string };
-type GenKind = "accueil" | "dashboard" | "table" | "cards" | "grid" | "kanban" | "agenda" | "form" | "todo" | "goals" | "settings" | "pricing" | "login" | "activity";
+type GenKind = "accueil" | "dashboard" | "table" | "cards" | "grid" | "kanban" | "agenda" | "form" | "todo" | "goals" | "settings" | "pricing" | "login" | "activity" | "waitlist";
 
 /** Pages du prototype et leur équivalent dans le projet généré. Les autres ne sont pas générées. */
 export const KIND_MAP: Partial<Record<PageKind, GenKind>> = {
   accueil: "accueil", dashboard: "dashboard", graphique: "dashboard", resultats: "dashboard",
   tableau: "table", liste: "cards", grille: "grid", kanban: "kanban", calendrier: "agenda", mois: "agenda",
   formulaire: "form", relances: "todo", objectifs: "goals", parametres: "settings", profil: "settings",
-  tarifs: "pricing", facturation: "pricing", connexion: "login", historique: "activity", notifications: "activity",
+  tarifs: "pricing", facturation: "pricing", connexion: "login", historique: "activity", notifications: "activity", waitlist: "waitlist",
 };
 const VIEW: Record<GenKind, string> = {
   accueil: "Home", dashboard: "Dashboard", table: "TableView", cards: "CardsView", grid: "CardsView", kanban: "KanbanView", agenda: "AgendaView",
-  form: "FormView", todo: "TodoView", goals: "GoalsView", settings: "SettingsView", pricing: "PricingView", login: "LoginView", activity: "ActivityView",
+  form: "FormView", todo: "TodoView", goals: "GoalsView", settings: "SettingsView", pricing: "PricingView", login: "LoginView", activity: "ActivityView", waitlist: "WaitlistView",
 };
 
 /** Versions identiques à celles de Décollage : connues pour fonctionner ensemble. */
-export const VERSIONS = { next: "16.4.2", react: "19.3.0", typescript: "^5", "@types/react": "^19", "@types/react-dom": "^19", "@types/node": "^24" };
+export const VERSIONS = { next: "16.4.2", react: "19.3.0", typescript: "^5", "@types/react": "^19", "@types/react-dom": "^19", "@types/node": "^24", "@supabase/supabase-js": "^2.118.0" };
 
 const js = (x: unknown) => JSON.stringify(x, null, 2);
 const routeId = (id: string) => id.toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "") || "page";
@@ -78,7 +84,21 @@ export function generationPlan(p: Project): { gen: GenPage[]; skipped: string[] 
   return { gen, skipped };
 }
 
-export function generateNextProject(p: Project): GenFile[] {
+/** Réservations : colonne date et heure, ressource éventuelle, statuts qui libèrent le créneau, horaires par défaut. */
+function bookingOf(templateId: string, types: FieldType[], statuts: string[]): Booking | undefined {
+  if (templateId !== "rendez-vous" && templateId !== "reservations") return undefined;
+  const date = types.indexOf("datetime");
+  if (date < 0) return undefined;
+  return {
+    date,
+    ...(templateId === "reservations" ? { ressource: 0 } : {}),
+    annule: statuts.filter((s) => /annul|refus/i.test(s)),
+    debut: "09:00", fin: "18:00", duree: templateId === "reservations" ? 60 : 30,
+    jours: [1, 2, 3, 4, 5, 6],
+  };
+}
+
+export function generateNextProject(p: Project, now = new Date()): GenFile[] {
   const cfg = p.config;
   const t = TEMPLATE_BY_ID[cfg.templateId];
   const demo = DEMO[cfg.templateId];
@@ -89,7 +109,12 @@ export function generateNextProject(p: Project): GenFile[] {
   // Données de départ : celles saisies dans Décollage si elles existent, sinon les exemples.
   const savedRows = p.appData?.rows.filter((r) => r.v.length === n);
   const saved = savedRows?.map((r) => r.v);
-  const exemples = saved?.length ? saved : (contenu?.lignes ?? demo.rows);
+  const brut = saved?.length ? saved : (contenu?.lignes ?? demo.rows);
+  // Type de chaque colonne, puis exemples convertis en vraies valeurs (dates ISO, nombres).
+  const types = inferTypes(entite.champs, demo.status, brut, now);
+  const exemples = brut.map((r) => r.map((v, j) => toStored(v, types[j] ?? "text", now)));
+  const booking = bookingOf(cfg.templateId, types, statuts);
+  const unique = cfg.templateId === "liste-attente" && types.includes("email") ? types.indexOf("email") : undefined;
   // Notes, leçons et documents écrits dans Décollage, rattachés aux mêmes lignes (ids « ex1 », « ex2 »…).
   const savedNotes = p.appData?.notes;
   const notes = savedRows?.length && savedNotes ? Object.fromEntries(savedRows.flatMap((r, k) => (savedNotes[String(r.id)] ? [[`ex${k + 1}`, savedNotes[String(r.id)]!]] : []))) : {};
@@ -112,8 +137,11 @@ export function generateNextProject(p: Project): GenFile[] {
 
   const saas = {
     nom: cfg.nom, initiales: cfg.initiales, description: cfg.description, cible: cfg.cible || t.nom,
-    storageKey: `${name}-donnees-v1`,
-    entite, statut: demo.status, statuts, exemples,
+    // v2 : dates et nombres enregistrés en format réel (ISO, notation point).
+    storageKey: `${name}-donnees-v2`,
+    entite, types, statut: demo.status, statuts, exemples,
+    ...(booking ? { booking } : {}),
+    ...(unique !== undefined ? { unique } : {}),
     pages: (arch ? extras : gen).map((g) => ({ id: g.id, titre: g.titre, kind: g.kind, href: g.href, nav: g.nav })),
     fonctionnalites: features,
     heroTitre: contenu?.copy.heroTitre.replaceAll("{nom}", cfg.nom) ?? t.copy.heroTitre,
@@ -155,10 +183,12 @@ ${arch ? `      <body className="arch">{children}</body>` : `      <body>
 `;
 
   const page = (g: (typeof gen)[number]) => {
-    const view = VIEW[g.kind as GenKind];
+    // Liste d'attente : la page publique passe par la base de données quand elle est configurée.
+    const cloudPage = g.kind === "waitlist" && unique !== undefined;
+    const view = cloudPage ? "WaitlistPage" : VIEW[g.kind as GenKind];
     const props = g.kind === "accueil" ? "" : ` titre=${js(g.titre)}${g.kind === "grid" ? " grid" : ""}`;
     return `import type { Metadata } from "next";
-import { ${view} } from "@/components/views";
+import { ${view} } from "@/components/${cloudPage ? "cloud" : "views"}";
 
 export const metadata: Metadata = { title: ${js(`${g.titre} · ${cfg.nom}`)} };
 
@@ -170,6 +200,21 @@ export default function Page() {
   const hasHome = gen.some((g) => g.kind === "accueil");
   const first = gen.find((g) => g.kind !== "accueil");
   const pageFiles: GenFile[] = arch ? archPageFiles(gen, cfg.nom, isScreen, page) : gen.filter((g) => g.kind !== "accueil").map((g) => ({ name: `app/${g.id}/page.tsx`, content: page(g) }));
+  // Page de détail d'une fiche (/fiche?id=…), ouverte depuis les listes.
+  if (!arch) pageFiles.push({ name: "app/fiche/page.tsx", content: `import type { Metadata } from "next";
+import { Suspense } from "react";
+import { DetailView } from "@/components/views";
+
+export const metadata: Metadata = { title: ${js(`Fiche · ${cfg.nom}`)} };
+
+export default function Page() {
+  return (
+    <Suspense fallback={<p className="mut">Chargement…</p>}>
+      <DetailView />
+    </Suspense>
+  );
+}
+` });
   if (!arch) pageFiles.push({
     name: "app/page.tsx",
     content: hasHome
@@ -180,7 +225,7 @@ export default function Page() {
   const pkg = {
     name, version: "0.1.0", private: true,
     scripts: { dev: "next dev", build: "next build", start: "next start" },
-    dependencies: { next: VERSIONS.next, react: VERSIONS.react, "react-dom": VERSIONS.react },
+    dependencies: { next: VERSIONS.next, react: VERSIONS.react, "react-dom": VERSIONS.react, ...(unique !== undefined ? { "@supabase/supabase-js": VERSIONS["@supabase/supabase-js"] } : {}) },
     devDependencies: { typescript: VERSIONS.typescript, "@types/react": VERSIONS["@types/react"], "@types/react-dom": VERSIONS["@types/react-dom"], "@types/node": VERSIONS["@types/node"] },
   };
   const tsconfig = {
@@ -197,8 +242,9 @@ export default function Page() {
     { name: "package.json", content: js(pkg) + "\n" },
     { name: "tsconfig.json", content: js(tsconfig) + "\n" },
     { name: "next.config.mjs", content: `/** @type {import('next').NextConfig} */\nconst nextConfig = {};\n\nexport default nextConfig;\n` },
-    { name: ".gitignore", content: "node_modules\n.next\nout\n*.tsbuildinfo\nnext-env.d.ts\n.env*\n" },
-    { name: "README.md", content: readme(p, gen, skipped, name, entite.pluriel) },
+    { name: ".gitignore", content: "node_modules\n.next\nout\n*.tsbuildinfo\nnext-env.d.ts\n.env*\n!.env.example\n" },
+    ...(unique !== undefined ? cloudFiles(cfg.nom) : []),
+    { name: "README.md", content: readme(p, gen, skipped, name, entite.pluriel, booking, unique) },
     { name: "app/layout.tsx", content: layout },
     { name: "app/globals.css", content: css },
     // Icône d'onglet aux initiales et aux couleurs du projet (détectée automatiquement par Next.js).
@@ -211,15 +257,61 @@ export default function Page() {
           { name: "components/frame.tsx", content: FRAME_TSX },
           { name: "components/screens.tsx", content: SCREENS_TSX },
         ]
-      : [{ name: "components/Shell.tsx", content: SHELL_TSX }]),
+      : [{ name: "components/Shell.tsx", content: unique !== undefined ? cloudShell(SHELL_TSX) : SHELL_TSX }]),
     { name: "components/views.tsx", content: VIEWS_TSX },
     { name: "lib/types.ts", content: TYPES_TS },
+    { name: "lib/rules.ts", content: RULES_TS },
     { name: "lib/store.ts", content: STORE_TS },
     { name: "lib/config.ts", content: `// Généré par Décollage à partir de ton projet. Tu peux modifier ces valeurs.\nimport type { SaasConfig } from "@/lib/types";\n\nexport const SAAS: SaasConfig = ${js(saas)};\n` },
   ];
 }
 
-const SITE_COMPONENT: Record<string, string> = { "site-home": "Home", "site-features": "Features", "site-pricing": "Pricing", "site-login": "Auth", "site-signup": "Auth signup" };
+/** Coquille de la liste d'attente : avec la base branchée, le badge et le compteur ne parlent plus du stockage local. */
+function cloudShell(shell: string): string {
+  const swaps: [string, string][] = [
+    ['import { storageError, useStore } from "@/lib/store";', 'import { storageError, useStore } from "@/lib/store";\nimport { cloudState } from "@/lib/cloud";'],
+    ['<span className="mut xs">{state.items.length} {SAAS.entite.pluriel.toLowerCase()}</span>', '{cloudState === "local" ? <span className="mut xs">{state.items.length} {SAAS.entite.pluriel.toLowerCase()}</span> : <Link href="/proprietaire" className="mut xs">Inscriptions en ligne →</Link>}'],
+    ['title="Les données restent dans ce navigateur">● Données enregistrées dans ce navigateur</div>', 'title={cloudState === "local" ? "Les données restent dans ce navigateur" : "Les inscriptions publiques vont dans la base ; les autres pages restent dans ce navigateur"}>{cloudState === "local" ? "● Données enregistrées dans ce navigateur" : "● Inscriptions enregistrées en ligne"}</div>'],
+  ];
+  return swaps.reduce((s, [a, b]) => {
+    if (!s.includes(a)) throw new Error("Coquille : passage introuvable pour la liste d'attente");
+    return s.replace(a, b);
+  }, shell);
+}
+
+/** Base de données facultative de la liste d'attente : migration, accès public, espace propriétaire. */
+function cloudFiles(nom: string): GenFile[] {
+  return [
+    { name: ".env.example", content: "# Copie ce fichier en .env.local et remplis les valeurs (voir le README).\n# Valeurs publiques uniquement : ne mets jamais ici la clé service_role ni une clé secrète.\nNEXT_PUBLIC_SUPABASE_URL=\nNEXT_PUBLIC_SUPABASE_ANON_KEY=\nNEXT_PUBLIC_LISTE_ID=\n" },
+    { name: "supabase/migrations/0001_liste_attente.sql", content: WAITLIST_SQL },
+    { name: "lib/cloud.ts", content: CLOUD_TS },
+    { name: "components/cloud.tsx", content: CLOUD_TSX },
+    { name: "app/proprietaire/page.tsx", content: `import type { Metadata } from "next";\nimport { OwnerView } from "@/components/cloud";\n\nexport const metadata: Metadata = { title: ${js(`Espace propriétaire · ${nom}`)}, robots: { index: false } };\n\nexport default function Page() {\n  return <OwnerView />;\n}\n` },
+  ];
+}
+
+const SUPABASE_README = String.raw`
+## Base de données (Supabase)
+
+Gratuit dans la limite de l'offre Free de Supabase. Aucune clé secrète n'est utilisée : la sécurité est appliquée par la base (règles RLS).
+
+1. Crée un projet sur https://supabase.com (offre Free).
+2. Ouvre **SQL Editor**, colle le contenu de CODEsupabase/migrations/0001_liste_attente.sqlCODE et exécute-le. Le script ne supprime aucune donnée.
+3. Dans **Project Settings → API**, copie l'URL du projet et la clé publique (*Publishable key*, ou *anon key*). **Jamais la clé service_role / secret.**
+4. Copie CODE.env.exampleCODE en CODE.env.localCODE et renseigne CODENEXT_PUBLIC_SUPABASE_URLCODE et CODENEXT_PUBLIC_SUPABASE_ANON_KEYCODE, puis relance CODEnpm run devCODE.
+5. Ouvre CODE/proprietaireCODE, crée ton compte et ta liste : l'identifiant de la liste s'affiche. Renseigne-le dans CODENEXT_PUBLIC_LISTE_IDCODE et relance.
+6. Une fois ton compte créé, désactive les nouvelles inscriptions de comptes dans Supabase (**Authentication → Sign In / Providers → Allow new users to sign up**) : toi seul en as besoin.
+
+Ce que garantit la base :
+
+- les visiteurs peuvent seulement s'inscrire (fonction CODEinscrireCODE) : ils ne peuvent lire aucune inscription ;
+- une adresse ne peut être inscrite qu'une fois par liste, quelle que soit la casse ; un doublon reçoit la même réponse, sans révéler que l'adresse était déjà inscrite ;
+- chaque compte ne voit et ne supprime que les inscriptions de ses propres listes.
+
+Limite : il n'y a pas de protection anti-robots (captcha). Surveille ta liste et supprime les inscriptions suspectes depuis CODE/proprietaireCODE.
+`.replaceAll("CODE", "`");
+
+const SITE_COMPONENT: Record<string, string> ={ "site-home": "Home", "site-features": "Features", "site-pricing": "Pricing", "site-login": "Auth", "site-signup": "Auth signup" };
 
 /** Pages d'un SaaS à architecture : site public dans le groupe (site), espace utilisateur sous app/app. */
 function archPageFiles(gen: GenPage[], nom: string, isScreen: (g: GenPage) => boolean, generic: (g: GenPage) => string): GenFile[] {
@@ -239,7 +331,7 @@ function archPageFiles(gen: GenPage[], nom: string, isScreen: (g: GenPage) => bo
   return files;
 }
 
-function readme(p: Project, gen: ReturnType<typeof generationPlan>["gen"], skipped: string[], name: string, entite: string) {
+function readme(p: Project, gen: ReturnType<typeof generationPlan>["gen"], skipped: string[], name: string, entite: string, booking?: Booking, unique?: number) {
   const c = p.config;
   const arch = archOf(c.templateId).id === "classic" ? null : archOf(c.templateId);
   return `# ${c.nom}
@@ -254,7 +346,8 @@ Le code est écrit à partir de modèles et de composants préprogrammés, sans 
 - Ajouter, modifier et supprimer des ${entite.toLowerCase()}, avec recherche, filtres et tri.
 - Les données sont **enregistrées dans le navigateur** (localStorage) : elles restent après actualisation et fermeture.
 - Import et export **CSV** (page « ${gen.find((g) => g.kind === "settings")?.titre ?? "Données"} »).
-${arch ? `- Architecture **« ${arch.nom} »** : ${arch.description}
+- **Saisies vérifiées** avant tout enregistrement (\`lib/rules.ts\`) : champs obligatoires, e-mails, dates, nombres et montants. Une saisie refusée affiche son erreur et n'est pas enregistrée ; un import CSV écarte les lignes invalides.
+${booking ? `- **Réservations** : créneaux de ${booking.duree} min, de ${booking.debut} à ${booking.fin}, ${booking.jours.length} jours par semaine (réglables dans \`lib/config.ts\`, clé \`booking\`). Une réservation passée, hors horaires ou sur un créneau déjà pris${booking.ressource !== undefined ? " pour la même ressource" : ""} est refusée ; l'annulation libère le créneau.\n` : ""}${unique !== undefined ? "- **Liste d'attente** : page publique `/inscription`, adresse e-mail vérifiée, une seule inscription par adresse.\n" : ""}${arch ? `- Architecture **« ${arch.nom} »** : ${arch.description}
 - Site public : ${gen.filter((g) => g.zone === "site").map((g) => `${g.titre} (\`${g.href}\`)`).join(", ")}.
 - Espace utilisateur (\`/app\`) : ${gen.filter((g) => g.zone === "app").map((g) => g.titre).join(", ")}.
 ` : `- Pages générées : ${gen.map((g) => g.titre).join(", ")}.
@@ -262,7 +355,7 @@ ${arch ? `- Architecture **« ${arch.nom} »** : ${arch.description}
 ## Ce qui n'est pas inclus (à brancher si besoin)
 
 - **Comptes utilisateurs** : pas de connexion réelle.${c.modules.includes("auth") && arch ? " L'inscription crée un *compte local* (nom et email gardés dans ce navigateur, sans mot de passe ni serveur) : il sert à ouvrir l'espace, ce n'est pas une sécurité." : ""} Chaque navigateur a ses propres données ; rien n'est partagé entre appareils.
-- **Base de données en ligne** : aucune. Pour partager des données, il faut un service (par exemple Supabase) et adapter \`lib/store.ts\`.
+- **Base de données en ligne** : aucune. Pour partager des données, il faut un service (par exemple Supabase) et adapter \`lib/store.ts\`.${unique !== undefined ? " **Pour la liste d'attente**, une base Supabase est prévue (section « Base de données (Supabase) ») ; tant qu'elle n'est pas configurée, les inscriptions de tes visiteurs restent dans *leur* navigateur et ne te parviennent pas." : ""}${booking ? " **Important pour les réservations** : sans base de données, une réservation faite par un client n'est visible que dans son navigateur ; la protection contre les doubles réservations ne vaut que pour les réservations saisies dans le même navigateur." : ""}
 - **Paiements** : non configurés. La page des offres est indicative. Pour encaisser, il faut un prestataire (par exemple Stripe) et un serveur.
 ${skipped.length ? `- Pages du prototype **non générées** dans cette version : ${skipped.join(", ")}.\n` : ""}
 ## Lancer le projet
@@ -284,8 +377,8 @@ npm run start
 \`\`\`
 
 Le projet se déploie sur tout hébergeur compatible Next.js (par exemple Vercel ou Netlify, qui demandent un compte).
-Aucune variable d'environnement ni clé n'est nécessaire dans cette version.
-
+${unique !== undefined ? "Sans variable d'environnement, la liste d'attente fonctionne en mode local. Pour recevoir les inscriptions, configure la base de données ci-dessous." : "Aucune variable d'environnement ni clé n'est nécessaire dans cette version."}
+${unique !== undefined ? SUPABASE_README : ""}
 ## Où modifier
 
 - \`lib/config.ts\` : nom, colonnes, statuts, pages et données de départ.
@@ -294,6 +387,6 @@ ${arch ? `- \`components/site.tsx\` : le site public (accueil, fonctionnalités,
 - \`components/frame.tsx\` : le cadre de l'espace utilisateur (menu, en-tête).
 - \`components/screens.tsx\` : les écrans de l'application.
 ` : ""}- \`components/views.tsx\` : les pages fonctionnelles${arch ? " communes (tableau, kanban, paramètres…)" : ""}.
-- \`lib/store.ts\` : l'enregistrement des données (clé localStorage : \`${name}-donnees-v1\`).
+- \`lib/store.ts\` : l'enregistrement des données (clé localStorage : \`${name}-donnees-v2\`).
 `;
 }

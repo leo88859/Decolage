@@ -3,12 +3,15 @@
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
+import { CheckoutDialog, type PurchaseConsent } from "@/components/CheckoutDialog";
 import { useFeatures } from "@/components/CloudSync";
+import { ManageCookiesButton } from "@/components/ConsentManager";
+import { LEGAL_PAGES } from "@/data/legal";
 import { OfferCards } from "@/components/OfferCards";
 import { Confirm, download, toast } from "@/components/ui";
 import { refreshPlan, signOut, useCloud } from "@/lib/cloud";
 import { dataJson, parseImport } from "@/lib/export";
-import { PLANS } from "@/lib/plans";
+import { PLANS, type PaidPlan } from "@/lib/plans";
 import { getData, hasStorageError, importProjects, resetAll, setPlan, setPrefs, useData, useHydrated } from "@/lib/store";
 
 export default function Page() {
@@ -35,6 +38,9 @@ function Parametres() {
   const [error, setError] = useState("");
   const [confirm, setConfirm] = useState<"local" | "compte" | null>(null);
   const [busy, setBusy] = useState(false);
+  const [buy, setBuy] = useState<PaidPlan | null>(null);
+  const [buyError, setBuyError] = useState("");
+  const [deleteError, setDeleteError] = useState("");
   const file = useRef<HTMLInputElement>(null);
   const paiement = params.get("paiement");
   // Retour vers l'idée en cours après le choix d'une offre (chemin interne uniquement).
@@ -71,9 +77,23 @@ function Parametres() {
     else toast(r.error ?? "Action impossible", "error");
   }
 
+  // Commande : le serveur refuse sans les confirmations et en garde la preuve avant d'ouvrir Stripe.
+  // Aucune confirmation n'est affichée tant que Stripe n'a pas renvoyé l'adresse de paiement.
+  async function checkout(consent: PurchaseConsent) {
+    if (!buy) return;
+    setBusy(true);
+    setBuyError("");
+    const r = await post("/api/stripe/checkout", "POST", { plan: buy, ...consent, ...(retour ? { retour } : {}) });
+    if (r.url) { window.location.assign(r.url); return; }
+    setBusy(false);
+    setBuyError(r.error ?? "Paiement indisponible pour le moment. Aucun montant n'a été débité.");
+  }
+
   async function deleteAccount() {
     const r = await post("/api/account", "DELETE");
-    if (!r.ok) return toast(r.error ?? "Suppression impossible", "error");
+    // Échec (par ex. résiliation de l'abonnement impossible) : le compte n'est PAS supprimé, on le dit clairement.
+    if (!r.ok) return setDeleteError(r.error ?? "Suppression impossible pour le moment. Ton compte n'a pas été supprimé.");
+    setDeleteError("");
     await signOut();
     toast("Compte supprimé");
     router.push("/");
@@ -89,7 +109,7 @@ function Parametres() {
           <span className="eyebrow">Paramètres</span>
           <h1 className="h-page" style={{ marginTop: 10 }}>Compte, préférences et données</h1>
           <nav className="pr-nav" aria-label="Sections">
-            {[["Compte", "#compte"], ["Préférences", "#preferences"], ["Formule", "#formule"], ["Données", "#donnees"], ["Zone sensible", "#sensible"]].map(([l, h]) => <a key={h} href={h} className="chip">{l}</a>)}
+            {[["Compte", "#compte"], ["Préférences", "#preferences"], ["Formule", "#formule"], ["Données", "#donnees"], ["Confidentialité et conditions", "#confidentialite"], ["Zone sensible", "#sensible"], ["Marque blanche", "/parametres/marque-blanche"]].map(([l, h]) => <a key={h} href={h} className="chip">{l}</a>)}
           </nav>
         </div>
         {hasStorageError() && <div className="alert alert-bad">Le navigateur refuse d&apos;enregistrer les données (stockage plein ou bloqué). Exporte tes projets pour ne pas les perdre.</div>}
@@ -149,12 +169,12 @@ function Parametres() {
               return <button className={`btn ${k === plan ? "" : "btn-ghost"}`} onClick={() => { setPlan(k); toast(`Formule ${PLANS[k].nom} activée (test)`); if (retour && k !== "gratuit") router.push(retour); }}>{k === plan ? "Active (test)" : `Tester ${PLANS[k].nom}`}</button>;
             }
             if (!session) return k === "gratuit" ? null : <Link href="/connexion?next=/parametres%23formule" className="btn">Se connecter pour choisir</Link>;
-            if (plan === "gratuit") return k === "gratuit" ? <button className="btn btn-ghost" disabled>Ta formule</button> : <button className={`btn ${k === "pro" ? "btn-coral" : ""}`} disabled={busy} onClick={() => go("/api/stripe/checkout", { plan: k, ...(retour ? { retour } : {}) })}>{busy ? "Redirection…" : `Choisir ${PLANS[k].nom}`}</button>;
+            if (plan === "gratuit") return k === "gratuit" ? <button className="btn btn-ghost" disabled>Ta formule</button> : <button className={`btn ${k === "pro" ? "btn-coral" : ""}`} disabled={busy} onClick={() => { setBuyError(""); setBuy(k); }}>{`Choisir ${PLANS[k].nom}`}</button>;
             // Déjà abonné : changement d'offre et résiliation dans le portail Stripe (prorata calculé par Stripe).
             if (k === plan) return <button className="btn" disabled={busy} onClick={() => go("/api/stripe/portal")}>Gérer mon abonnement</button>;
             return <button className="btn btn-ghost" disabled={busy} onClick={() => go("/api/stripe/portal")}>{k === "gratuit" ? "Résilier" : "Changer pour celle-ci"}</button>;
           }} />
-          {payments && <p className="tiny mut">Paiement sécurisé par Stripe. Sans engagement : tu changes d&apos;offre ou tu résilies en ligne, à tout moment.</p>}
+          {payments && <p className="tiny mut">Paiement sécurisé par Stripe. Sans engagement : tu changes d&apos;offre ou tu résilies en ligne, à tout moment. Avant de commander, tu confirmes avoir lu les <Link href="/cgv" style={{ textDecoration: "underline" }}>conditions générales de vente</Link> et ta demande d&apos;accès immédiat (voir <Link href="/remboursement" style={{ textDecoration: "underline" }}>Remboursement</Link>).</p>}
         </section>
 
         <section className="panel stack" style={{ gap: 14 }} id="donnees">
@@ -163,17 +183,29 @@ function Parametres() {
           <div className="row">
             <button className="btn" onClick={() => { download(`decollage-donnees-${new Date().toISOString().slice(0, 10)}.json`, dataJson(getData()), "application/json"); toast("Données exportées"); }}>Exporter toutes mes données</button>
             <button className="btn btn-ghost" onClick={() => file.current?.click()}>Importer un fichier</button>
+            {session && <a className="btn btn-ghost" href="/api/account/export" download>Télécharger mes données</a>}
             <input ref={file} type="file" accept="application/json,.json" className="sr-only" onChange={onImport} aria-label="Fichier à importer" />
           </div>
           {error && <div className="alert alert-bad" role="alert">{error}</div>}
+          {session && <p className="hint">« Télécharger mes données » : copie complète de ton compte en ligne (profil, projets, sites publiés, acceptations des conditions), sans tes identifiants de paiement.</p>}
           <p className="hint">Format : JSON « decollage-projet » ou « decollage-donnees », version 2 (voir docs/FORMAT.md). Chaque projet est vérifié avant import.</p>
+        </section>
+
+        <section className="panel stack" style={{ gap: 12 }} id="confidentialite">
+          <h2 className="h-sec">Confidentialité et conditions</h2>
+          <p className="mut small">Les textes qui encadrent le service et tes données personnelles. Tu peux aussi revoir ou changer ton choix sur les cookies à tout moment.</p>
+          <div className="row">
+            {LEGAL_PAGES.map((l) => <Link key={l.href} href={l.href} className="chip">{l.label}</Link>)}
+            <ManageCookiesButton className="btn btn-ghost btn-sm" />
+          </div>
         </section>
 
         <section className="panel stack" style={{ gap: 12, borderColor: "rgba(196,43,60,.25)" }} id="sensible">
           <h2 className="h-sec">Zone sensible</h2>
           {session ? (
             <>
-              <p className="mut small">Supprime définitivement ton compte, tes projets, tes sites publiés et leurs inscrits. Ton abonnement éventuel est résilié.</p>
+              <p className="mut small">Supprime définitivement ton compte, tes projets, tes sites publiés, leurs listes d&apos;inscrits et tes preuves d&apos;acceptation. Ton abonnement éventuel est résilié immédiatement, sans remboursement automatique de la période en cours. Sont conservés : ton client et tes factures chez Stripe (obligation comptable), et les copies de sauvegarde de nos hébergeurs jusqu&apos;à leur renouvellement. Télécharge tes données avant si tu veux les garder.</p>
+              {deleteError && <div className="alert alert-bad" role="alert">{deleteError}</div>}
               <button className="btn btn-danger" style={{ alignSelf: "flex-start" }} onClick={() => setConfirm("compte")}>Supprimer mon compte</button>
             </>
           ) : (
@@ -184,8 +216,9 @@ function Parametres() {
           )}
         </section>
       </div>
+      <CheckoutDialog plan={buy} busy={busy} error={buyError} onClose={() => { if (!busy) setBuy(null); }} onConfirm={(c) => void checkout(c)} />
       <Confirm open={confirm === "local"} onClose={() => setConfirm(null)} onConfirm={() => { resetAll(); toast("Données effacées"); }} title="Tout effacer ?" text={`${data.projects.length} projet(s) et ${data.favorites.length} favori(s) seront supprimés définitivement de ce navigateur.`} cta="Tout effacer" danger />
-      <Confirm open={confirm === "compte"} onClose={() => setConfirm(null)} onConfirm={() => void deleteAccount()} title="Supprimer ton compte ?" text="C'est définitif : projets, sites publiés et listes d'inscrits seront effacés. Exporte tes données avant si tu veux les garder." cta="Supprimer définitivement" danger />
+      <Confirm open={confirm === "compte"} onClose={() => setConfirm(null)} onConfirm={() => void deleteAccount()} title="Supprimer ton compte ?" text="C'est définitif : projets, sites publiés et listes d'inscrits seront effacés, et ton abonnement éventuel sera résilié tout de suite. Ton client et tes factures restent chez Stripe (obligation comptable). Si la résiliation échoue, rien n'est supprimé." cta="Supprimer définitivement" danger />
     </main>
   );
 }

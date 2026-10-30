@@ -6,7 +6,7 @@ import { Suspense, useState } from "react";
 import { PageHero } from "@/components/PageHero";
 import { IDEA_BY_ID } from "@/data/ideas";
 import { TEMPLATE_BY_ID, TEMPLATES } from "@/data/templates";
-import { can, PLANS } from "@/lib/plans";
+import { can, PLANS, prixCourt } from "@/lib/plans";
 import { createProject, useData, useHydrated } from "@/lib/store";
 import type { TemplateId } from "@/lib/types";
 
@@ -62,7 +62,7 @@ function Nouveau() {
 
         {full && limit === 0 && (
           <div className="alert alert-warn" style={{ marginBottom: 20 }}>
-            Tu peux parcourir les modèles librement. Pour générer ton SaaS, <Link href="/parametres#formule" style={{ textDecoration: "underline" }}>choisis une offre</Link> (dès 2,99 €/mois), ou <Link href="/creer" style={{ textDecoration: "underline" }}>essaie d&apos;abord ton idée dans les 10 designs</Link>.
+            Tu peux parcourir les modèles librement. Pour générer ton SaaS, <Link href="/parametres#formule" style={{ textDecoration: "underline" }}>choisis une offre</Link> (dès {prixCourt("solo")}/mois), ou <Link href="/creer" style={{ textDecoration: "underline" }}>essaie d&apos;abord ton idée dans les 10 designs</Link>.
           </div>
         )}
         {full && limit > 0 && (
@@ -94,7 +94,7 @@ function Nouveau() {
         <div className="tp-bar">
           <span>{picked ? <>Type : <b>{TEMPLATE_BY_ID[picked].nom}</b></> : "Choisis un type pour continuer"}</span>
           <div className="row">
-            {error && <span className="err">{error}</span>}
+            {error && <span className="err" role="alert">{error}</span>}
             <button className="btn btn-coral btn-lg" disabled={!picked || full || (picked ? locked(picked) : false)} onClick={create}>Étape 2 : le design <span className="arrow">→</span></button>
           </div>
         </div>

@@ -149,7 +149,7 @@ function ProjectPage() {
         onClose={() => setConfirmDelete(false)}
         onConfirm={() => { deleteProject(project.id); toast("Projet supprimé"); router.push("/tableau-de-bord"); }}
         title={`Supprimer « ${project.config.nom} » ?`}
-        text="Le projet et toutes ses données (validation, feuille de route, prix, indicateurs) seront supprimés de ce navigateur. Exporte-le d'abord si tu veux le garder."
+        text="Le projet et toutes ses données (validation, feuille de route, prix, indicateurs) seront supprimés de ce navigateur (et de ton compte s'il est connecté). Si ce projet est publié en ligne, son site est dépublié et sa liste d'inscrits est effacée. Exporte-le d'abord si tu veux le garder."
         cta="Supprimer définitivement"
         danger
       />

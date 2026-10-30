@@ -20,7 +20,84 @@ export const REFERENCES: [string, Project][] = [
   ["documents", projet("documents", "Cabinet Plume", "terminal", "Rédiger et classer les contrats d'un cabinet", "general")],
   ["boutique", projet("boutique", "Bougies Lune", "brutal", "Vendre des bougies artisanales", "general")],
   ["rdv", projet("rendez-vous", "Salon Zen", "aurora", "Prise de rendez-vous pour un salon", "general")],
+  ["annuaire", projet("annuaire", "Artisans Près", "maison", "Un annuaire des artisans de ma ville", "general")],
+  ["attente", projet("liste-attente", "Bientôt Lancé", "pastel", "Une liste d'attente pour le lancement de mon appli", "general")],
+  ["abonnement", projet("abonnement", "Club Recettes", "neon", "Des recettes exclusives par abonnement", "general")],
 ];
+
+const config = (p: Project) => {
+  const src = generateNextProject(p, new Date(2026, 9, 26, 9)).find((f) => f.name === "lib/config.ts")!.content;
+  return JSON.parse(src.slice(src.indexOf("= ") + 2, src.lastIndexOf(";")));
+};
+const ref = (d: string) => REFERENCES.find(([k]) => k === d)![1];
+
+describe("données réelles et règles métier des projets générés", () => {
+  it("chaque colonne a un type et les exemples sont convertis", () => {
+    const rdv = config(ref("rdv"));
+    expect(rdv.types).toEqual(["text", "datetime", "text", "status"]);
+    expect(rdv.exemples.every((r: string[]) => /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(r[1]!))).toBe(true);
+    const gains = config(ref("revenus"));
+    expect(gains.types[3]).toBe("money");
+    expect(gains.exemples.every((r: string[]) => /^-?\d+(\.\d+)?$/.test(r[3]!))).toBe(true);
+  });
+  it("les réservations ont des horaires et un statut d'annulation", () => {
+    expect(config(ref("rdv")).booking).toEqual({ date: 1, annule: ["Annulé"], debut: "09:00", fin: "18:00", duree: 30, jours: [1, 2, 3, 4, 5, 6] });
+    const res = config(projet("reservations", "Salles", "aurora", "Réserver les salles", "general"));
+    expect(res.booking.ressource).toBe(0);
+    expect(res.booking.annule).toEqual(["Refusée"]);
+    expect(config(ref("taches")).booking).toBeUndefined();
+  });
+  it("la liste d'attente a une page d'inscription publique et refuse les doublons d'e-mail", () => {
+    const p = ref("attente");
+    expect(names(p)).toContain("app/inscription/page.tsx");
+    expect(file(p, "app/inscription/page.tsx")).toContain("WaitlistPage");
+    // Sans base configurée, la page garde le mode local d'origine.
+    expect(file(p, "components/cloud.tsx")).toContain("if (cloudState === \"local\") return <WaitlistView");
+    expect(config(p).unique).toBe(0);
+    expect(generationPlan(p).skipped).toEqual([]);
+  });
+  it("les projets sans architecture dédiée ont une page de détail", () => {
+    for (const d of ["rdv", "annuaire", "attente", "abonnement"]) expect(names(ref(d))).toContain("app/fiche/page.tsx");
+    expect(names(ref("taches"))).not.toContain("app/fiche/page.tsx");
+  });
+  it("les écrans d'architecture lisent les dates ISO enregistrées", () => {
+    expect(file(ref("revenus"), "components/arch-kit.tsx")).toContain(String.raw`t.match(/^(\d{4})-(\d{2})-(\d{2})/)`);
+  });
+  it("la liste d'attente peut enregistrer ses inscriptions dans Supabase, sans clé secrète", () => {
+    const p = ref("attente");
+    for (const f of ["supabase/migrations/0001_liste_attente.sql", "lib/cloud.ts", "components/cloud.tsx", "app/proprietaire/page.tsx", ".env.example"]) expect(names(p)).toContain(f);
+    expect(file(p, "app/inscription/page.tsx")).toContain('import { WaitlistPage } from "@/components/cloud"');
+    expect(JSON.parse(file(p, "package.json")).dependencies["@supabase/supabase-js"]).toBeDefined();
+    expect(file(p, ".gitignore")).toContain("!.env.example");
+    // Uniquement des valeurs publiques, jamais de clé service_role dans le code.
+    const code = file(p, "lib/cloud.ts") + file(p, "components/cloud.tsx");
+    expect([...code.matchAll(/process\.env\.(\w+)/g)].map((m) => m[1]).sort()).toEqual(["NEXT_PUBLIC_LISTE_ID", "NEXT_PUBLIC_SUPABASE_ANON_KEY", "NEXT_PUBLIC_SUPABASE_URL"]);
+    expect(code).not.toMatch(/service_role|secret/i);
+    expect(file(p, ".env.example")).not.toMatch(/=\S/);
+    expect(file(p, "README.md")).toContain("## Base de données (Supabase)");
+    // Le badge ne prétend pas que tout est local quand la base est branchée (et inversement).
+    expect(file(p, "components/Shell.tsx")).toContain('cloudState === "local" ? "● Données enregistrées dans ce navigateur" : "● Inscriptions enregistrées en ligne"');
+    // Les autres modèles ne changent pas.
+    expect(file(ref("rdv"), "components/Shell.tsx")).not.toContain("cloudState");
+    expect(names(ref("rdv"))).not.toContain("lib/cloud.ts");
+    expect(JSON.parse(file(ref("rdv"), "package.json")).dependencies["@supabase/supabase-js"]).toBeUndefined();
+  });
+  it("la migration active la RLS partout et ne donne aucun accès direct aux visiteurs", () => {
+    const sql = file(ref("attente"), "supabase/migrations/0001_liste_attente.sql");
+    const tables = [...sql.matchAll(/create table if not exists (public\.\w+)/g)].map((m) => m[1]);
+    expect(tables).toEqual(["public.listes", "public.inscriptions"]);
+    for (const t of tables) expect(sql).toContain(`alter table ${t} enable row level security;`);
+    expect(sql).toContain("revoke all on table public.listes, public.inscriptions from anon;");
+    expect(sql).not.toMatch(/to anon\b(?!, authenticated;)|using \(true\)|with check \(true\)|drop table|truncate|delete from/i);
+    expect(sql).toMatch(/security definer\s+set search_path = ''/);
+    expect(sql).toContain("unique (liste_id, email)");
+  });
+  it("les règles sont incluses et branchées sur le stockage", () => {
+    const p = ref("rdv");
+    expect(names(p)).toContain("lib/rules.ts");
+    expect(file(p, "lib/store.ts")).toContain("validate(v, s.items, SCHEMA)");
+  });
+});
 
 const names = (p: Project) => generateNextProject(p).map((f) => f.name);
 const file = (p: Project, n: string) => generateNextProject(p).find((f) => f.name === n)?.content ?? "";
@@ -33,9 +110,11 @@ describe("génération de projets Next.js", () => {
       for (const f of ["package.json", "tsconfig.json", "next.config.mjs", "README.md", "app/layout.tsx", "app/globals.css", "components/views.tsx", "lib/store.ts", "lib/config.ts", "lib/types.ts"]) expect(ns).toContain(f);
       expect(new Set(ns).size).toBe(ns.length);
       // Aucune clé, aucun secret, aucune variable d'environnement inventée.
-      const all = files.map((f) => f.content).join("\n");
+      // Seule exception : les 3 valeurs publiques de la base de données de la liste d'attente.
+      const all = files.map((f) => f.content).join("\n").replace(/(process\.env\.)?NEXT_PUBLIC_(SUPABASE_URL|SUPABASE_ANON_KEY|LISTE_ID)\b/g, "");
       expect(all).not.toMatch(/sk_(live|test)_|SUPABASE_|STRIPE_|process\.env|apiKey/i);
-      expect(all).not.toContain("undefined");
+      // La configuration ne doit contenir aucune valeur manquante (le code, lui, peut tester undefined).
+      expect(files.find((f) => f.name === "lib/config.ts")!.content).not.toMatch(/undefined|null|NaN/);
       expect(JSON.parse(files.find((f) => f.name === "package.json")!.content).dependencies.next).toBe("16.4.2");
       expect(files.find((f) => f.name === "app/globals.css")!.content).toContain(`--p:${p.config.couleurs.primaire}`);
       expect(files.find((f) => f.name === "lib/config.ts")!.content).toContain(JSON.stringify(p.config.nom));

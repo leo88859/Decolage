@@ -46,3 +46,6 @@ export const limiteLabel = (n: number, singulier: string, pluriel: string) => (n
 
 /** Formule payante la moins chère qui permet `count` projets (pour les invitations à passer à l'offre supérieure). */
 export const planForProjects = (count: number): PaidPlan => PAID_PLANS.find((p) => PLANS[p].maxProjets >= count) ?? "illimite";
+
+/** Prix mensuel d'une formule pour un texte courant : « 2,99 € » (jamais écrit en dur ailleurs). */
+export const prixCourt = (plan: Plan) => `${PLANS[plan].prix.toLocaleString("fr-FR", { minimumFractionDigits: 2 })} €`;

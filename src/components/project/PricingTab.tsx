@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { toast } from "@/components/ui";
 import { REVENUE_LABEL } from "@/lib/modules";
 import { averagePaid, breakEven, defaultPricing, offerId, scenario } from "@/lib/pricing";
@@ -160,10 +160,11 @@ export function PricingTab({ project: p }: { project: Project }) {
 }
 
 function Num({ label, value, step, onChange }: { label: string; value: number; step: number; onChange: (v: number) => void }) {
+  const id = useId();
   return (
     <div className="field">
-      <label>{label}</label>
-      <input className="input" type="number" min={0} step={step} value={value} onChange={(e) => onChange(Number(e.target.value))} />
+      <label htmlFor={id}>{label}</label>
+      <input id={id} className="input" type="number" min={0} step={step} value={value} onChange={(e) => onChange(Number(e.target.value))} />
     </div>
   );
 }

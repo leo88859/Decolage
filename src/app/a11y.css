@@ -1,0 +1,84 @@
+/* ─── Accessibilité : contrastes, focus clavier, mouvement réduit ───────────────
+   Importé en tête de globals.css. Comme un @import passe avant le reste, les règles ci-dessous
+   utilisent le préfixe « html » (spécificité +1) pour l'emporter sur celles de globals.css,
+   marketing.css et des feuilles <style> intégrées aux composants.
+   Les valeurs de ce fichier sont vérifiées par src/lib/a11y/contrast.test.ts (paires dans palette-pairs.ts). */
+
+:root {
+  /* Variantes foncées pour le petit texte (la palette crème / bleu nuit / bleu / corail ne change pas). */
+  --ok-ink: var(--ok);
+  --warn-ink: #8a5206;
+  --bad-ink: var(--bad);
+  --dim: var(--mut);
+  /* Traits d'interface (bordure de champ, case, interrupteur) : 3:1 minimum sur crème, papier et blanc. */
+  --ui-line: #767c96;
+  --placeholder: #6b7190;
+  --placeholder-on-dark: rgba(255, 255, 255, 0.62);
+  /* Corail pour les jauges et graphiques (3:1 sur --cream-2). */
+  --coral-graph: #cf4524;
+  /* Anneau de focus : bleu foncé sur fond clair, blanc sur fond sombre, bleu nuit sur corail. */
+  --focus-light: #1f45e0;
+  --focus-dark: #ffffff;
+  --focus-on-coral: #0a1433;
+  --focus: var(--focus-light);
+  /* Surtitre et italique sur les bandeaux colorés. */
+  --eyebrow-on-blue: #ffffff;
+  --phero-coral-serif: #0a1433;
+}
+
+/* ─── Focus clavier visible ─── */
+html :focus-visible { outline: 3px solid var(--focus) !important; outline-offset: 2px; }
+/* Fonds sombres ou colorés : on change la couleur de l'anneau, tous les descendants suivent. */
+.nav.dark, .phero.navy, .phero.blue, .hero, .sec-dark, .footer, .dg-tray, .toast, .ex-next, .ov-journey,
+.offer4.hl, .offer.hl, .versus .dec, .b-a, .b-d, .pr-result, .val-reco, .bz-spec, .st-hl, .gd-code,
+.tp-card.on, .compare-tray, .id-search, .wiz-steps { --focus: var(--focus-dark); }
+.phero.coral, .b-b, .final, .if-validate { --focus: var(--focus-on-coral); }
+/* Surfaces claires posées dans une zone sombre. */
+.nav-panel, .acct-menu, .mobile-menu, dialog.modal, .demo-device, .show-device, .device, .pr-result .btn-light { --focus: var(--focus-light); }
+/* Un champ sans contour propre (zone de saisie dans une boîte) : l'anneau est sur la boîte entière. */
+html :where(.ib-box, .cr-box, .db-search, .on-url, .id-search) :focus-visible { outline: 0 !important; }
+html :where(.ib-box, .cr-box, .db-search, .on-url, .id-search):focus-within { outline: 3px solid var(--focus) !important; outline-offset: 2px; }
+/* Import de fichier : le vrai champ est masqué, l'anneau passe sur le bouton visible. */
+html label:has(> input.sr-only:focus-visible) { outline: 3px solid var(--focus) !important; outline-offset: 2px; }
+
+/* ─── Lien d'évitement (« Aller au contenu ») : visible dès qu'il reçoit le focus ─── */
+html a.sr-only:focus, html a.sr-only:active {
+  position: fixed; top: 12px; left: 12px; z-index: 1000; width: auto; height: auto; overflow: visible; clip: auto;
+  white-space: normal; padding: 12px 18px; border-radius: 12px; background: var(--navy); color: #fff;
+  font: 600 15px var(--body); box-shadow: var(--shadow-lg);
+}
+html a.sr-only:focus-visible { outline-color: var(--focus-dark) !important; outline-offset: 3px; }
+
+/* ─── Champs : bordures et textes indicatifs lisibles ─── */
+html .input, html .check, html .cr-box, html .db-search, html .on-url { border-color: var(--ui-line); }
+html .input:hover { border-color: var(--ink-2); }
+html .switch { background: var(--ui-line); }
+html .input::placeholder, html .cr-input::placeholder { color: var(--placeholder); opacity: 1; }
+html .ib-box textarea::placeholder, html .id-search input::placeholder { color: var(--placeholder-on-dark); opacity: 1; }
+html .ib-box, html .id-search { border-color: rgba(255, 255, 255, 0.55); }
+
+/* ─── Éléments dont la couleur d'origine ne tenait pas le contraste ─── */
+html .dg-fav.on { color: var(--navy); }
+html .tab[aria-selected="true"]::after { background: var(--coral-ink); }
+html .meter > i { background: var(--blue); }
+html .meter.coral > i { background: var(--coral-graph); }
+html .db-steps span.now { background: var(--coral-graph); }
+html .st-steps li { opacity: 1; }
+html .phero.blue .eyebrow { color: var(--eyebrow-on-blue); }
+html .phero.blue .lead, html .phero.blue .phero-facts dd { opacity: 1; }
+html .phero.coral .serif { color: var(--phero-coral-serif); }
+html .phero.coral .phero-facts dd { opacity: 0.8; }
+
+/* ─── Mouvement réduit : plus d'animation ni de transition (le choix « Mouvement réduit » de Paramètres fait de même) ─── */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  html *, html *::before, html *::after {
+    animation-duration: 0.01ms !important; animation-delay: 0ms !important; animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important; transition-delay: 0ms !important; scroll-behavior: auto !important;
+  }
+  .reveal { opacity: 1; transform: none; }
+  .word { opacity: 1; transform: none; }
+  .halo, .caret, .acct-sync, .final::before { animation: none !important; }
+  .show-device { transform: none; }
+  .btn:hover, .lift:hover, .dg-card:hover, .tp-card:hover, .tpl-card:hover, .dz-card:hover, .offer4:hover { transform: none; }
+}

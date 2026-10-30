@@ -1,4 +1,5 @@
 /* ─── Décollage · système de design ─────────────────────────────── */
+@import "./a11y.css"; /* contrastes, focus clavier, mouvement réduit (un @import doit rester en tête) */
 :root {
   --navy: #0a1433;
   --navy-2: #121e48;
@@ -7,7 +8,7 @@
   --blue-ink: #1f45e0;
   --blue-soft: #e4eaff;
   --coral: #ff6b4a;
-  --coral-ink: #c8401f;
+  --coral-ink: #bd3a19; /* était #c8401f : 4,43:1 sur crème, sous le seuil de 4,5 */
   --coral-soft: #ffe6de;
   --cream: #f6f1e7;
   --cream-2: #ede5d5;
@@ -17,7 +18,7 @@
   --mut: #5b6280;
   --line: rgba(11, 19, 48, 0.1);
   --line-2: rgba(11, 19, 48, 0.18);
-  --ok: #138a5a;
+  --ok: #0e7550; /* était #138a5a : 4,37:1 avec du blanc, sous le seuil de 4,5 */
   --ok-soft: #dcf3e8;
   --warn: #a8660a;
   --warn-soft: #fbecd2;
@@ -43,7 +44,7 @@ p { margin: 0; }
 img { max-width: 100%; }
 button { font: inherit; color: inherit; }
 ::selection { background: var(--coral); color: var(--navy); }
-:focus-visible { outline: 2.5px solid var(--blue); outline-offset: 2px; border-radius: 6px; }
+:focus-visible { outline: 3px solid var(--focus, var(--blue-ink)); outline-offset: 2px; } /* couleur par fond : voir a11y.css */
 
 .container { width: 100%; max-width: 1200px; margin: 0 auto; padding: 0 20px; }
 .narrow { max-width: 820px; }
@@ -100,8 +101,8 @@ button { font: inherit; color: inherit; }
 /* Badges et pastilles */
 .badge { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 99px; font-size: 12.5px; font-weight: 600; background: var(--blue-soft); color: var(--blue-ink); white-space: nowrap; }
 .badge-coral { background: var(--coral-soft); color: var(--coral-ink); }
-.badge-ok { background: var(--ok-soft); color: var(--ok); }
-.badge-warn { background: var(--warn-soft); color: var(--warn); }
+.badge-ok { background: var(--ok-soft); color: var(--ok-ink, var(--ok)); }
+.badge-warn { background: var(--warn-soft); color: var(--warn-ink, var(--warn)); }
 .badge-bad { background: var(--bad-soft); color: var(--bad); }
 .badge-dark { background: var(--navy); color: #fff; }
 .badge-line { background: transparent; border: 1px solid var(--line-2); color: var(--ink-2); }

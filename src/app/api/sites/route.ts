@@ -1,7 +1,17 @@
 import { isCloudConfigured } from "@/lib/env";
-import { normalizePlan, PLANS } from "@/lib/plans";
+import { normalizePlan, PLANS, prixCourt } from "@/lib/plans";
 import { slugError, validateSiteData } from "@/lib/publish";
-import { getUser } from "@/lib/supabase/server";
+import { createAdminClient, getUser } from "@/lib/supabase/server";
+
+/** Écritures dans `sites` : toujours par le serveur (clé service_role) après les contrôles ci-dessous. La RLS interdit l'écriture directe depuis le navigateur (migration 0002). */
+function writer() {
+  try {
+    return createAdminClient();
+  } catch {
+    return null;
+  }
+}
+const NO_WRITER = "La mise en ligne n'est pas entièrement configurée sur ce site (clé serveur manquante).";
 
 const json = (body: unknown, status = 200) => Response.json(body, { status, headers: { "cache-control": "no-store" } });
 
@@ -32,19 +42,21 @@ export async function POST(req: Request) {
   ]);
   const plan = normalizePlan(profile?.plan);
   const existing = (mine ?? []).find((s) => s.project_id === projectId);
-  if (!existing && (mine ?? []).length >= PLANS[plan].maxSites) {
+  if ((!existing && (mine ?? []).length >= PLANS[plan].maxSites) || PLANS[plan].maxSites === 0) {
     return json({
       error: PLANS[plan].maxSites === 0
-        ? "La mise en ligne est incluse dans les offres payantes (à partir de 2,99 €/mois)."
+        ? `La mise en ligne est incluse dans les offres payantes (à partir de ${prixCourt("solo")}/mois).`
         : `Ta formule ${PLANS[plan].nom} permet ${PLANS[plan].maxSites} site${PLANS[plan].maxSites > 1 ? "s" : ""} en ligne. Dépublie un site ou choisis une offre supérieure.`,
     }, 403);
   }
 
+  const admin = writer();
+  if (!admin) return json({ error: NO_WRITER }, 503);
   const now = new Date().toISOString();
   const row = { slug, user_id: user.id, project_id: projectId, data: v.data, updated_at: now };
   const res = existing
-    ? await supabase.from("sites").update(row).eq("user_id", user.id).eq("project_id", projectId)
-    : await supabase.from("sites").insert({ ...row, published_at: now });
+    ? await admin.from("sites").update(row).eq("user_id", user.id).eq("project_id", projectId)
+    : await admin.from("sites").insert({ ...row, published_at: now });
   if (res.error) {
     if (res.error.code === "23505") return json({ error: "Cette adresse est déjà prise. Choisis-en une autre." }, 409);
     return json({ error: "Publication impossible pour le moment." }, 500);
@@ -65,10 +77,12 @@ export async function GET(req: Request) {
 /** Retire un site de la publication (ses inscrits sont supprimés avec lui). */
 export async function DELETE(req: Request) {
   if (!isCloudConfigured()) return json({ error: "Non disponible." }, 503);
-  const { supabase, user } = await getUser();
+  const { user } = await getUser();
   if (!user) return json({ error: "Connecte-toi." }, 401);
   const projectId = new URL(req.url).searchParams.get("projectId") ?? "";
-  const { error } = await supabase.from("sites").delete().eq("user_id", user.id).eq("project_id", projectId);
+  const admin = writer();
+  if (!admin) return json({ error: NO_WRITER }, 503);
+  const { error } = await admin.from("sites").delete().eq("user_id", user.id).eq("project_id", projectId);
   if (error) return json({ error: "Impossible de dépublier pour le moment." }, 500);
   return json({ ok: true });
 }

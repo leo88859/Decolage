@@ -164,7 +164,7 @@ export default function Dashboard() {
         onClose={() => setToDelete(null)}
         onConfirm={() => { if (toDelete) { deleteProject(toDelete.id); toast(`« ${toDelete.config.nom} » supprimé`); } }}
         title={`Supprimer « ${toDelete?.config.nom ?? ""} » ?`}
-        text="Le projet, sa configuration, sa page de vente et sa feuille de route seront supprimés de ce navigateur (et de ton compte s'il est connecté). Exporte-le d'abord si tu veux le garder."
+        text="Le projet, sa configuration, sa page de vente et sa feuille de route seront supprimés de ce navigateur (et de ton compte s'il est connecté). Si ce projet est publié en ligne, son site est dépublié et sa liste d'inscrits est effacée. Exporte-le d'abord si tu veux le garder."
         cta="Supprimer définitivement"
         danger
       />

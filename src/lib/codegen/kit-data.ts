@@ -3,9 +3,11 @@
 // car ils sont stockés dans des gabarits JavaScript.
 
 /** lib/types.ts — types partagés du projet généré. */
-export const TYPES_TS = String.raw`export type PageKind =
+export const TYPES_TS = String.raw`import type { Booking, FieldType } from "@/lib/rules";
+
+export type PageKind =
   | "accueil" | "dashboard" | "table" | "cards" | "grid" | "kanban" | "agenda"
-  | "form" | "todo" | "goals" | "settings" | "pricing" | "login" | "activity";
+  | "form" | "todo" | "goals" | "settings" | "pricing" | "login" | "activity" | "waitlist";
 
 export type NavPage = { id: string; titre: string; kind: PageKind; href: string; nav: boolean };
 
@@ -16,14 +18,20 @@ export type SaasConfig = {
   cible: string;
   storageKey: string;
   entite: { nom: string; pluriel: string; champs: string[] };
+  /** Type de chaque colonne : texte, e-mail, date, date et heure, montant, nombre, statut. */
+  types: FieldType[];
   statut: number;
   statuts: string[];
+  /** Réservations : colonne de la date, ressource éventuelle, statuts d'annulation et horaires d'ouverture. */
+  booking?: Booking;
+  /** Colonne qui ne peut pas contenir deux fois la même valeur (ex. e-mail d'une liste d'attente). */
+  unique?: number;
   exemples: string[][];
   pages: NavPage[];
   fonctionnalites: [string, string][];
   heroTitre: string;
   revenu: string;
-  offres: { nom: string; prix: number; periode: string; points: string[] }[];
+  offres: Offre[];
   csvSeparateur: string;
   /** Textes de départ rattachés aux éléments (notes, leçons, documents). */
   notes?: Record<string, string>;
@@ -43,6 +51,7 @@ export type ArchConfig = {
   extras: NavPage[];
 };
 
+export type Offre = { nom: string; prix: number; periode: string; points: string[] };
 export type Item = { id: string; values: string[]; fav: boolean; createdAt: string; updatedAt: string };
 export type Goal = { id: string; nom: string; cible: number; actuel: number };
 export type LogEntry = { at: string; text: string };
@@ -59,6 +68,8 @@ export type State = {
   /** Compte local (dans ce navigateur uniquement) : ce n'est pas une authentification. */
   compte: { nom: string; email: string } | null;
   session: boolean;
+  /** Offres de la page Tarifs, modifiables dans Paramètres. */
+  offres: Offre[];
 };
 `;
 
@@ -67,7 +78,8 @@ export const STORE_TS = String.raw`"use client";
 
 import { useSyncExternalStore } from "react";
 import { SAAS } from "@/lib/config";
-import type { Goal, Item, Order, State } from "@/lib/types";
+import { isEmail, normalize, toNumber, validate, type Errors, type Schema } from "@/lib/rules";
+import type { Goal, Item, Offre, Order, State } from "@/lib/types";
 
 // Toutes les données de l'application sont gardées dans le navigateur de l'utilisateur.
 // Pas de serveur ni de base de données : chaque appareil a ses propres données.
@@ -88,6 +100,7 @@ function seed(): State {
     nextOrder: 1001,
     compte: null,
     session: false,
+    offres: SAAS.offres.map((o) => ({ ...o, points: o.points.slice() })),
   };
 }
 const SEED = seed();
@@ -116,6 +129,7 @@ function parse(raw: string | null): State | null {
       nextOrder: typeof d.nextOrder === "number" ? d.nextOrder : 1001,
       compte: d.compte && typeof d.compte.nom === "string" && typeof d.compte.email === "string" ? { nom: d.compte.nom.slice(0, 80), email: d.compte.email.slice(0, 120) } : null,
       session: d.session === true,
+      offres: Array.isArray(d.offres) ? d.offres.filter((o) => o && typeof o.nom === "string" && typeof o.prix === "number" && Array.isArray(o.points)).slice(0, 6) : SEED.offres,
     };
   } catch {
     return null;
@@ -157,27 +171,46 @@ function subscribe(f: () => void) {
 export const useStore = () => useSyncExternalStore(subscribe, read, () => SEED);
 export const storageError = () => lastError;
 
-const clean = (values: string[]) => SAAS.entite.champs.map((_, i) => String(values[i] ?? "").trim().slice(0, 500));
+const clean = (values: string[]) => SAAS.entite.champs.map((_, i) => normalize(String(values[i] ?? "").slice(0, 500), SCHEMA.types[i] ?? "text"));
+
+/** Schéma des données (types, statuts, réservations, doublons) : voir lib/config.ts. */
+export const SCHEMA: Schema = { champs: SAAS.entite.champs, types: SAAS.types, statut: SAAS.statut, statuts: SAAS.statuts, booking: SAAS.booking, unique: SAAS.unique };
+
+/** Résultat d'une écriture : rien n'est enregistré si la saisie est invalide. */
+export type Result = { ok: true; item?: Item } | { ok: false; error: string; fields: Errors };
+const refuse = (fields: Errors): Result => ({ ok: false, error: Object.values(fields)[0] ?? "Saisie invalide.", fields });
+const saved = (item?: Item): Result => (lastError ? { ok: false, error: lastError, fields: {} } : { ok: true, item });
 
 export const actions = {
-  add(values: string[]): Item {
+  /** Vérifie une saisie sans l'enregistrer (pour afficher les erreurs au fil de la frappe). */
+  check(values: string[], exceptId?: string): Errors {
+    return validate(clean(values), read().items, SCHEMA, exceptId);
+  },
+  add(values: string[]): Result {
+    const v = clean(values);
+    const s = read();
+    const errors = validate(v, s.items, SCHEMA);
+    if (Object.keys(errors).length) return refuse(errors);
     const now = new Date().toISOString();
-    const item: Item = { id: newId(), values: clean(values), fav: false, createdAt: now, updatedAt: now };
-    const s = read();
+    const item: Item = { id: newId(), values: v, fav: false, createdAt: now, updatedAt: now };
     write({ ...s, items: [item, ...s.items] }, SAAS.entite.nom + " ajouté : " + item.values[0]);
-    return item;
+    return saved(item);
   },
-  update(id: string, values: string[]) {
+  update(id: string, values: string[]): Result {
+    const v = clean(values);
     const s = read();
-    write({ ...s, items: s.items.map((i) => (i.id === id ? { ...i, values: clean(values), updatedAt: new Date().toISOString() } : i)) }, "Modifié : " + (values[0] ?? ""));
+    if (!s.items.some((i) => i.id === id)) return { ok: false, error: "Cet élément n'existe plus.", fields: {} };
+    const errors = validate(v, s.items, SCHEMA, id);
+    if (Object.keys(errors).length) return refuse(errors);
+    write({ ...s, items: s.items.map((i) => (i.id === id ? { ...i, values: v, updatedAt: new Date().toISOString() } : i)) }, "Modifié : " + (v[0] ?? ""));
+    return saved();
   },
-  setStatus(id: string, statut: string) {
-    const s = read();
-    const it = s.items.find((i) => i.id === id);
-    if (!it) return;
+  setStatus(id: string, statut: string): Result {
+    const it = read().items.find((i) => i.id === id);
+    if (!it) return { ok: false, error: "Cet élément n'existe plus.", fields: {} };
     const values = it.values.slice();
     values[SAAS.statut] = statut;
-    write({ ...s, items: s.items.map((i) => (i.id === id ? { ...i, values, updatedAt: new Date().toISOString() } : i)) }, it.values[0] + " → " + statut);
+    return actions.update(id, values);
   },
   remove(id: string) {
     const s = read();
@@ -205,6 +238,20 @@ export const actions = {
     const s = read();
     write({ ...s, profil: { nom: nom.trim().slice(0, 80) } }, "Profil mis à jour");
   },
+  /** Offres affichées sur la page Tarifs (indicatives : aucun paiement n'est branché). */
+  setOffres(list: Offre[]): Result {
+    if (list.length > 6) return { ok: false, error: "6 offres maximum.", fields: {} };
+    const clean: Offre[] = [];
+    for (const o of list) {
+      const nom = String(o.nom ?? "").trim().slice(0, 60);
+      const prix = toNumber(String(o.prix));
+      if (!nom) return { ok: false, error: "Chaque offre doit avoir un nom.", fields: {} };
+      if (prix === null || prix < 0) return { ok: false, error: "Prix invalide pour « " + nom + " » (nombre positif attendu).", fields: {} };
+      clean.push({ nom, prix, periode: String(o.periode ?? "").trim().slice(0, 20) || "mois", points: o.points.map((p) => String(p).trim().slice(0, 120)).filter(Boolean).slice(0, 10) });
+    }
+    write({ ...read(), offres: clean }, "Offres mises à jour");
+    return saved();
+  },
   setNote(id: string, text: string) {
     const s = read();
     write({ ...s, notes: { ...s.notes, [id]: text.slice(0, 20000) } });
@@ -217,6 +264,8 @@ export const actions = {
     const roles = SAAS.arch?.roles ?? {};
     const sc = roles.stock;
     const stock = typeof sc === "number" ? parseInt(it.values[sc] ?? "", 10) : NaN;
+    if (!Number.isInteger(qte) || qte < 1 || qte > 9999) return "Quantité invalide (nombre entier positif).";
+    if (!client.trim()) return "Indique le nom du client.";
     if (Number.isFinite(stock) && stock < qte) return "Stock insuffisant (" + stock + " restant).";
     const unit = typeof roles.prix === "number" ? amount(it.values[roles.prix] ?? "") ?? 0 : 0;
     const values = it.values.slice();
@@ -231,10 +280,12 @@ export const actions = {
     write({ ...s, orders: s.orders.map((o) => (o.id === id ? { ...o, statut } : o)) }, "Commande #" + id + " : " + statut);
   },
   /** Compte local : enregistré dans ce navigateur, sans mot de passe ni serveur. */
-  signup(nom: string, email: string) {
+  signup(nom: string, email: string): string | null {
+    if (!isEmail(email)) return "Adresse e-mail invalide.";
     const s = read();
     const n = nom.trim().slice(0, 80) || "Moi";
     write({ ...s, compte: { nom: n, email: email.trim().toLowerCase().slice(0, 120) }, session: true, profil: { nom: n } }, "Compte local créé");
+    return null;
   },
   login(email: string): boolean {
     const s = read();
@@ -258,7 +309,8 @@ export const actions = {
     const q = (c: string) => '"' + c.replace(/"/g, '""') + '"';
     return "﻿" + [SAAS.entite.champs, ...read().items.map((i) => i.values)].map((l) => l.map(q).join(sep)).join("\n");
   },
-  importCsv(text: string): number {
+  /** Import CSV : chaque ligne passe par la même validation qu'une saisie ; les lignes invalides sont écartées. */
+  importCsv(text: string): { ajoutees: number; rejetees: number } {
     const lines = parseCsv(text);
     const low = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").trim().toLowerCase();
     const head = (lines[0] ?? []).map(low);
@@ -267,17 +319,21 @@ export const actions = {
     const rows = (hasHead ? lines.slice(1) : lines).slice(0, 5000);
     const now = new Date().toISOString();
     const added: Item[] = [];
+    const existing = read().items;
+    let rejetees = 0;
     for (const l of rows) {
-      const values = SAAS.entite.champs.map((_, i) => String((hasHead ? (idx[i]! >= 0 ? l[idx[i]!] : "") : l[i]) ?? "").trim().slice(0, 500));
-      if (!values[0]) continue;
+      const values = clean(SAAS.entite.champs.map((_, i) => String((hasHead ? (idx[i]! >= 0 ? l[idx[i]!] : "") : l[i]) ?? "")));
+      if (!values.some((v) => v)) continue;
       if (!SAAS.statuts.includes(values[SAAS.statut]!)) values[SAAS.statut] = SAAS.statuts[0] ?? values[SAAS.statut]!;
+      // Un import peut contenir des réservations passées : seule la date de création n'est pas vérifiée.
+      if (Object.keys(validate(values, [...added, ...existing], SCHEMA, undefined, new Date(), false)).length) { rejetees++; continue; }
       added.push({ id: newId(), values, fav: false, createdAt: now, updatedAt: now });
     }
     if (added.length) {
       const s = read();
       write({ ...s, items: [...added, ...s.items] }, "Import CSV : " + added.length + " ligne(s)");
     }
-    return added.length;
+    return { ajoutees: added.length, rejetees };
   },
 };
 

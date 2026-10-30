@@ -98,6 +98,8 @@ async function flush() {
   try {
     if (ups.length) await pushProjects(s.userId, ups);
     if (dels.length) {
+      // Dépublication du site du projet supprimé (en plus du déclencheur de la base, migration 0002). Sans effet bloquant.
+      await Promise.all(dels.map((id) => fetch(`/api/sites?projectId=${encodeURIComponent(id)}`, { method: "DELETE" }).catch(() => null)));
       const { error } = await sb.from("projects").delete().eq("user_id", s.userId).in("id", dels);
       if (error) throw new Error(error.message);
     }

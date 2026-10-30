@@ -6,8 +6,13 @@ import { createPublicClient } from "@/lib/supabase/server";
 /** Données validées d'un site publié, ou null. */
 export async function loadSite(slug: string): Promise<SiteData | null> {
   if (!isCloudConfigured() || !/^[a-z0-9-]{3,40}$/.test(slug)) return null;
-  const { data } = await createPublicClient().from("sites").select("data").eq("slug", slug).maybeSingle();
-  if (!data) return null;
+  const sb = createPublicClient();
+  let { data, error } = await sb.from("sites").select("data, suspended_at").eq("slug", slug).maybeSingle();
+  if (error) {
+    // Colonne suspended_at absente (migration 0002 pas encore exécutée) : on lit sans elle.
+    ({ data, error } = (await sb.from("sites").select("data").eq("slug", slug).maybeSingle()) as unknown as { data: typeof data; error: typeof error });
+  }
+  if (!data || (data as { suspended_at?: string | null }).suspended_at) return null;
   const v = validateSiteData(data.data);
   return v.ok ? v.data : null;
 }

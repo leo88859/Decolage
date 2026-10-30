@@ -131,14 +131,14 @@ function Creer() {
             <section className="cr-found fade" aria-live="polite">
               <div className="cr-field">
                 <span className="label">Type de SaaS</span>
-                <select className="input" value={typeChoice} onChange={(e) => setTypeChoice(e.target.value as TemplateId | "")}>
+                <select className="input" aria-label="Type de SaaS" value={typeChoice} onChange={(e) => setTypeChoice(e.target.value as TemplateId | "")}>
                   <option value="">Détecté : {TEMPLATE_BY_ID[a.type].nom}</option>
                   {TEMPLATES.map((t) => <option key={t.id} value={t.id}>{t.nom}{t.premium ? " · offre payante" : ""}</option>)}
                 </select>
               </div>
               <div className="cr-field">
                 <span className="label">Métier ou secteur</span>
-                <select className="input" value={secteurChoice} onChange={(e) => setSecteurChoice(e.target.value)}>
+                <select className="input" aria-label="Métier ou secteur" value={secteurChoice} onChange={(e) => setSecteurChoice(e.target.value)}>
                   <option value="">Détecté : {a.secteur.nom}</option>
                   {[...SECTEURS, SECTEUR_GENERAL].map((s) => <option key={s.id} value={s.id}>{s.nom}</option>)}
                 </select>
