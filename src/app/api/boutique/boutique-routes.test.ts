@@ -8,6 +8,9 @@ const h = vi.hoisted(() => ({
   calls: [] as { table: string; steps: [string, unknown[]][] }[],
   results: {} as Record<string, { data: unknown; error: { code?: string; message?: string; hint?: string } | null }>,
   rpc: vi.fn(),
+  /** Résultats des fonctions SQL ajoutées par la migration 0007 (par défaut : « fonction absente » pour le produit, limite non atteinte). */
+  extra: {} as Record<string, { data: unknown; error: { code?: string; message?: string; hint?: string } | null }>,
+  extraCalls: [] as [string, unknown][],
   adminOk: true,
 }));
 
@@ -25,7 +28,13 @@ function chain(table: string) {
   q.then = (ok: (v: unknown) => unknown) => ok(res());
   return q;
 }
-const client = () => ({ from: (t: string) => chain(t), rpc: (...a: unknown[]) => h.rpc(...a) });
+const client = () => ({
+  from: (t: string) => chain(t),
+  rpc: (name: string, ...a: unknown[]) => {
+    if (name in h.extra) { h.extraCalls.push([name, a[0]]); return Promise.resolve(h.extra[name]); }
+    return h.rpc(name, ...a);
+  },
+});
 vi.mock("@/lib/supabase/server", () => ({
   getUser: async () => ({ supabase: client(), user: h.user }),
   createAdminClient: () => { if (!h.adminOk) throw new Error("no key"); return client(); },
@@ -57,6 +66,11 @@ beforeEach(() => {
   h.calls = [];
   h.results = {};
   h.adminOk = true;
+  h.extraCalls = [];
+  h.extra = {
+    limite_debit: { data: false, error: null },
+    boutique_creer_produit: { data: null, error: { code: "PGRST202", message: "Could not find the function public.boutique_creer_produit" } },
+  };
   h.rpc.mockReset().mockResolvedValue({ data: { ref: "CMD-AAAA1111", statut: "nouvelle", total_centimes: 2000, paiement: "non_payee", mode: "retrait", rejouee: false, jeton_suivi: "a".repeat(64) }, error: null });
   resetRateLimit();
 });
@@ -153,14 +167,34 @@ describe("catalogue public", () => {
     expect((await catalogue(req("GET", undefined, {}), ctx({ slug: "brouillon-x" }))).status).toBe(404);
     expect((await catalogue(req("GET", undefined, {}), ctx({ slug: "../etc" }))).status).toBe(404);
     h.results.boutiques = { data: [{ id: ID, slug: "chez-awa", nom: "Chez Awa" }], error: null };
-    h.results.produits = { data: [{ id: "p", titre: "Robe", variantes: [{ id: "v", nom: "M", stock: 0, position: 0 }, { id: "w", nom: "L", stock: 2, position: 1 }] }], error: null };
+    h.results.produits = { data: [{ id: "p", titre: "Robe" }], error: null };
+    h.results.variantes_publiques = { data: [
+      { id: "v", produit_id: "p", nom: "M", position: 0, disponible: false, stock_bas: false },
+      { id: "w", produit_id: "p", nom: "L", position: 1, disponible: true, stock_bas: true },
+    ], error: null };
     const r = await catalogue(req("GET", undefined, {}), ctx({ slug: "chez-awa" }));
     const body = await r.json();
     expect(r.status).toBe(200);
     expect(body.produits[0].variantes.map((v: { disponible: boolean }) => v.disponible)).toEqual([false, true]);
+    expect(body.produits[0].variantes.map((v: { stock_bas: boolean }) => v.stock_bas)).toEqual([false, true]);
+    expect(JSON.stringify(body)).not.toContain("stock\":"); // jamais la quantité exacte
     const select = String(steps("boutiques", "select")[0]![0]);
     expect(select).not.toContain("proprietaire_id");
     expect(steps("boutiques", "eq")).toContainEqual(["statut", "publiee"]);
+  });
+
+  it("repli avant la migration 0007 : l'ancienne lecture des variantes est convertie en booléens, le stock exact n'est jamais renvoyé", async () => {
+    h.results.boutiques = { data: [{ id: ID, slug: "chez-awa", nom: "Chez Awa" }], error: null };
+    h.results.produits = { data: [{ id: "p", titre: "Robe" }], error: null };
+    h.results.variantes_publiques = { data: null, error: { code: "42P01", message: "relation does not exist" } };
+    h.results.variantes = { data: [{ id: "v", produit_id: "p", nom: "M", stock: 0, position: 0 }, { id: "w", produit_id: "p", nom: "L", stock: 2, position: 1 }, { id: "x", produit_id: "p", nom: "XL", stock: 40, position: 2 }], error: null };
+    const body = await (await catalogue(req("GET", undefined, {}), ctx({ slug: "chez-awa" }))).json();
+    expect(body.produits[0].variantes).toEqual([
+      { id: "v", nom: "M", position: 0, disponible: false, stock_bas: false },
+      { id: "w", nom: "L", position: 1, disponible: true, stock_bas: true },
+      { id: "x", nom: "XL", position: 2, disponible: true, stock_bas: false },
+    ]);
+    expect(JSON.stringify(body)).not.toMatch(/"stock":/);
   });
 });
 
@@ -233,5 +267,60 @@ describe("POST /api/boutique/suivi", () => {
     h.rpc.mockResolvedValueOnce({ data: null, error: null });
     expect((await suivre(req("POST", { ref: "CMD-AAAA1111", jeton: "b".repeat(64) }))).status).toBe(404);
     expect((await suivre(req("POST", { ref: "CMD-AAAA1111", jeton: "a".repeat(64) }, { origin: "https://evil.example" }))).status).toBe(403);
+  });
+});
+
+describe("migration 0007 : création atomique, limite de débit en base, plafonds", () => {
+  it("le produit et ses variantes sont créés par UNE seule fonction SQL (aucune écriture en deux temps)", async () => {
+    h.results.boutiques = { data: [{ id: ID }], error: null };
+    h.extra.boutique_creer_produit = { data: { id: "p1", titre: "Robe", variantes: [{ id: "v1", nom: "M", stock: 3 }] }, error: null };
+    const r = await createProduit(req("POST", { titre: "Robe", prix_centimes: 2599, variantes: [{ nom: "M", stock: 3 }] }), ctx({ id: ID }));
+    expect(r.status).toBe(201);
+    expect((await r.json()).produit).toMatchObject({ id: "p1", variantes: [{ nom: "M", stock: 3 }] });
+    expect(h.extraCalls).toEqual([["boutique_creer_produit", { p_boutique: ID, p_produit: { titre: "Robe", prix_centimes: 2599 }, p_variantes: [{ nom: "M", stock: 3 }] }]]);
+    expect(steps("produits", "insert")).toHaveLength(0);
+    expect(steps("variantes", "insert")).toHaveLength(0);
+  });
+
+  it("un plafond de la base devient une réponse 403 claire, une entrée refusée 400, sans repli sur l'ancien chemin", async () => {
+    h.results.boutiques = { data: [{ id: ID }], error: null };
+    h.extra.boutique_creer_produit = { data: null, error: { code: "P0001", message: "Limite de 500 produits", hint: "plafond_produits" } };
+    const r = await createProduit(req("POST", { titre: "Robe", prix_centimes: 100 }), ctx({ id: ID }));
+    expect(r.status).toBe(403);
+    expect((await r.json()).code).toBe("plafond_produits");
+    h.extra.boutique_creer_produit = { data: null, error: { code: "23514", message: "violates check produits_images_https" } };
+    expect((await createProduit(req("POST", { titre: "Robe", prix_centimes: 100 }), ctx({ id: ID }))).status).toBe(400);
+    expect(steps("produits", "insert")).toHaveLength(0);
+  });
+
+  it("limite de débit PARTAGÉE en base : refus 429 avant tout appel à la création de commande", async () => {
+    h.extra.limite_debit = { data: true, error: null };
+    const r = await passerCommande(req("POST", CMD, { origin: ORIGIN, "x-forwarded-for": "9.9.9.9" }));
+    expect(r.status).toBe(429);
+    expect((await r.json()).code).toBe("rate_limit");
+    expect(h.rpc).not.toHaveBeenCalled();
+    expect(h.extraCalls.some(([n, a]) => n === "limite_debit" && (a as { p_cle: string }).p_cle === "9.9.9.9")).toBe(true);
+  });
+
+  it("limite de débit absente (migration pas exécutée) : la commande passe, la limite mémoire reste active", async () => {
+    h.extra.limite_debit = { data: null, error: { code: "PGRST202", message: "Could not find the function" } };
+    expect((await passerCommande(req("POST", CMD, { origin: ORIGIN, "x-forwarded-for": "8.8.8.8" }))).status).toBe(201);
+  });
+
+  it("plafond de commandes « nouvelle » par contact : 429 clair ; trop d'articles : refusé avant la base", async () => {
+    h.rpc.mockResolvedValueOnce(sqlErr("E_CONTACT_TROP_DE_COMMANDES"));
+    const r = await passerCommande(req("POST", CMD, { origin: ORIGIN, "x-forwarded-for": "7.7.7.7" }));
+    expect(r.status).toBe(429);
+    expect((await r.json()).code).toBe("trop_de_commandes_contact");
+    const gros = { ...CMD, lignes: [1, 2, 3].map((i) => ({ variante_id: `0000000${i}-0000-4000-8000-000000000000`, quantite: 99 })) };
+    expect((await passerCommande(req("POST", gros, { origin: ORIGIN, "x-forwarded-for": "6.6.6.6" }))).status).toBe(400);
+    expect(h.rpc).toHaveBeenCalledTimes(1);
+  });
+
+  it("le suivi accepte les références de 8 caractères (anciennes) et de 12 (nouvelles)", async () => {
+    h.rpc.mockResolvedValue({ data: { ref: "CMD-3F9A1C2B4D5E", statut: "prete" }, error: null });
+    expect((await suivre(req("POST", { ref: "CMD-3F9A1C2B4D5E", jeton: "a".repeat(64) }))).status).toBe(200);
+    expect((await suivre(req("POST", { ref: "CMD-3F9A1C2B", jeton: "a".repeat(64) }))).status).toBe(200);
+    expect((await suivre(req("POST", { ref: "CMD-3F9A1C2B4", jeton: "a".repeat(64) }))).status).toBe(404);
   });
 });

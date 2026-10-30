@@ -39,7 +39,7 @@ export function CatalogueView() {
       <ul className="vt-grid">
         {liste.map((p) => {
           const img = imagesSures(p.images)[0];
-          const dispo = p.variantes.filter((v) => v.stock > 0);
+          const dispo = p.variantes.filter((v) => v.disponible);
           const direct = peutCommander && p.variantes.length === 1 && dispo.length === 1;
           return (
             <li key={p.id} className="vt-card">

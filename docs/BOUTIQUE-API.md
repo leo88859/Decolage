@@ -43,7 +43,8 @@ Erreurs propres au commerçant : 403 `limite_boutiques` / `limite_sites` / `publ
 
 ### `GET /api/boutique/catalogue/{slug}`
 Boutique **publiée** uniquement (brouillon, inconnue : 404). Réponse :
-`{ boutique: { id, slug, nom, description, couleur_principale, couleur_accent, logo, adresse, whatsapp, email, telephone, modes, published_at }, categories: [{ id, nom, position }], produits: [{ id, categorie_id, titre, description, prix_centimes, images, position, variantes: [{ id, nom, stock, position, disponible }] }] }`
+`{ boutique: { id, slug, nom, description, couleur_principale, couleur_accent, logo, adresse, whatsapp, email, telephone, modes, published_at }, categories: [{ id, nom, position }], produits: [{ id, categorie_id, titre, description, prix_centimes, images, position, variantes: [{ id, nom, position, disponible, stock_bas }] }] }`
+**Le stock exact n'est plus public** (migration 0007) : le public reçoit seulement `disponible` (stock > 0) et `stock_bas` (1 à 5 restants), jamais la quantité. Le commerçant, lui, voit toujours le stock exact de SES variantes (`GET /api/boutique/{id}`). Une quantité trop grande est refusée à la commande (409 `stock_insuffisant`), pas dans le panier.
 Seuls les produits et variantes actifs sont renvoyés. Le panier ne garde que `variante_id` et `quantite`.
 
 ### `POST /api/boutique/commande`
@@ -58,12 +59,13 @@ Corps :
 - `client.nom` obligatoire ; au moins un `email` ou `telephone` ; `adresse` obligatoire si `mode = "livraison"`.
 - `site` : champ piège caché (laisser vide, `display:none`, `tabindex=-1`, `autocomplete=off`). Rempli = faux succès sans enregistrement.
 - Tout prix, total, statut ou paiement envoyé est **ignoré** : prix et stock sont relus en base, le total est recalculé.
-- 1 à 20 lignes, quantité entière 1 à 99, lignes d'une même variante additionnées.
+- 1 à 20 lignes, quantité entière 1 à 99, lignes d'une même variante additionnées, **200 articles au maximum par commande** (migration 0007).
+- Anti-blocage de stock (migration 0007) : au plus **3 commandes « nouvelle » en 7 jours par contact** (e-mail ou téléphone normalisé : majuscules, « +tag » de l'e-mail et forme du numéro ignorés) et par boutique ; une commande confirmée ou annulée ne compte plus. Au-delà : 429 `trop_de_commandes_contact`. Les commandes « nouvelle » trop anciennes peuvent être annulées automatiquement (voir « Expiration » plus bas).
 
-Réponse 201 : `{ commande: { ref: "CMD-3F9A1C2B", statut: "nouvelle", total_centimes, paiement: "non_payee", mode, jeton_suivi }, rejouee: false }`.
+Réponse 201 : `{ commande: { ref: "CMD-3F9A1C2B4D5E", statut: "nouvelle", total_centimes, paiement: "non_payee", mode, jeton_suivi }, rejouee: false }`.
 Même `cle` rejouée : 200, `rejouee: true`, même `ref`, **sans** `jeton_suivi` (il n'est donné qu'une fois : l'interface doit le garder, par exemple dans le lien de suivi).
 
-Erreurs : 400 `invalid` (+ `errors`), `mode_invalide`, `client_invalide`, `quantite_invalide`, `cle_invalide` ; 403 `origin` ; 404 `boutique_introuvable` (brouillon ou inconnue) ; 409 `stock_insuffisant`, `produit_indisponible` (produit/variante inactif ou d'une autre boutique) ; 429 `rate_limit` (5 par minute et 30 par heure et par IP) ou `trop_de_commandes` (100 par heure et par boutique) ; 503 si le serveur n'est pas configuré.
+Erreurs : 400 `invalid` (+ `errors`), `mode_invalide`, `client_invalide`, `quantite_invalide`, `cle_invalide` ; 403 `origin` ; 404 `boutique_introuvable` (brouillon ou inconnue) ; 409 `stock_insuffisant`, `produit_indisponible` (produit/variante inactif ou d'une autre boutique) ; 429 `rate_limit` (5 par minute et 30 par heure et par IP, comptés en mémoire PUIS en base : valable entre plusieurs instances), `trop_de_commandes` (100 par heure et par boutique, compté sous verrou) ou `trop_de_commandes_contact` ; 503 si le serveur n'est pas configuré.
 
 ### `POST /api/boutique/suivi`
 Corps `{ ref, jeton }` (le `jeton_suivi` reçu à la commande). Réponse `{ commande: { ref, statut, paiement, mode, total_centimes, boutique: { nom, slug }, lignes: [{ titre, variante, prix_unitaire_centimes, quantite }] } }`. Mauvais couple : 404 (rien n'est révélé). Les coordonnées du client ne sont jamais renvoyées.
@@ -71,7 +73,10 @@ Corps `{ ref, jeton }` (le `jeton_suivi` reçu à la commande). Réponse `{ comm
 ## Garanties côté base (testées)
 
 - Le public ne lit jamais une commande (ni la sienne : le suivi passe par le jeton) ; un commerçant ne lit que les commandes de ses boutiques.
-- Le public ne lit pas `proprietaire_id` ; il ne voit que boutiques publiées, produits et variantes actifs.
+- Le public ne lit pas `proprietaire_id`, `sites.user_id` ni le stock exact ; il ne voit que les boutiques publiées, les produits actifs et la vue `variantes_publiques` (disponible / stock bas). Un compte connecté ne lit que SES boutiques et SES sites (migration 0007).
+- Plafonds (0007, tous rôles) : 500 produits par boutique et 2000 par compte, 50 variantes par produit, 50 catégories par boutique (403 `plafond_produits` / `plafond_variantes` / `plafond_categories`). Images et logo : `https://` seulement, 500 caractères, 5 images au plus, vérifiés AUSSI en base.
+- `POST .../produits` appelle une fonction SQL unique et atomique (`boutique_creer_produit`, avec les droits du commerçant) : tout ou rien, jamais de produit sans variante. (La modification d'une variante reste une seule écriture, déjà atomique.)
+- Référence de commande : `CMD-` + 12 caractères hexadécimaux aléatoires pour les nouvelles commandes ; les anciennes (8 caractères) restent valables, y compris pour le suivi.
 - La commande est créée par la fonction SQL `boutique_creer_commande` (réservée à la clé serveur) : prix/stock relus, stock décrémenté sous verrou de ligne (pas de survente), tout ou rien, idempotence par `(boutique, cle)`.
 - Les lignes copient titre, variante et prix au moment de la commande.
 - `commandes.paiement` est contraint à `non_payee` par la base.
@@ -81,5 +86,20 @@ Corps `{ ref, jeton }` (le `jeton_suivi` reçu à la commande). Réponse `{ comm
 - Le stock est obligatoire (entier, 0 = épuisé) : pas de « stock illimité ».
 - Pas d'envoi de fichiers : logo et images = URL https.
 - Aucun e-mail / notification envoyé au commerçant ni au client (le commerçant consulte la liste des commandes).
-- Limite par IP en mémoire (par instance serveur), comme la liste d'attente.
+- Limite par IP : d'abord en mémoire (par instance), puis en base (`limite_debit`, migration 0007) pour tenir entre instances ; un attaquant qui change d'adresse IP la contourne (d'où les plafonds par contact et par boutique, et l'expiration).
 - Le contrôle d'origine suppose que la page boutique est servie depuis le domaine du site (ou `NEXT_PUBLIC_APP_URL`) ; un domaine personnalisé demandera d'autoriser son origine.
+
+## Expiration des commandes « nouvelle » (migration 0007)
+
+Une commande sans paiement réserve du stock. Une commande « nouvelle » jamais traitée bloquerait donc ce stock indéfiniment. La fonction SQL `boutique_expirer_commandes_nouvelles(p_age interval)` passe en « annulee » toutes les commandes « nouvelle » plus anciennes que `p_age` (minimum 1 heure) et remet le stock **une seule fois** (même déclencheur que l'annulation par le commerçant). Elle renvoie le nombre de commandes annulées. Rejouable sans effet : une commande déjà annulée n'est plus touchée.
+
+**Elle n'est planifiée nulle part** (aucun cron créé). Deux façons de l'appeler, au choix du patron :
+
+1. **pg_cron dans Supabase** (Database -> Extensions -> activer `pg_cron`), puis dans le SQL Editor, par exemple toutes les heures et pour les commandes de plus de 72 heures :
+   ```sql
+   select cron.schedule('expirer-commandes-nouvelles', '17 * * * *', $$select public.boutique_expirer_commandes_nouvelles(interval '72 hours')$$);
+   -- pour arrêter : select cron.unschedule('expirer-commandes-nouvelles');
+   ```
+2. **Route protégée** `/api/boutique/expiration` (POST ou GET) : elle n'existe que si la variable d'environnement OPTIONNELLE `CRON_SECRET` est définie (sinon 404). Appel : en-tête `Authorization: Bearer <CRON_SECRET>`, paramètre facultatif `?heures=72` (entier de 1 à 720). Réponse `{ annulees, heures }`. Un planificateur externe (ou Vercel Cron, qui envoie ce même en-tête) peut l'appeler. Le dépôt ne fournit aucune valeur ni clé : le patron choisit un secret long et aléatoire.
+
+Appel manuel unique (SQL Editor) : `select public.boutique_expirer_commandes_nouvelles(interval '72 hours');`

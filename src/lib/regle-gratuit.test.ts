@@ -65,8 +65,9 @@ const order = (slug: string, variante: string) =>
 beforeAll(async () => {
   db = new PGlite();
   await db.exec(SUPABASE_STUB);
-  for (const f of ["0001_schema.sql", "0002_conformite.sql", "0003_marque_blanche.sql", "0004_limites_serveur.sql", "0005_boutique.sql", "0006_regle_gratuit.sql"]) await db.exec(sql(f));
+  for (const f of ["0001_schema.sql", "0002_conformite.sql", "0003_marque_blanche.sql", "0004_limites_serveur.sql", "0005_boutique.sql", "0006_regle_gratuit.sql", "0007_durcissement.sql"]) await db.exec(sql(f));
   await db.exec(sql("0006_regle_gratuit.sql")); // rejouable sans erreur
+  await db.exec(sql("0007_durcissement.sql")); // rejouable sans erreur (dernière migration)
   await db.query("insert into auth.users (id) values ($1), ($2)", [A, B]);
 });
 beforeEach(async () => {
@@ -117,7 +118,7 @@ describe("(1) Gratuit : créer, enregistrer, retrouver et prévisualiser", () =>
 describe("(9) aperçu : aucune URL publique n'est créée sans publication", () => {
   it("le brouillon d'un Gratuit (boutique, produits, catégories, variantes) est invisible du public ; le propriétaire le voit", async () => {
     const s = await seedShop(A, "brouillon-a", "brouillon");
-    for (const t of ["boutiques", "categories", "produits", "variantes"]) {
+    for (const t of ["boutiques", "categories", "produits", "variantes_publiques"]) { // 0007 : le public lit les variantes par la vue (sans stock)
       expect(await as("anon", null, `select 1 from public.${t}`), `anon ${t}`).toHaveLength(0);
     }
     expect(await as("authenticated", B, "select 1 from public.boutiques")).toHaveLength(0);
@@ -249,14 +250,14 @@ describe("rétrogradation vers Gratuit : rien n'est supprimé, plus rien de publ
     const s = await seedShop(A, "vitrine-a");
     await serverSite(A, "site-de-a");
     await q("insert into public.waitlist (slug, email) values ('site-de-a','x@exemple.fr')");
-    for (const t of ["boutiques", "categories", "produits", "variantes", "sites"]) expect(await as("anon", null, `select 1 from public.${t}`), `public avant ${t}`).not.toHaveLength(0);
+    for (const t of ["boutiques", "categories", "produits", "variantes_publiques", "sites"]) expect(await as("anon", null, `select 1 from public.${t}`), `public avant ${t}`).not.toHaveLength(0);
     expect(await order("vitrine-a", s.variante)).toHaveLength(1);
 
     await setPlan(A, "gratuit"); // rétrogradation, webhook pas encore passé
 
-    for (const t of ["boutiques", "categories", "produits", "variantes", "sites"]) expect(await as("anon", null, `select 1 from public.${t}`), `public après ${t}`).toHaveLength(0);
+    for (const t of ["boutiques", "categories", "produits", "variantes_publiques", "sites"]) expect(await as("anon", null, `select 1 from public.${t}`), `public après ${t}`).toHaveLength(0);
     await expect(order("vitrine-a", s.variante)).rejects.toThrow(/E_BOUTIQUE_INTROUVABLE/);
-    await expect(as("anon", null, "insert into public.waitlist (slug, email) values ('site-de-a','y@exemple.fr')")).rejects.toThrow(/row-level security/);
+    await expect(as("anon", null, "insert into public.waitlist (slug, email) values ('site-de-a','y@exemple.fr')")).rejects.toThrow(/row-level security|permission denied/); // 0007 : plus aucune insertion directe
     // conservé : le propriétaire retrouve tout, et rien n'a été supprimé
     expect(await as("authenticated", A, "select 1 from public.boutiques")).toHaveLength(1);
     expect(await as("authenticated", A, "select 1 from public.sites")).toHaveLength(1);

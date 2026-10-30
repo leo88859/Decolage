@@ -13,7 +13,7 @@ type Suivi = {
   lignes: { titre: string; variante: string; prix_unitaire_centimes: number; quantite: number }[];
 };
 
-const REF = /^CMD-[0-9A-F]{8}$/;
+const REF = /^CMD-(?:[0-9A-F]{8}|[0-9A-F]{12})$/;
 const JETON = /^[0-9a-f]{64}$/;
 
 const subHash = (f: () => void) => { window.addEventListener("hashchange", f); return () => window.removeEventListener("hashchange", f); };
@@ -124,7 +124,7 @@ export function SuiviView({ confirmation = false }: { confirmation?: boolean }) 
           <p className="vt-hint">Entre la référence de ta commande et le code de suivi (contenu dans le lien de suivi donné à la commande).</p>
           {err && !confirmation ? <div className="vt-alert bad" role="alert">{err}</div> : null}
           <div className="vt-field">
-            <label htmlFor="s-ref">Référence (ex. CMD-3F9A1C2B)</label>
+            <label htmlFor="s-ref">Référence (ex. CMD-3F9A1C2B4D5E)</label>
             <input id="s-ref" value={ref} onChange={(e) => setRef(e.target.value)} autoComplete="off" spellCheck={false} />
           </div>
           <div className="vt-field">

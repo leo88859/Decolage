@@ -45,9 +45,10 @@ const count = async (uid: string) => (await db.query<{ n: number }>("select coun
 beforeAll(async () => {
   db = new PGlite();
   await db.exec(SUPABASE_STUB);
-  for (const f of ["0001_schema.sql", "0002_conformite.sql", "0003_marque_blanche.sql", "0004_limites_serveur.sql", "0005_boutique.sql", "0006_regle_gratuit.sql"]) await db.exec(sql(f));
+  for (const f of ["0001_schema.sql", "0002_conformite.sql", "0003_marque_blanche.sql", "0004_limites_serveur.sql", "0005_boutique.sql", "0006_regle_gratuit.sql", "0007_durcissement.sql"]) await db.exec(sql(f));
   await db.exec(sql("0004_limites_serveur.sql")); // rejouable sans erreur
   await db.exec(sql("0006_regle_gratuit.sql")); // rejouable sans erreur (0006 remplace 0004 pour plan_max_projects : on la rejoue en dernier)
+  await db.exec(sql("0007_durcissement.sql")); // rejouable sans erreur (dernière migration)
   await db.query("insert into auth.users (id) values ($1), ($2)", [A, B]);
 });
 

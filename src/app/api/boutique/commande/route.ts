@@ -1,4 +1,4 @@
-import { adminClient, clientIp, json, invalid, originOk, readJson, tooMany } from "@/lib/boutique/api";
+import { adminClient, clientIp, dbTooMany, json, invalid, originOk, readJson, tooMany } from "@/lib/boutique/api";
 import { validateCommande } from "@/lib/boutique/validate";
 import { isCloudConfigured } from "@/lib/env";
 
@@ -10,15 +10,18 @@ const SQL_ERRORS: Record<string, [number, string, string]> = {
   E_BOUTIQUE_INTROUVABLE: [404, "boutique_introuvable", "Cette boutique n'existe pas ou n'est pas ouverte."],
   E_MODE_INVALIDE: [400, "mode_invalide", "Ce mode de commande n'est pas proposé par la boutique."],
   E_CLIENT_INVALIDE: [400, "client_invalide", "Les coordonnées sont incomplètes ou invalides."],
-  E_QUANTITE_INVALIDE: [400, "quantite_invalide", "Le panier est invalide (quantité entre 1 et 99, 20 lignes au maximum)."],
+  E_QUANTITE_INVALIDE: [400, "quantite_invalide", "Le panier est invalide (quantité entre 1 et 99 par article, 200 articles au maximum, 20 lignes au maximum)."],
   E_CLE_INVALIDE: [400, "cle_invalide", "Clé de commande invalide."],
+  E_CONTACT_TROP_DE_COMMANDES: [429, "trop_de_commandes_contact", "Tu as déjà plusieurs commandes en attente de confirmation dans cette boutique. Attends qu'elles soient traitées ou contacte la boutique."],
   E_TROP_DE_COMMANDES: [429, "trop_de_commandes", "Cette boutique reçoit trop de commandes en ce moment. Réessaie plus tard."],
 };
 
 /**
  * Passe une commande SANS paiement en ligne (publique). Le navigateur n'envoie que les identifiants de variantes et les
  * quantités : prix, stock et total sont relus/recalculés en base par boutique_creer_commande (clé service_role).
- * Anti-spam : Origin, champ piège « site », 5 envois/minute et 30/heure par IP, clé d'idempotence obligatoire.
+ * Anti-spam : Origin, champ piège « site », 5 envois/minute et 30/heure par IP (en mémoire, puis en base : migration 0007,
+ * valable entre plusieurs instances), clé d'idempotence obligatoire. La base plafonne aussi les commandes « nouvelle » par
+ * contact et par boutique et à 100 par heure et par boutique, et annule les commandes « nouvelle » trop anciennes.
  */
 export async function POST(req: Request) {
   if (!isCloudConfigured()) return json({ error: "Les commandes ne sont pas disponibles pour le moment.", code: "demo" }, 503);
@@ -36,6 +39,8 @@ export async function POST(req: Request) {
   if (!admin) return json({ error: "Les commandes ne sont pas encore configurées sur ce site.", code: "server" }, 503);
 
   const { slug, cle, mode, client, lignes } = v.value;
+  // Limite partagée en base (tient même si les requêtes arrivent sur des instances différentes).
+  if ((await dbTooMany(admin, "cmd-min", ip, 5, 60)) || (await dbTooMany(admin, "cmd-h", ip, 30, 3600))) return json({ error: "Trop de tentatives. Réessaie dans une minute.", code: "rate_limit" }, 429);
   const { data, error } = await admin.rpc("boutique_creer_commande", {
     p_slug: slug,
     p_cle: cle,

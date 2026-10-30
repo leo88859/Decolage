@@ -3,7 +3,8 @@
 import { totalCentimes } from "@/lib/boutique/money";
 import { REF_RE, UUID_RE } from "@/lib/boutique/validate";
 
-export type VariantePub = { id: string; nom: string; stock: number; position: number; disponible: boolean };
+/** Variante vue par le PUBLIC : jamais la quantité en stock (migration 0007), seulement disponible / stock bas. */
+export type VariantePub = { id: string; nom: string; position: number; disponible: boolean; stock_bas: boolean };
 export type ProduitPub = {
   id: string;
   categorie_id: string | null;
@@ -24,6 +25,7 @@ export type CataloguePub = { boutique: BoutiquePub; categories: { id: string; no
 
 export const MAX_LIGNES = 20;
 export const MAX_QTE = 99;
+/** Seuil « stock bas » (miroir de la vue SQL variantes_publiques et de la route catalogue). */
 export const STOCK_BAS = 5;
 
 // ---------- Panier (seulement variante_id + quantité) ----------
@@ -66,7 +68,7 @@ export const countArticles = (lignes: readonly Ligne[]) => lignes.reduce((s, l) 
 
 // ---------- Disponibilité et résolution du panier avec le catalogue ----------
 export type Dispo = "disponible" | "bas" | "indisponible";
-export const dispoVariante = (v: Pick<VariantePub, "stock">): Dispo => (v.stock <= 0 ? "indisponible" : v.stock <= STOCK_BAS ? "bas" : "disponible");
+export const dispoVariante = (v: Pick<VariantePub, "disponible" | "stock_bas">): Dispo => (!v.disponible ? "indisponible" : v.stock_bas ? "bas" : "disponible");
 export const dispoProduit = (p: Pick<ProduitPub, "variantes">): Dispo => {
   const d = p.variantes.map(dispoVariante);
   return d.includes("disponible") ? "disponible" : d.includes("bas") ? "bas" : "indisponible";
@@ -80,7 +82,7 @@ export type LigneResolue = {
   variante: VariantePub | null;
   prix_unitaire_centimes: number;
   probleme: Probleme | null;
-  /** Quantité maximale commandable d'après le catalogue chargé (indicatif). */
+  /** Quantité maximale commandable d'après le catalogue chargé (indicatif : le stock exact n'est plus public, la base tranche à la commande). */
   max: number;
 };
 
@@ -91,8 +93,8 @@ export function resolveCart(lignes: readonly Ligne[], produits: readonly Produit
     const hit = idx.get(ligne.variante_id);
     if (!hit) return { ligne, produit: null, variante: null, prix_unitaire_centimes: 0, probleme: "retire", max: 0 };
     const { p, v } = hit;
-    const probleme: Probleme | null = v.stock <= 0 ? "indisponible" : ligne.quantite > v.stock ? "stock_insuffisant" : null;
-    return { ligne, produit: p, variante: v, prix_unitaire_centimes: p.prix_centimes, probleme, max: Math.min(MAX_QTE, Math.max(0, v.stock)) };
+    const probleme: Probleme | null = !v.disponible ? "indisponible" : null;
+    return { ligne, produit: p, variante: v, prix_unitaire_centimes: p.prix_centimes, probleme, max: v.disponible ? MAX_QTE : 0 };
   });
 }
 /** Total INDICATIF des seules lignes sans problème (le serveur recalcule à la commande). */
@@ -158,9 +160,10 @@ export function mapCommandeError(status: number | null, body: unknown): Commande
     case "boutique_introuvable": return e("Cette boutique n'est plus ouverte aux commandes.");
     case "mode_invalide": return e("Ce mode de commande n'est pas proposé par la boutique.");
     case "invalid": case "client_invalide": return e(serveur || "Certains champs sont invalides.");
-    case "quantite_invalide": return e("Le panier est invalide (quantité de 1 à 99, 20 articles différents au maximum).");
+    case "quantite_invalide": return e("Le panier est invalide (quantité de 1 à 99, 200 articles au maximum, 20 articles différents au maximum).");
     case "cle_invalide": return e("Commande interrompue, réessaie.", { reessayer: true });
     case "rate_limit": return e("Trop de tentatives. Réessaie dans une minute.", { reessayer: true });
+    case "trop_de_commandes_contact": return e("Tu as déjà plusieurs commandes en attente de confirmation dans cette boutique. Attends qu'elles soient traitées ou contacte la boutique.");
     case "trop_de_commandes": return e("Cette boutique reçoit trop de commandes en ce moment. Réessaie plus tard.", { reessayer: true });
     case "origin": return e("Requête refusée par le site. Recharge la page puis réessaie.");
     case "demo": return e("Les commandes ne sont pas disponibles pour le moment.");

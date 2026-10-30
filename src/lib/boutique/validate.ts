@@ -1,6 +1,6 @@
 import { slugError, EMAIL_RE } from "@/lib/publish";
 import { validateColor } from "@/lib/brand/validate";
-import { isCentimes, QUANTITE_MAX } from "./money";
+import { isCentimes, QUANTITE_MAX, QUANTITE_TOTALE_MAX } from "./money";
 import { MODES, STATUTS_BOUTIQUE, STATUTS_COMMANDE, type Mode, type StatutBoutique, type StatutCommande } from "./types";
 
 // Validation STRICTE des entrées de l'API boutique. Pure (sans serveur) : réutilisable côté navigateur pour les messages.
@@ -12,7 +12,8 @@ export type Result<T> = { ok: true; value: T } | { ok: false; errors: Errors };
 
 const BAD_CHARS = /[\u0000-\u0008\u000b-\u001f\u007f-\u009f\u200b-\u200f\u202a-\u202e\u2066-\u2069\ufeff]/; // contrôle (sauf \n et \t) et caractères bidi/invisibles
 export const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-export const REF_RE = /^CMD-[0-9A-F]{8}$/;
+// Anciennes commandes : 8 caractères ; nouvelles (migration 0007) : 12 caractères.
+export const REF_RE = /^CMD-(?:[0-9A-F]{8}|[0-9A-F]{12})$/;
 export const CLE_RE = /^[A-Za-z0-9_-]{16,64}$/;
 const PHONE_RE = /^\+?[0-9 ().-]{6,20}$/;
 
@@ -216,6 +217,7 @@ export function validateCommande(input: unknown): Result<CommandeIn> {
       else lignes.push({ variante_id: id, quantite: q });
     }
   }
+  if (!errors.lignes && lignes.reduce((s, l) => s + l.quantite, 0) > QUANTITE_TOTALE_MAX) errors.lignes = `${QUANTITE_TOTALE_MAX} articles au maximum par commande.`;
   if (Object.keys(errors).length || !mode) return { ok: false, errors };
   return { ok: true, value: { slug, cle, mode, client, lignes } };
 }

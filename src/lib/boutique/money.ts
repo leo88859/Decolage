@@ -2,6 +2,8 @@
 
 export const PRIX_MAX_CENTIMES = 99_999_999; // ~ 1 million d'euros : même plafond que la base
 export const QUANTITE_MAX = 99;
+/** Articles au total dans une commande (miroir de la base, migration 0007). */
+export const QUANTITE_TOTALE_MAX = 200;
 
 export const isCentimes = (n: unknown): n is number => typeof n === "number" && Number.isInteger(n) && n >= 0 && n <= PRIX_MAX_CENTIMES;
 

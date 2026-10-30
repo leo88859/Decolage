@@ -1,8 +1,8 @@
 # Limites de formule : ce que le serveur applique
 
-Source des valeurs : `src/lib/plans.ts` (miroir SQL : `supabase/0004_limites_serveur.sql`, `0005_boutique.sql`, puis `0006_regle_gratuit.sql` qui a le dernier mot ; des tests comparent le SQL à `plans.ts`).
+Source des valeurs : `src/lib/plans.ts` (miroir SQL : `supabase/0004_limites_serveur.sql`, `0005_boutique.sql`, puis `0006_regle_gratuit.sql`, puis `0007_durcissement.sql` qui a le dernier mot ; des tests comparent le SQL à `plans.ts`).
 
-**Migrations à exécuter À LA MAIN (Supabase, SQL Editor), dans cet ordre : `0004` puis `0005` puis `0006`.** Chacune est rejouable et ne supprime rien. `0006` ne modifie pas les fichiers 0004 et 0005 : elle remplace des fonctions, des déclencheurs et des politiques par de nouvelles versions. Tant que `0006` n'est pas exécutée, la règle « Gratuit = 1 projet » et les gardes décrites plus bas côté base ne sont pas actives (les gardes de l'API, elles, le sont dès le déploiement du code).
+**Migrations à exécuter À LA MAIN (Supabase, SQL Editor), dans cet ordre : `0004` puis `0005` puis `0006` puis `0007` (durcissement, voir la section dédiée plus bas).** Chacune est rejouable et ne supprime rien. `0006` ne modifie pas les fichiers 0004 et 0005 : elle remplace des fonctions, des déclencheurs et des politiques par de nouvelles versions. Tant que `0006` n'est pas exécutée, la règle « Gratuit = 1 projet » et les gardes décrites plus bas côté base ne sont pas actives (les gardes de l'API, elles, le sont dès le déploiement du code).
 
 ## Droits par formule (règle du patron, octobre 2026)
 
@@ -29,7 +29,7 @@ Le principe : plusieurs couches indépendantes, la base ayant le dernier mot. Au
 | Lire une page publique `/s/{slug}` | `loadSite` refuse `suspended_at` | politique « lecture publique des sites publiables » : visible seulement si `suspended_at` est nul **et** si le propriétaire a une formule qui publie (`owner_can_publish`) |
 | Lire `/b/{slug}`, `/api/boutique/catalogue/{slug}` | filtre `statut = 'publiee'` | politique de lecture : `statut = 'publiee'` ET non suspendue ET propriétaire autorisé ; idem pour catégories, produits, variantes (`boutique_publiee`). Sinon 404. |
 | Commander dans une boutique | `/api/boutique/commande` : 404 `boutique_introuvable` | `boutique_creer_commande` + déclencheur `commandes_boutique_publiable` : aucune commande sur une boutique non publique, stock intact |
-| Liste d'attente d'un site | | politique d'inscription : le site doit être non suspendu ET lisible par le public (donc propriétaire autorisé) |
+| Liste d'attente d'un site | `/api/waitlist/{slug}` (seule voie d'inscription depuis la migration 0007, clé serveur) | fonction `waitlist_inscrire` : le site doit être non suspendu ET lisible par le public (donc propriétaire autorisé) ; plus aucune insertion directe par le navigateur (0006 : politique d'inscription ; 0007 : retirée) |
 
 Conséquence importante : si un compte repasse en Gratuit, ses anciennes URL publiques répondent 404 **immédiatement**, sans attendre le webhook Stripe (la lecture publique dépend de la formule courante dans `profiles`).
 
@@ -97,3 +97,29 @@ RLS sur `projects`, `profiles`, `boutiques` (+ produits, variantes, commandes), 
   **Écart avec la base (0006)** : `sites_enforce_plan` compte TOUS les sites (suspendus compris) et toutes les boutiques `publiee` (suspendues comprises) : un nouvel INSERT est donc encore refusé par la base (403 `limite_sites`) tant que ce correctif SQL n'est pas appliqué. Correctif proposé (nouvelle migration, à appliquer par le patron ou l'autre développeur ; non exécuté ici) : dans `sites_enforce_plan`, remplacer le calcul de `n` par
   `select (select count(*) from public.sites where user_id = new.user_id and suspended_at is null) + (select count(*) from public.boutiques where proprietaire_id = new.user_id and statut = 'publiee' and suspended_at is null) into n;`
   Même changement à faire dans le déclencheur équivalent des boutiques (`boutique_enforce_limit`) pour compter les sites non suspendus, et vérifier qu'une mise à jour qui lève `suspended_at` (service_role) respecte la limite.
+
+## Durcissement de sécurité (migration 0007, audit d'octobre 2026)
+
+`supabase/0007_durcissement.sql` (copie identique pour le copier-coller : `supabase/A-COLLER-0007.sql`). **À exécuter en dernier, après 0006**, rejouable sans erreur, ne modifie aucune donnée ni les fichiers 0001 à 0006. Ne rejoue jamais 0005 ou 0006 *après* elle (elles recréeraient d'anciennes politiques de lecture) ; si cela arrive, rejoue 0007. **Ordre de mise en ligne conseillé : déployer d'abord le code (il fonctionne avec ou sans 0007 grâce à des replis), puis exécuter 0007.**
+
+| Problème | Correction |
+|---|---|
+| Liste d'attente : insertion directe par `anon` via PostgREST (spam sans limite, doublon = 409 qui révèle une adresse) | insertion retirée pour `anon`/`authenticated` (politique supprimée, `revoke insert`) ; inscription par la route `/api/waitlist/{slug}` -> fonction `waitlist_inscrire` (service_role) : réponse **identique** pour un doublon, e-mail en minuscules et au bon format (contrainte `not valid`), plafond de 5000 inscrits par site, 300 inscriptions par heure et par site, limite par IP en base |
+| Commandes sans paiement qui bloquent le stock | limite de débit en base (`limite_debit`, par IP, entre instances) ; 3 commandes « nouvelle » en 7 jours par contact et par boutique ; 200 articles au plus par commande ; comptage « 100 par heure » sous verrou consultatif par boutique ; `boutique_expirer_commandes_nouvelles(interval)` (non planifiée : voir `docs/BOUTIQUE-API.md`) |
+| Plafonds / images | 500 produits par boutique, 2000 par compte, 50 variantes par produit, 50 catégories par boutique (déclencheurs) ; URL d'images et logo en https, 500 caractères, 5 images, sans espace ni balise ni identifiants (contraintes `not valid`, valables aussi en écriture directe) |
+| Exposition publique | `anon` ne lit plus `sites.user_id` / `project_id` (droits de colonnes) ; un compte connecté ne lit que SES sites et SES boutiques (plus `proprietaire_id` / `suspended_at` des autres) ; stock exact : `anon` ne lit plus `variantes`, il lit la vue `variantes_publiques` (`disponible`, `stock_bas`) ; l'API catalogue ne renvoie plus `stock` |
+| TRUNCATE / REFERENCES / TRIGGER | retirés à `anon` et `authenticated` sur toutes les tables de Décollage (la suppression de compte et ses cascades, faites par le serveur, sont testées) |
+| Création produit + variantes non atomique | fonction `boutique_creer_produit` (droits du commerçant, tout ou rien) appelée par `POST /api/boutique/{id}/produits` |
+| Référence de commande de 32 bits | nouvelles références `CMD-` + 12 hexadécimaux (48 bits) ; collision = nouvelle tentative ; anciennes références (8) toujours valables |
+| Divers | fonctions de déclencheur non exécutables via `/rpc` ; quantité non numérique -> `E_QUANTITE_INVALIDE` (jamais d'erreur brute) ; adresses réservées (`admin`, `api`...) refusées en base pour les sites et les boutiques |
+
+### Code généré (kit « waitlist »)
+Le code généré pour l'utilisateur du SaaS (`src/lib/codegen/kit-cloud.ts`) écrit dans **le Supabase de cet utilisateur** (tables `listes` / `inscriptions`, fonction `inscrire`), un autre projet que celui de Décollage : il n'écrit jamais dans la table `waitlist` de Décollage et n'est pas modifié. Seuls la landing publiée (`/s/{slug}`, formulaire vers `/api/waitlist/{slug}`) et l'onglet « En ligne » (lecture et suppression par le propriétaire, avec sa session) touchent `waitlist`. Dans le code généré, l'inscription publique passe déjà par la fonction `inscrire` (réponse identique pour un doublon) et non par une insertion directe ; sa limite de débit dépend du Supabase de l'utilisateur, hors de la portée de cette migration.
+
+### Reste ouvert après 0007
+- Un compte connecté garde l'exécution de `my_plan()`, `boutique_possedee()`, `owner_can_publish()`... (nécessaires aux politiques) ; ils ne révèlent que l'état de la formule.
+- La vue `variantes_publiques` s'exécute avec les droits de son propriétaire (le linter Supabase peut l'afficher comme « security definer view ») : c'est voulu, elle ne montre que des booléens et seulement les variantes publiques.
+- Limite de débit en fenêtre fixe : une rafale à cheval sur deux fenêtres peut doubler brièvement le plafond. Un attaquant qui change d'adresse IP contourne la limite par IP (les plafonds par contact, par boutique, 100 par heure et l'expiration limitent le dégât).
+- L'expiration des commandes n'est exécutée que si le patron la planifie (pg_cron ou route protégée).
+- Le stock exact n'est plus affiché au public : « stock bas » sans nombre ; une quantité trop grande n'est refusée qu'à la commande (409).
+- Non testé contre un vrai Supabase (PGlite simule PostgreSQL, rôles et droits par défaut compris) ; voir le compte rendu.

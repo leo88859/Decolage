@@ -57,8 +57,10 @@ const nbCommandes = async () => (await db.query("select 1 from public.commandes"
 beforeAll(async () => {
   db = new PGlite();
   await db.exec(SUPABASE_STUB);
-  for (const f of ["0001_schema.sql", "0002_conformite.sql", "0003_marque_blanche.sql", "0004_limites_serveur.sql", "0005_boutique.sql"]) await db.exec(sql(f));
+  for (const f of ["0001_schema.sql", "0002_conformite.sql", "0003_marque_blanche.sql", "0004_limites_serveur.sql", "0005_boutique.sql", "0006_regle_gratuit.sql", "0007_durcissement.sql"]) await db.exec(sql(f));
   await db.exec(sql("0005_boutique.sql")); // rejouable sans erreur
+  await db.exec(sql("0006_regle_gratuit.sql"));
+  await db.exec(sql("0007_durcissement.sql")); // rejouable sans erreur (0007 a le dernier mot : rejouée en dernier)
   await db.query("insert into auth.users (id) values ($1), ($2)", [A, B]);
 });
 beforeEach(async () => {
@@ -112,17 +114,17 @@ describe("lecture publique : seulement les boutiques publiées et les produits a
     const d = await seed(A, "brouillon-a", "brouillon");
     expect(await as("anon", null, "select id from public.boutiques")).toEqual([]);
     expect(await as("anon", null, "select id from public.produits")).toEqual([]);
-    expect(await as("anon", null, "select id from public.variantes")).toEqual([]);
+    expect(await as("anon", null, "select id from public.variantes_publiques")).toEqual([]);
     expect(await as("authenticated", A, "select id from public.boutiques where id = $1", [d.id])).toHaveLength(1);
   });
 
   it("une boutique publiée montre ses produits actifs seulement ; un produit inactif disparaît", async () => {
     const s = await seed(A, "vitrine-a");
     expect(await as("anon", null, "select id from public.produits")).toHaveLength(1);
-    expect(await as("anon", null, "select id from public.variantes")).toHaveLength(2);
+    expect(await as("anon", null, "select id from public.variantes_publiques")).toHaveLength(2); // 0007 : le public lit la vue (sans stock exact)
     await db.query("update public.produits set actif = false where id = $1", [s.produit]);
     expect(await as("anon", null, "select id from public.produits")).toEqual([]);
-    expect(await as("anon", null, "select id from public.variantes")).toEqual([]);
+    expect(await as("anon", null, "select id from public.variantes_publiques")).toEqual([]);
   });
 
   it("le public ne lit pas l'identifiant du propriétaire et ne peut rien écrire", async () => {
@@ -181,7 +183,7 @@ describe("création de commande : prix, stock, statuts", () => {
       client: { ...CLIENT, total_centimes: 1, paiement: "payee", statut: "terminee" },
     });
     expect(r).toMatchObject({ total_centimes: 3000, paiement: "non_payee", statut: "nouvelle", rejouee: false });
-    expect(String(r.ref)).toMatch(/^CMD-[0-9A-F]{8}$/);
+    expect(String(r.ref)).toMatch(/^CMD-[0-9A-F]{12}$/);
     expect(typeof r.jeton_suivi).toBe("string");
     const row = (await db.query<{ statut: string; paiement: string }>("select statut, paiement from public.commandes")).rows[0]!;
     expect(row).toEqual({ statut: "nouvelle", paiement: "non_payee" });
@@ -317,10 +319,12 @@ describe("limites de formule", () => {
     }
   });
 
-  it("Gratuit ne peut pas créer de boutique ; Solo en a 1 ; Pro 5 ; Illimité sans limite", async () => {
+  it("Gratuit : 1 boutique (règle 0006) ; Solo en a 1 ; Pro 5 ; Illimité sans limite", async () => {
     const make = (slug: string) => as("authenticated", A, "insert into public.boutiques (proprietaire_id, slug, nom) values ($1,$2,'x')", [A, slug]);
     await setPlan(A, "gratuit");
-    await refused(make("une-boutique"));
+    await make("une-boutique");
+    await refused(make("deux-boutiques"));
+    await db.query("delete from public.boutiques");
     await setPlan(A, "solo");
     await make("boutique-un");
     await refused(make("boutique-deux"));
@@ -346,6 +350,8 @@ describe("limites de formule", () => {
     await seed(A, "vitrine-a");
     await setPlan(A, "gratuit");
     expect(await as("authenticated", A, "update public.boutiques set nom = 'nouveau nom' returning id")).toHaveLength(1);
-    expect(await as("anon", null, "select id from public.boutiques")).toHaveLength(1);
+    // règle 0006 : une boutique d'un compte devenu Gratuit n'est plus publique, mais le propriétaire la garde
+    expect(await as("anon", null, "select id from public.boutiques")).toHaveLength(0);
+    expect(await as("authenticated", A, "select id from public.boutiques")).toHaveLength(1);
   });
 });

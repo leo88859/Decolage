@@ -11,7 +11,7 @@ export function ProduitView({ produitId }: { produitId: string }) {
   const { catalogue, lignes, ajouter } = useVitrine();
   const p = catalogue.produits.find((x) => x.id === produitId);
   const [img, setImg] = useState(0);
-  const premiereDispo = p?.variantes.find((v) => v.stock > 0) ?? p?.variantes[0];
+  const premiereDispo = p?.variantes.find((v) => v.disponible) ?? p?.variantes[0];
   const [choix, setChoix] = useState<string | null>(null);
   const [qte, setQte] = useState(1);
   const [msg, setMsg] = useState("");
@@ -21,7 +21,7 @@ export function ProduitView({ produitId }: { produitId: string }) {
   const vid = choix ?? premiereDispo?.id ?? "";
   const v = p.variantes.find((x) => x.id === vid);
   const dansPanier = lignes.find((l) => l.variante_id === vid)?.quantite ?? 0;
-  const max = v ? Math.max(0, Math.min(MAX_QTE, v.stock) - dansPanier) : 0;
+  const max = v && v.disponible ? Math.max(0, MAX_QTE - dansPanier) : 0; // le stock exact n'est pas public : la boutique confirme à la commande
   const commandable = catalogue.boutique.modes.length > 0;
 
   const ajouterAuPanier = () => {
@@ -65,7 +65,7 @@ export function ProduitView({ produitId }: { produitId: string }) {
                 return (
                   <label key={x.id} className={`vt-opt${d === "indisponible" ? " off" : ""}`}>
                     <input type="radio" name="variante" value={x.id} checked={x.id === vid} disabled={d === "indisponible"} onChange={() => { setChoix(x.id); setQte(1); }} />
-                    <span>{x.nom} <span className="vt-hint">({DISPO_LABEL[d]}{d === "bas" ? `, ${x.stock} restant${x.stock > 1 ? "s" : ""}` : ""})</span></span>
+                    <span>{x.nom} <span className="vt-hint">({DISPO_LABEL[d]})</span></span>
                   </label>
                 );
               })}
@@ -75,9 +75,9 @@ export function ProduitView({ produitId }: { produitId: string }) {
 
         {!commandable ? (
           <p className="vt-hint">Cette boutique ne prend pas de commande en ligne pour le moment : contacte-la directement (voir en bas de page).</p>
-        ) : v && v.stock > 0 ? (
+        ) : v && v.disponible ? (
           <>
-            {v.stock <= 5 ? <p className="vt-hint">Plus que {v.stock} en stock.</p> : null}
+            {v.stock_bas ? <p className="vt-hint">Stock bas : il n&apos;en reste plus beaucoup.</p> : null}
             <div className="vt-field">
               <label htmlFor="vt-qte">Quantité</label>
               <div className="vt-qty">

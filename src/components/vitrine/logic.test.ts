@@ -10,7 +10,8 @@ const V2 = "22222222-2222-4222-8222-222222222222";
 const V3 = "33333333-3333-4333-8333-333333333333";
 const prod = (id: string, prix: number, stocks: number[]): ProduitPub => ({
   id, categorie_id: null, titre: "P" + id, description: "", prix_centimes: prix, images: [], position: 0,
-  variantes: stocks.map((s, i) => ({ id: i === 0 ? id : `${id}-${i}`, nom: "v" + i, stock: s, position: i, disponible: s > 0 })),
+  // Le public ne reçoit plus la quantité exacte (migration 0007) : seulement disponible / stock_bas (stock de 1 à 5).
+  variantes: stocks.map((s, i) => ({ id: i === 0 ? id : `${id}-${i}`, nom: "v" + i, position: i, disponible: s > 0, stock_bas: s > 0 && s <= 5 })),
 });
 
 describe("panier", () => {
@@ -50,16 +51,17 @@ describe("totaux indicatifs et disponibilité", () => {
     expect(totalIndicatif(items)).toBe(2800);
     expect(hasProbleme(items)).toBe(false);
   });
-  it("signale épuisé, stock insuffisant et article retiré, hors du total", () => {
+  it("signale épuisé et article retiré, hors du total ; le stock exact n'étant plus public, une quantité trop grande n'est tranchée que par le serveur", () => {
     const items = resolveCart([{ variante_id: V2, quantite: 3 }, { variante_id: V3, quantite: 1 }, { variante_id: "44444444-4444-4444-8444-444444444444", quantite: 1 }, { variante_id: V1, quantite: 1 }], produits);
-    expect(items.map((i) => i.probleme)).toEqual(["stock_insuffisant", "indisponible", "retire", null]);
-    expect(totalIndicatif(items)).toBe(1250);
+    expect(items.map((i) => i.probleme)).toEqual([null, "indisponible", "retire", null]);
+    expect(totalIndicatif(items)).toBe(3 * 300 + 1250);
     expect(hasProbleme(items)).toBe(true);
+    expect(items.map((i) => i.max)).toEqual([99, 0, 0, 99]);
   });
   it("disponible / stock bas / indisponible", () => {
-    expect(dispoVariante({ stock: 0 })).toBe("indisponible");
-    expect(dispoVariante({ stock: 3 })).toBe("bas");
-    expect(dispoVariante({ stock: 6 })).toBe("disponible");
+    expect(dispoVariante({ disponible: false, stock_bas: false })).toBe("indisponible");
+    expect(dispoVariante({ disponible: true, stock_bas: true })).toBe("bas");
+    expect(dispoVariante({ disponible: true, stock_bas: false })).toBe("disponible");
     expect(dispoProduit(prod("a", 1, [0, 2]))).toBe("bas");
     expect(dispoProduit(prod("a", 1, [0, 0]))).toBe("indisponible");
     expect(dispoProduit(prod("a", 1, [0, 9]))).toBe("disponible");
@@ -94,6 +96,11 @@ describe("réponse de commande", () => {
   it("accepte une vraie réussite", () => {
     expect(parseCommandeSuccess(201, { commande: { ref: "CMD-3F9A1C2B", total_centimes: 2599, jeton_suivi: jeton }, rejouee: false }))
       .toEqual({ ref: "CMD-3F9A1C2B", jeton, total_centimes: 2599, rejouee: false });
+  });
+  it("accepte une référence de 12 caractères (nouvelles commandes) comme de 8 (anciennes)", () => {
+    const jeton = "a".repeat(64);
+    expect(parseCommandeSuccess(201, { commande: { ref: "CMD-3F9A1C2B4D5E", total_centimes: 1, jeton_suivi: jeton }, rejouee: false })?.ref).toBe("CMD-3F9A1C2B4D5E");
+    expect(parseCommandeSuccess(201, { commande: { ref: "CMD-3F9A1C2B4D5", total_centimes: 1, jeton_suivi: jeton }, rejouee: false })).toBeNull();
   });
   it("accepte une commande rejouée sans jeton", () => {
     const r = parseCommandeSuccess(200, { commande: { ref: "CMD-3F9A1C2B", total_centimes: 100 }, rejouee: true });

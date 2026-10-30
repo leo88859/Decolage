@@ -68,10 +68,11 @@ type PgError = { code?: string; message?: string; hint?: string } | null;
 export function dbError(e: NonNullable<PgError>): Response {
   if (e.hint === "publication_formule") return json({ error: "La publication en ligne n'est pas incluse dans la formule Gratuit. Ta boutique reste enregistrée en brouillon et tu peux la préparer : passe à Solo pour la publier.", code: "publication_formule" }, 403);
   if (e.hint === "limite_boutiques" || e.hint === "limite_sites") return json({ error: "Ta formule ne permet pas d'aller plus loin. Passe à une offre supérieure ou dépublie un site.", code: e.hint }, 403);
+  if (e.hint === "plafond_produits" || e.hint === "plafond_variantes" || e.hint === "plafond_categories") return json({ error: "Tu as atteint le nombre maximum autorisé (500 produits par boutique, 2000 par compte, 50 variantes par produit, 50 catégories par boutique).", code: e.hint }, 403);
   if (e.hint === "statut_invalide") return json({ error: "Ce changement de statut n'est pas possible.", code: "statut_invalide" }, 409);
   if (e.code === "23505") return json({ error: "Cet élément existe déjà (adresse ou nom déjà utilisé).", code: "duplicate" }, 409);
   if (e.code === "42501") return json({ error: "Action non autorisée.", code: "forbidden" }, 403);
-  if (e.code === "23503" || e.code === "23514" || e.code === "22P02" || e.code === "22003") return json({ error: "Valeur refusée par la base.", code: "invalid" }, 400);
+  if (e.code === "23503" || e.code === "23514" || e.code === "22P02" || e.code === "22003" || e.code === "22023") return json({ error: "Valeur refusée par la base.", code: "invalid" }, 400);
   return json({ error: "Opération impossible pour le moment.", code: "server" }, 500);
 }
 
@@ -94,6 +95,24 @@ export function tooMany(ip: string, max: number, windowMs = 60_000, bucket = "")
   if (hits.size > 5000) hits.clear();
   return recent.length > max;
 }
+/** La fonction SQL appelée n'existe pas encore : migration 0007 pas exécutée (le code reste alors compatible). */
+export const fonctionAbsente = (e: { code?: string; message?: string } | null | undefined) =>
+  Boolean(e) && (e!.code === "PGRST202" || e!.code === "42883" || /could not find the function|does not exist/i.test(e!.message ?? ""));
+
+/**
+ * Limite de débit PARTAGÉE (en base, migration 0007) : fonctionne entre plusieurs instances Vercel, contrairement à tooMany.
+ * Renvoie true si la limite est dépassée. Si la fonction est absente ou la base en panne, renvoie false : la limite en
+ * mémoire (tooMany), toujours appliquée avant, reste la seule protection. La clé n'est stockée que hachée.
+ */
+export async function dbTooMany(db: SupabaseClient, seau: string, cle: string, max: number, fenetreSecondes: number): Promise<boolean> {
+  try {
+    const { data, error } = await db.rpc("limite_debit", { p_seau: seau, p_cle: cle, p_max: max, p_fenetre_s: fenetreSecondes });
+    return !error && data === true;
+  } catch {
+    return false;
+  }
+}
+
 export const clientIp = (req: Request) => req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "local";
 export const resetRateLimit = () => hits.clear();
 
