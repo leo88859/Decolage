@@ -103,3 +103,6 @@ Une commande sans paiement réserve du stock. Une commande « nouvelle » jamais
 2. **Route protégée** `/api/boutique/expiration` (POST ou GET) : elle n'existe que si la variable d'environnement OPTIONNELLE `CRON_SECRET` est définie (sinon 404). Appel : en-tête `Authorization: Bearer <CRON_SECRET>`, paramètre facultatif `?heures=72` (entier de 1 à 720). Réponse `{ annulees, heures }`. Un planificateur externe (ou Vercel Cron, qui envoie ce même en-tête) peut l'appeler. Le dépôt ne fournit aucune valeur ni clé : le patron choisit un secret long et aléatoire.
 
 Appel manuel unique (SQL Editor) : `select public.boutique_expirer_commandes_nouvelles(interval '72 hours');`
+
+### Mise à jour (migration 0008)
+Délai par défaut **72 heures** : `boutique_expirer_commandes_nouvelles()` sans argument (la version avec `p_age` reste). N'annule que `nouvelle` ET `non_payee`, pose `annulee_le` et `annulation_motif = 'expiree_automatiquement'`, exécutable par `service_role` seulement. Comparaison `pg_cron` / route protégée, recommandation et mode d'emploi : `docs/EXPIRATION-COMMANDES.md`.

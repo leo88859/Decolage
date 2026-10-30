@@ -94,9 +94,7 @@ RLS sur `projects`, `profiles`, `boutiques` (+ produits, variantes, commandes), 
 - **Webhook** : si l'écriture du plan, la lecture du profil, la synchronisation des publications (`syncPublicationsWithPlan` renvoie `ok:false`) ou l'option marque blanche (hors migration absente) échouent => 500, Stripe rejoue. Le rejeu relit l'abonnement chez Stripe et refait les mêmes écritures (idempotent) : il complète une suspension manquante. Types d'événements non gérés : 200 « ignoré ».
 - **Checkout** : refus (409 `abonnement_existant` ou 503 `verification_impossible`) si la base indique une formule payante ou un abonnement non terminé, ou si Stripe (`subscriptions.list`, tous statuts) en liste un non terminé. Seuls `canceled` et `incomplete_expired` prouvent la fin ; statut inconnu, erreur Stripe ou plus de 100 abonnements => refus. Limite connue : deux sessions de paiement ouvertes en même temps avant tout paiement ne sont pas détectées (l'abonnement n'existe qu'après paiement).
 - **Sites suspendus et limite** : l'API (`POST /api/sites`) ne compte plus que les sites ET boutiques EN LIGNE (`suspended_at` nul). Un site suspendu n'est jamais réactivé par cette route.
-  **Écart avec la base (0006)** : `sites_enforce_plan` compte TOUS les sites (suspendus compris) et toutes les boutiques `publiee` (suspendues comprises) : un nouvel INSERT est donc encore refusé par la base (403 `limite_sites`) tant que ce correctif SQL n'est pas appliqué. Correctif proposé (nouvelle migration, à appliquer par le patron ou l'autre développeur ; non exécuté ici) : dans `sites_enforce_plan`, remplacer le calcul de `n` par
-  `select (select count(*) from public.sites where user_id = new.user_id and suspended_at is null) + (select count(*) from public.boutiques where proprietaire_id = new.user_id and statut = 'publiee' and suspended_at is null) into n;`
-  Même changement à faire dans le déclencheur équivalent des boutiques (`boutique_enforce_limit`) pour compter les sites non suspendus, et vérifier qu'une mise à jour qui lève `suspended_at` (service_role) respecte la limite.
+  **Écart avec la base (0006)** : `sites_enforce_plan` comptait TOUS les sites (suspendus compris) : un nouvel INSERT était refusé par la base alors que l'API l'autorisait. **Corrigé par la migration 0008** (voir « Suspendus et limite » plus bas).
 
 ## Durcissement de sécurité (migration 0007, audit d'octobre 2026)
 
@@ -123,3 +121,32 @@ Le code généré pour l'utilisateur du SaaS (`src/lib/codegen/kit-cloud.ts`) é
 - L'expiration des commandes n'est exécutée que si le patron la planifie (pg_cron ou route protégée).
 - Le stock exact n'est plus affiché au public : « stock bas » sans nombre ; une quantité trop grande n'est refusée qu'à la commande (409).
 - Non testé contre un vrai Supabase (PGlite simule PostgreSQL, rôles et droits par défaut compris) ; voir le compte rendu.
+
+## Suspendus et limite de publication (migration 0008)
+
+`supabase/0008_suspendus_et_expiration.sql` (copie identique : `supabase/A-COLLER-0008.sql`). **À exécuter en dernier, après 0007**, rejouable, ne modifie ni ne supprime aucune donnée. Si 0007 est rejouée un jour, rejoue ensuite 0008.
+
+**Règle (identique dans la base et dans l'API)**
+- Seuls les sites et boutiques **en ligne** (`suspended_at` nul) comptent dans la limite (Solo 1, Pro 5, Illimité sans limite, Gratuit jamais). Sites et boutiques partagent **une seule limite** et **un seul verrou** par propriétaire.
+- Rétrogradation : les plus anciennement publiés restent en ligne, les autres sont suspendus (rien n'est supprimé). Un suspendu ne compte pas : on peut publier un **nouveau** site dans la limite.
+- **Réactiver** un suspendu (`suspended_at` repassé à nul) est soumis à la même limite, **y compris pour le serveur (`service_role`)** ; refusé pour le Gratuit. Seul l'administrateur SQL (`postgres`, `supabase_admin`) n'est pas bloqué (dépannage manuel).
+- Le navigateur ne peut toujours pas écrire `suspended_at` (aucun droit de colonne). Suspendre reste toujours permis au serveur.
+- `syncPublicationsWithPlan` applique d'abord **toutes** les suspensions, puis les réactivations (sinon la base refuserait une réactivation avant que la place soit libérée).
+
+**Décisions à confirmer par le patron** (ce n'est pas un changement de droit commercial, mais le comportement est maintenant strict) :
+1. Une boutique ou un site suspendu qui devient réactivable (réabonnement) n'est réactivé que si la synchronisation le choisit : le plus ancien d'abord. Aucun autre critère n'existe.
+2. Une boutique publiée par le serveur (`service_role`) à partir d'un brouillon n'est toujours pas contrôlée par la limite (seul le navigateur l'est, comme avant) ; aucune route actuelle ne le fait.
+
+## Seuils appliqués (base ET serveur)
+
+| Seuil | Où | Test (N passe, N+1 refusé) |
+|---|---|---|
+| 3 commandes « nouvelle » / contact / 7 jours / boutique | `boutique_creer_commande` (429 `trop_de_commandes_contact`) | `seuils-0008.test.ts`, `durcissement-0007.test.ts` |
+| 200 articles / commande (99 par variante, 20 lignes) | validation de la route (400) ET base (`E_QUANTITE_INVALIDE`) | `seuils-0008.test.ts`, `validate-0007.test.ts` |
+| 500 produits / boutique | déclencheur `boutique_plafonds` (403 `plafond_produits`), tous les rôles | `seuils-0008.test.ts` |
+| 2 000 produits / compte | idem (boutiques cumulées) | `seuils-0008.test.ts` |
+| 50 variantes / produit | validation de la route (400) ET déclencheur (403 `plafond_variantes`) | `seuils-0008.test.ts` |
+| 50 catégories / boutique | déclencheur (403 `plafond_categories`) | `seuils-0008.test.ts` |
+| 5 000 inscrits / liste d'attente | `waitlist_inscrire` (`liste_pleine`) ET déclencheur `waitlist_plafond` | `seuils-0008.test.ts`, `waitlist-route.test.ts` |
+
+Vérification : aucun de ces seuils n'était contourné ; aucune correction de code n'a été nécessaire pour eux. Expiration des commandes (72 h) : voir `docs/EXPIRATION-COMMANDES.md`.

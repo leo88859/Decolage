@@ -61,7 +61,7 @@ beforeAll(async () => {
   db = new PGlite();
   await db.exec(SUPABASE_STUB);
   const files = ["0001_schema.sql", "0002_conformite.sql", "0003_marque_blanche.sql", "0004_limites_serveur.sql", "0005_boutique.sql", "0006_regle_gratuit.sql"];
-  if (process.env.SANS_0007 !== "1") files.push("0007_durcissement.sql");
+  if (process.env.SANS_0007 !== "1") files.push("0007_durcissement.sql", "0008_suspendus_et_expiration.sql");
   for (const f of files) await db.exec(sql(f));
   await q("insert into auth.users (id) values ($1), ($2)", [A, B]);
 });
@@ -252,6 +252,7 @@ describe("2. commandes sans paiement : plafonds, expiration, référence", () =>
       expect(await stock(s.variante)).toBe(98);
     } finally {
       await db.exec(sql("0007_durcissement.sql")); // restaure le vrai générateur
+      await db.exec(sql("0008_suspendus_et_expiration.sql")); // 0008 a le dernier mot
     }
   });
 });
@@ -464,6 +465,7 @@ describe("8. rejouabilité", () => {
     await seedSite(A, "site-de-a");
     await db.exec(sql("0007_durcissement.sql"));
     await db.exec(sql("0007_durcissement.sql"));
+    await db.exec(sql("0008_suspendus_et_expiration.sql")); // 0008 a le dernier mot (0007 remplace la fonction d'expiration)
     expect(await stock(s.variante)).toBe(98);
     expect(await q("select 1 from public.commandes")).toHaveLength(1);
     expect(await q("select 1 from public.sites")).toHaveLength(1);

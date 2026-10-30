@@ -59,3 +59,22 @@ describe("POST|GET /api/boutique/expiration", () => {
     expect(JSON.stringify(await e.json())).not.toContain("secrete");
   });
 });
+
+describe("choix documenté : GET (Vercel Cron) et POST (appel manuel), rien d'autre ; secret comparé en temps constant", () => {
+  it("seuls GET et POST sont exportés (PUT, DELETE, PATCH : 405 par Next.js)", async () => {
+    const mod = await import("./route");
+    const methodes = Object.keys(mod).filter((k) => /^[A-Z]+$/.test(k)).sort();
+    expect(methodes).toEqual(["GET", "POST"]);
+  });
+
+  it("le secret est comparé par empreintes de même longueur avec timingSafeEqual (pas de ===), y compris pour des secrets de longueurs différentes", async () => {
+    const { readFileSync } = await import("node:fs");
+    const src = readFileSync("src/app/api/boutique/expiration/route.ts", "utf8");
+    expect(src).toContain("timingSafeEqual");
+    expect(src).not.toMatch(/===\s*secret|secret\s*===/);
+    vi.stubEnv("CRON_SECRET", "s3cret-de-test");
+    expect((await call("GET", "Bearer s3cret-de-test-plus-long")).status).toBe(401);
+    expect((await call("GET", "Bearer s3")).status).toBe(401);
+    expect(h.rpc).not.toHaveBeenCalled();
+  });
+});

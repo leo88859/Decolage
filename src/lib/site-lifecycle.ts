@@ -95,10 +95,10 @@ export async function syncPublicationsWithPlan(admin: SupabaseClient, userId: st
         : await admin.from("boutiques").update({ suspended_at: value }).eq("proprietaire_id", userId).in("id", keys);
       if (r.error) throw new Error(r.error.message);
     };
-    for (const kind of ["site", "boutique"] as const) {
-      await set(kind, suspend, now);
-      await set(kind, keep, null);
-    }
+    // Toutes les suspensions d'abord, puis les réactivations : la base (migration 0008) refuse de réactiver au-delà
+    // de la limite, donc on libère la place avant de la reprendre (sites et boutiques confondus).
+    for (const kind of ["site", "boutique"] as const) await set(kind, suspend, now);
+    for (const kind of ["site", "boutique"] as const) await set(kind, keep, null);
     return { ok: true, suspended: suspend.length, restored: keep.length };
   } catch (e) {
     console.error(`[publications] synchronisation avec la formule non appliquée (migrations 0002/0006 exécutées ?) : ${(e as Error).message}`);

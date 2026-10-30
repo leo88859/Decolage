@@ -57,10 +57,11 @@ const nbCommandes = async () => (await db.query("select 1 from public.commandes"
 beforeAll(async () => {
   db = new PGlite();
   await db.exec(SUPABASE_STUB);
-  for (const f of ["0001_schema.sql", "0002_conformite.sql", "0003_marque_blanche.sql", "0004_limites_serveur.sql", "0005_boutique.sql", "0006_regle_gratuit.sql", "0007_durcissement.sql"]) await db.exec(sql(f));
+  for (const f of ["0001_schema.sql", "0002_conformite.sql", "0003_marque_blanche.sql", "0004_limites_serveur.sql", "0005_boutique.sql", "0006_regle_gratuit.sql", "0007_durcissement.sql", "0008_suspendus_et_expiration.sql"]) await db.exec(sql(f));
   await db.exec(sql("0005_boutique.sql")); // rejouable sans erreur
   await db.exec(sql("0006_regle_gratuit.sql"));
   await db.exec(sql("0007_durcissement.sql")); // rejouable sans erreur (0007 a le dernier mot : rejouée en dernier)
+  await db.exec(sql("0008_suspendus_et_expiration.sql")); // rejouable sans erreur (dernière migration)
   await db.query("insert into auth.users (id) values ($1), ($2)", [A, B]);
 });
 beforeEach(async () => {
