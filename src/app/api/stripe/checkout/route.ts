@@ -1,15 +1,15 @@
-import { blockingStatus, existingSubscriptionRefusal, subscriptionBlocksCheckout, verificationRefusal } from "@/lib/billing";
-import { appUrl, isPaymentConfigured, stripePrices } from "@/lib/env";
+import { blockingStatus, buildCheckoutLines, existingSubscriptionRefusal, subscriptionBlocksCheckout, verificationRefusal } from "@/lib/billing";
+import { appUrl, isPaymentConfigured, stripeBrandPrice, stripePrices } from "@/lib/env";
 import { checkPurchaseConsent, recordAcceptances } from "@/lib/legal-acceptance";
 import { originGuard } from "@/lib/origin";
-import { isPaidPlan, normalizePlan, PLANS } from "@/lib/plans";
+import { isPaidPlan, normalizePlan } from "@/lib/plans";
 import { getStripe } from "@/lib/stripe";
 import { stripeErrorMessage } from "@/lib/stripe-errors";
 import { createAdminClient, getUser } from "@/lib/supabase/server";
 
 /**
- * Ouvre le paiement Stripe d'une formule. Le navigateur n'envoie que le nom de la formule :
- * le prix est choisi côté serveur dans la liste autorisée.
+ * Ouvre le paiement Stripe d'une formule. Le navigateur n'envoie que le nom de la formule (et, pour Solo seulement, le choix de l'option
+ * marque blanche) : les prix sont choisis côté serveur dans la liste autorisée. Toujours UN SEUL abonnement (l'option est une 2e ligne).
  */
 export async function POST(req: Request) {
   const refused = originGuard(req);
@@ -18,12 +18,12 @@ export async function POST(req: Request) {
   const { user } = await getUser();
   if (!user) return Response.json({ error: "Connecte-toi pour t'abonner." }, { status: 401 });
 
-  const body = (await req.json().catch(() => ({}))) as { plan?: unknown; retour?: unknown; acceptCgv?: unknown; renonciation?: unknown; cgvVersion?: unknown };
+  const body = (await req.json().catch(() => ({}))) as { plan?: unknown; retour?: unknown; acceptCgv?: unknown; renonciation?: unknown; cgvVersion?: unknown; brandOption?: unknown };
   // Retour vers l'idée en cours après paiement : uniquement un chemin interne vers /creer.
   const retour = typeof body.retour === "string" && /^\/creer(\?|$)/.test(body.retour) && body.retour.length <= 600 ? `&retour=${encodeURIComponent(body.retour)}` : "";
   if (!isPaidPlan(body.plan)) return Response.json({ error: "Formule inconnue." }, { status: 400 });
-  const priceId = stripePrices()[body.plan];
-  if (!priceId) return Response.json({ error: `Le prix de la formule ${PLANS[body.plan].nom} n'est pas configuré.` }, { status: 503 });
+  const built = buildCheckoutLines(body.plan, body.brandOption, stripePrices(), stripeBrandPrice());
+  if (!built.ok) return Response.json({ error: built.error }, { status: built.status });
 
   // Commande avec obligation de paiement : le serveur exige les confirmations (CGV lues, accès immédiat et
   // renonciation à la rétractation) et en garde la preuve AVANT d'ouvrir le paiement.
@@ -61,7 +61,7 @@ export async function POST(req: Request) {
   if (!saved) return Response.json({ error: "Nous n'avons pas pu enregistrer ta confirmation de commande, donc le paiement n'a pas été ouvert. Rien n'a été débité : réessaie dans un instant." }, { status: 500 });
 
   try {
-    return await openCheckout(user.id, user.email, knownCustomer, priceId, body.plan, retour, admin);
+    return await openCheckout(user.id, user.email, knownCustomer, built.lines, built.brandOption, body.plan, retour, admin);
   } catch (err) {
     // Détail complet dans les journaux serveur (Vercel), message neutre pour le navigateur.
     const e = err as { type?: string; code?: string; message?: string };
@@ -78,7 +78,7 @@ function shortHash(s: string): string {
   return h.toString(36);
 }
 
-async function openCheckout(userId: string, email: string | undefined, customerId: string | null, priceId: string, plan: string, retour: string, admin: ReturnType<typeof createAdminClient>) {
+async function openCheckout(userId: string, email: string | undefined, customerId: string | null, lines: { price: string; quantity: 1 }[], brandOption: boolean, plan: string, retour: string, admin: ReturnType<typeof createAdminClient>) {
   const stripe = getStripe();
   if (!customerId) {
     // Clé d'idempotence Stripe : deux demandes simultanées sans client connu obtiennent le MÊME client (pas de client orphelin).
@@ -99,14 +99,14 @@ async function openCheckout(userId: string, email: string | undefined, customerI
     mode: "subscription",
     customer: customerId,
     client_reference_id: userId,
-    line_items: [{ price: priceId, quantity: 1 }],
-    subscription_data: { metadata: { user_id: userId, plan } },
+    line_items: lines,
+    subscription_data: { metadata: { user_id: userId, plan, brand_option: brandOption ? "1" : "0" } },
     // Les codes sont saisis et vérifiés sur la page Stripe : seuls les « codes promotionnels »
     // Stripe actifs sont acceptés (le nom d'un coupon ne suffit pas).
     allow_promotion_codes: true,
     success_url: `${appUrl()}/parametres?paiement=ok${retour}`,
     cancel_url: `${appUrl()}/parametres?paiement=annule${retour}`,
-  }, { idempotencyKey: `decollage-checkout-${userId}-${plan}-${priceId}-${shortHash(retour)}-${window10}` });
+  }, { idempotencyKey: `decollage-checkout-${userId}-${plan}${brandOption ? "+brand" : ""}-${lines.map((l) => l.price).join("+")}-${shortHash(retour)}-${window10}` });
   if (!session.url) return Response.json({ error: "Paiement indisponible pour le moment." }, { status: 502 });
   return Response.json({ url: session.url });
 }

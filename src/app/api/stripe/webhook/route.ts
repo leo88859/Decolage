@@ -1,5 +1,5 @@
 import type Stripe from "stripe";
-import { analyzeSubscription, HANDLED_EVENTS, isActiveStatus, resolvePlan, subscriptionIdOf } from "@/lib/billing";
+import { analyzeSubscription, brandEntitlementAction, brandItemsToDrop, brandRightWanted, HANDLED_EVENTS, isActiveStatus, resolvePlan, subscriptionIdOf } from "@/lib/billing";
 import { isPaymentConfigured, stripeBrandPrice, stripeLegacyPrices, stripePrices, stripeWebhookSecret } from "@/lib/env";
 import { normalizePlan } from "@/lib/plans";
 import { isMissingSchema, syncPublicationsWithPlan } from "@/lib/site-lifecycle";
@@ -72,13 +72,21 @@ export async function POST(req: Request) {
       .update({ plan: newPlan, stripe_subscription_id: sub.id, subscription_status: sub.status, updated_at: new Date().toISOString() })
       .eq("id", profile.id);
     if (error) throw new Error(error.message);
-    // Option marque blanche : droit SÉPARÉ de la formule (ne modifie jamais profiles.plan).
-    await syncBrandOption(admin, profile.id, analysis.brandOption && isActiveStatus(sub.status));
+    // Option marque blanche : droit SÉPARÉ de la formule (ne modifie jamais profiles.plan). Voulu seulement pour Solo + option sur un
+    // abonnement actif ; pour Pro/Illimité le droit vient de la formule (la ligne « stripe » est désactivée), pour Solo sans option il est retiré.
+    await syncBrandOption(admin, profile.id, brandRightWanted(sub.status, newPlan, analysis));
     // Résiliation / changement de formule : suspend (ou réactive) sites ET boutiques selon la nouvelle limite. Rien n’est supprimé.
     // Si cette étape échoue, la formule est déjà écrite mais des sites pourraient rester en ligne : on remonte l'erreur (500)
     // pour que Stripe rejoue l'événement. Le rejeu relit l'abonnement chez Stripe et refait exactement les mêmes écritures.
     const sync = await syncPublicationsWithPlan(admin, profile.id, newPlan);
     if (!sync.ok) throw new Error("synchronisation des publications non appliquée");
+    // Double facturation : Pro et Illimité incluent l'option. Si l'abonnement porte encore la ligne « option » avec une de ces formules
+    // (changement de formule dans le portail), on la retire, avec crédit au prorata. Un échec remonte (500) : Stripe rejoue, et le rejeu
+    // ne trouve plus la ligne une fois retirée (idempotent).
+    for (const itemId of brandItemsToDrop(sub.status, analysis, sub.items.data, stripeBrandPrice())) {
+      console.error(`[stripe] option marque blanche retirée de ${sub.id} (déjà incluse dans la formule ${analysis.plan}) : crédit au prorata`);
+      await stripe.subscriptionItems.del(itemId, { proration_behavior: "create_prorations" }, { idempotencyKey: `decollage-drop-brand-${itemId}` });
+    }
     return Response.json({ received: true });
   } catch (e) {
     console.error(`[stripe] échec du traitement de ${event.id} (${event.type}) : ${(e as Error).message}`);
@@ -96,16 +104,14 @@ async function syncBrandOption(admin: ReturnType<typeof createAdminClient>, user
   try {
     const { data, error } = await admin.from("brand_entitlements").select("enabled, source").eq("user_id", userId).maybeSingle();
     if (error) throw new Error(error.message);
-    if (present) {
-      if (!data) {
-        const r = await admin.from("brand_entitlements").insert({ user_id: userId, enabled: true, source: "stripe" });
-        if (r.error) throw new Error(r.error.message);
-      } else if (data.source === "stripe" && !data.enabled) {
-        const r = await admin.from("brand_entitlements").update({ enabled: true }).eq("user_id", userId);
-        if (r.error) throw new Error(r.error.message);
-      }
-    } else if (data && data.source === "stripe" && data.enabled) {
-      const r = await admin.from("brand_entitlements").update({ enabled: false }).eq("user_id", userId);
+    const { action, manualConflict } = brandEntitlementAction(present, data as { enabled: boolean; source: string | null } | null);
+    if (manualConflict) console.error("[stripe] option marque blanche payée mais un droit « manuel » désactivé existe : non modifié (à examiner à la main)");
+    if (action === "insert") {
+      const r = await admin.from("brand_entitlements").insert({ user_id: userId, enabled: true, source: "stripe" });
+      if (r.error) throw new Error(r.error.message);
+    } else if (action === "enable" || action === "disable") {
+      // « source = stripe » est répété dans la requête : un droit manuel n'est jamais touché, même en cas de concurrence.
+      const r = await admin.from("brand_entitlements").update({ enabled: action === "enable" }).eq("user_id", userId).eq("source", "stripe");
       if (r.error) throw new Error(r.error.message);
     }
   } catch (e) {

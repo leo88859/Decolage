@@ -154,3 +154,54 @@ export function subscriptionIdOf(event: { type: string; data: { object: unknown 
   }
   return null;
 }
+
+// ─── Option marque blanche Solo : lignes du paiement, droit et double facturation (docs/ADAPTATION-FACTURATION.md) ───
+
+export type CheckoutLine = { price: string; quantity: 1 };
+export type CheckoutLinesResult = { ok: true; lines: CheckoutLine[]; brandOption: boolean } | { ok: false; status: number; error: string };
+
+/**
+ * Lignes de la session de paiement, décidées par le SERVEUR (liste blanche). Un SEUL abonnement : la formule, plus (Solo seulement)
+ * l'option marque blanche comme deuxième ligne du MÊME abonnement. `option` vient du navigateur : seul `true` ou `false`/absent
+ * est accepté (tout le reste est refusé, donc jamais deux fois) ; l'option est refusée pour Pro et Illimité, qui l'incluent déjà.
+ */
+export function buildCheckoutLines(plan: PaidPlan, option: unknown, prices: Partial<Record<PaidPlan, string>>, brandPriceId: string | null | undefined): CheckoutLinesResult {
+  const planPrice = prices[plan];
+  if (!planPrice) return { ok: false, status: 503, error: "Le prix de cette formule n'est pas configuré." };
+  if (option !== undefined && option !== null && typeof option !== "boolean") return { ok: false, status: 400, error: "Option marque blanche : valeur invalide." };
+  if (option !== true) return { ok: true, lines: [{ price: planPrice, quantity: 1 }], brandOption: false };
+  if (plan !== "solo") return { ok: false, status: 400, error: "L'option marque blanche n'existe que pour la formule Solo : elle est déjà incluse dans Pro et Illimité, tu ne la paies jamais deux fois." };
+  if (!brandPriceId) return { ok: false, status: 503, error: "L'option marque blanche n'est pas disponible à l'achat pour le moment. Rien n'a été débité." };
+  if (PAID_PLANS.some((p) => prices[p] === brandPriceId)) return { ok: false, status: 503, error: "L'option marque blanche est mal configurée : paiement non ouvert, rien n'a été débité." };
+  return { ok: true, lines: [{ price: planPrice, quantity: 1 }, { price: brandPriceId, quantity: 1 }], brandOption: true };
+}
+
+/** Statuts pour lesquels on accepte de MODIFIER un abonnement (ajout/retrait d'élément) : jamais en impayé ni en pause. */
+export const isModifiableStatus = (status: string | null | undefined) => status === "active" || status === "trialing";
+
+/** Le droit « marque blanche » issu de Stripe est voulu seulement pour Solo + option sur un abonnement actif (past_due : accès gardé, comme la formule). */
+export const brandRightWanted = (status: string | null | undefined, plan: Plan, a: SubscriptionAnalysis): boolean => isActiveStatus(status) && plan === "solo" && a.brandOption;
+
+export type BrandRow = { enabled: boolean; source: string | null } | null;
+export type BrandAction = { action: "none" | "insert" | "enable" | "disable"; /** droit manuel présent mais désactivé alors que l'option est payée : jamais modifié, à signaler. */ manualConflict?: boolean };
+
+/** Décision d'écriture dans brand_entitlements. Un droit « manuel » n'est JAMAIS modifié ; seules les lignes « stripe » sont gérées. Idempotent. */
+export function brandEntitlementAction(wanted: boolean, row: BrandRow): BrandAction {
+  if (wanted) {
+    if (!row) return { action: "insert" };
+    if (row.source === "stripe") return { action: row.enabled ? "none" : "enable" };
+    return { action: "none", manualConflict: !row.enabled };
+  }
+  return { action: row && row.source === "stripe" && row.enabled ? "disable" : "none" };
+}
+
+/**
+ * Éléments « option marque blanche » à retirer de l'abonnement : Pro et Illimité l'incluent déjà, la payer en plus serait une DOUBLE
+ * FACTURATION (cas : passage de Solo+option à Pro/Illimité dans le portail). Seulement si une formule Pro/Illimité est RECONNUE et
+ * l'abonnement actif (pas impayé). Ne renvoie jamais autre chose que des éléments dont le prix est celui de l'option.
+ */
+export function brandItemsToDrop(status: string | null | undefined, a: SubscriptionAnalysis, items: readonly { id: string; price?: { id?: string | null } | null }[], brandPriceId: string | null | undefined): string[] {
+  if (!brandPriceId || !isModifiableStatus(status)) return [];
+  if (a.plan !== "pro" && a.plan !== "illimite") return [];
+  return items.filter((i) => i.price?.id === brandPriceId).map((i) => i.id);
+}
