@@ -12,7 +12,7 @@ import { Confirm, download, toast } from "@/components/ui";
 import { refusalButtons } from "@/lib/billing";
 import { refreshPlan, signOut, useCloud } from "@/lib/cloud";
 import { dataJson, parseImport } from "@/lib/export";
-import { PLANS, type PaidPlan } from "@/lib/plans";
+import { BRAND_OPTION_PRIX, brandOptionTotalSolo, PLANS, type PaidPlan } from "@/lib/plans";
 import { getData, hasStorageError, importProjects, resetAll, setPlan, setPrefs, useData, useHydrated } from "@/lib/store";
 
 export default function Page() {
@@ -44,6 +44,11 @@ function Parametres() {
   const [refusal, setRefusal] = useState<{ message: string; code?: string; action?: string; plan: PaidPlan } | null>(null);
   const [retryWait, setRetryWait] = useState(false);
   const [deleteError, setDeleteError] = useState("");
+  // Option marque blanche : vendue ? droit actuel ? (lecture seule, /api/stripe/option) ; dialogue d'ajout à un abonnement Solo existant.
+  const [brand, setBrand] = useState<{ purchasable: boolean; enabled: boolean; source: string | null } | null>(null);
+  const [optionDialog, setOptionDialog] = useState(false);
+  const [optionBusy, setOptionBusy] = useState(false);
+  const [optionError, setOptionError] = useState("");
   const file = useRef<HTMLInputElement>(null);
   const paiement = params.get("paiement");
   // Retour vers l'idée en cours après le choix d'une offre (chemin interne uniquement).
@@ -57,6 +62,11 @@ function Parametres() {
     const id = setInterval(() => { n++; void refreshPlan(); if (n >= 6) clearInterval(id); }, 2000);
     return () => clearInterval(id);
   }, [paiement, session]);
+
+  const loadBrand = () => { fetch("/api/stripe/option", { cache: "no-store" }).then((r) => r.json()).then(setBrand).catch(() => setBrand(null)); };
+  useEffect(() => { if (session && payments) loadBrand(); }, [session, payments]);
+  // Après un ajout / retrait, le webhook met le droit à jour : on relit quelques fois.
+  function refreshBrandSoon() { let n = 0; const id = setInterval(() => { n++; loadBrand(); if (n >= 6) clearInterval(id); }, 2000); }
 
   async function onImport(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
@@ -86,7 +96,7 @@ function Parametres() {
     if (!buy) return;
     setBusy(true);
     setBuyError("");
-    const r = await post("/api/stripe/checkout", "POST", { plan: buy, ...consent, ...(retour ? { retour } : {}) });
+    const r = await post("/api/stripe/checkout", "POST", { plan: buy, ...consent, ...(retour ? { retour } : {}) }); // consent porte brandOption: true seulement pour Solo avec l'option
     if (r.url) { window.location.assign(r.url); return; }
     setBusy(false);
     // Abonnement déjà présent (ou vérification impossible) : jamais de second paiement ; message clair + action sûre selon le cas.
@@ -98,6 +108,18 @@ function Parametres() {
       return;
     }
     setBuyError(r.error ?? "Paiement indisponible pour le moment. Aucun montant n'a été débité.");
+  }
+
+  // Ajout / retrait de l'option sur l'abonnement Solo existant : uniquement sur clic, le serveur revérifie tout chez Stripe.
+  async function changeOption(action: "add" | "remove", consent?: PurchaseConsent) {
+    setOptionBusy(true);
+    setOptionError("");
+    const r = await post("/api/stripe/option", "POST", { action, ...(consent ?? {}) });
+    setOptionBusy(false);
+    if (!r.ok) { setOptionError(r.error ?? "Action impossible pour le moment. Rien n'a été modifié."); if (action === "remove") toast(r.error ?? "Action impossible", "error"); return; }
+    setOptionDialog(false);
+    toast(action === "add" ? "Option ajoutée : elle s'active dans quelques secondes" : "Option retirée");
+    refreshBrandSoon();
   }
 
   async function deleteAccount() {
@@ -200,7 +222,24 @@ function Parametres() {
             if (k === plan) return <button className="btn" disabled={busy} onClick={() => go("/api/stripe/portal")}>Gérer mon abonnement</button>;
             return <button className="btn btn-ghost" disabled={busy} onClick={() => go("/api/stripe/portal")}>{k === "gratuit" ? "Résilier" : "Changer pour celle-ci"}</button>;
           }} />
-          <p className="tiny mut">Entreprise : sur devis, sans tarif affiché ni engagement ; <Link href="/contact" style={{ textDecoration: "underline" }}>contacte-nous</Link>. L&apos;option marque blanche de Solo n&apos;est pas encore achetable en ligne.</p>
+          {payments && session && plan === "solo" && brand?.purchasable && (
+            <div className="panel stack" style={{ gap: 8 }} id="option-marque-blanche">
+              <b>Option marque blanche (Solo)</b>
+              {brand.enabled ? (
+                <>
+                  <p className="small mut">{brand.source === "stripe" ? `Option active sur ton abonnement : ${brandOptionTotalSolo().toLocaleString("fr-FR", { minimumFractionDigits: 2 })} €/mois au total.` : "Marque blanche activée sur ton compte (accordée par l'équipe)."} La mention « Créé avec Décollage » est retirée de tes boutiques publiées.</p>
+                  {brand.source === "stripe" && <div className="row"><button className="btn btn-ghost btn-sm" disabled={optionBusy} onClick={() => void changeOption("remove")}>Retirer l&apos;option</button></div>}
+                </>
+              ) : (
+                <>
+                  <p className="small mut">Retire la mention « Créé avec Décollage » de tes boutiques publiées : +{BRAND_OPTION_PRIX.toLocaleString("fr-FR", { minimumFractionDigits: 2 })} €/mois sur ton abonnement Solo ({brandOptionTotalSolo().toLocaleString("fr-FR", { minimumFractionDigits: 2 })} €/mois au total). Sans l&apos;option, la mention reste affichée.</p>
+                  <div className="row"><button className="btn btn-sm" disabled={optionBusy} onClick={() => { setOptionError(""); setOptionDialog(true); }}>Ajouter l&apos;option</button></div>
+                </>
+              )}
+              {optionError && !optionDialog && <div className="alert alert-bad" role="alert">{optionError}</div>}
+            </div>
+          )}
+          <p className="tiny mut">Entreprise : sur devis, sans tarif affiché ni engagement ; <Link href="/contact" style={{ textDecoration: "underline" }}>contacte-nous</Link>. {brand?.purchasable ? "L'option marque blanche de Solo se choisit à la commande de Solo ou s'ajoute ensuite ci-dessus ; elle est incluse dans Pro et Illimité." : "L'option marque blanche de Solo n'est pas encore achetable en ligne."}</p>
           {payments && <p className="tiny mut">Paiement sécurisé par Stripe. Sans engagement : tu changes d&apos;offre ou tu résilies en ligne, à tout moment. Avant de commander, tu confirmes avoir lu les <Link href="/cgv" style={{ textDecoration: "underline" }}>conditions générales de vente</Link> et ta demande d&apos;accès immédiat (voir <Link href="/remboursement" style={{ textDecoration: "underline" }}>Remboursement</Link>).</p>}
         </section>
 
@@ -243,7 +282,8 @@ function Parametres() {
           )}
         </section>
       </div>
-      <CheckoutDialog plan={buy} busy={busy} error={buyError} onClose={() => { if (!busy) setBuy(null); }} onConfirm={(c) => void checkout(c)} />
+      <CheckoutDialog plan={buy} busy={busy} error={buyError} brandAvailable={Boolean(brand?.purchasable)} onClose={() => { if (!busy) setBuy(null); }} onConfirm={(c) => void checkout(c)} />
+      <CheckoutDialog plan={optionDialog ? "solo" : null} addOptionOnly busy={optionBusy} error={optionError} onClose={() => { if (!optionBusy) setOptionDialog(false); }} onConfirm={(c) => void changeOption("add", c)} />
       <Confirm open={confirm === "local"} onClose={() => setConfirm(null)} onConfirm={() => { resetAll(); toast("Données effacées"); }} title="Tout effacer ?" text={`${data.projects.length} projet(s) et ${data.favorites.length} favori(s) seront supprimés définitivement de ce navigateur.`} cta="Tout effacer" danger />
       <Confirm open={confirm === "compte"} onClose={() => setConfirm(null)} onConfirm={() => void deleteAccount()} title="Supprimer ton compte ?" text="C'est définitif : projets, sites publiés et listes d'inscrits seront effacés, et ton abonnement éventuel sera résilié tout de suite. Ton client et tes factures restent chez Stripe (obligation comptable). Si la résiliation échoue, rien n'est supprimé." cta="Supprimer définitivement" danger />
     </main>

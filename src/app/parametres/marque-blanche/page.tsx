@@ -76,6 +76,13 @@ export default function Page() {
     return () => { alive = false; };
   }, [loaded, cloud, ready, session, apply]);
 
+  // L'option Solo est annoncée « achetable » seulement si le serveur a bien un prix d'option configuré.
+  const [optionSold, setOptionSold] = useState(false);
+  useEffect(() => {
+    if (remote !== "denied") return;
+    fetch("/api/stripe/option", { cache: "no-store" }).then((r) => r.json()).then((b: { purchasable?: boolean }) => setOptionSold(b.purchasable === true)).catch(() => setOptionSold(false));
+  }, [remote]);
+
   const dirty = !sameBrand(draft, saved);
   useEffect(() => {
     if (!dirty) return;
@@ -167,7 +174,7 @@ export default function Page() {
         {access === "anon" && <div className="alert alert-info bw-alert bw-alert-info" role="status"><span>Connecte-toi pour utiliser la marque blanche. <Link href="/connexion?next=/parametres/marque-blanche" style={{ textDecoration: "underline" }}>Se connecter</Link></span></div>}
         {access === "denied" && (
           <div className="alert alert-warn bw-alert bw-alert-warn" role="status">
-            <span><b>Fonction non activée sur ton compte.</b> La marque blanche est incluse dans Pro et Illimité, proposée en option pour Solo à {brandOptionLabel()} ({brandOptionTotalLabel()}), et non comprise dans Découverte. L&apos;option Solo n&apos;est pas encore achetable en ligne : <Link href="/contact" style={{ textDecoration: "underline" }}>contacte-nous</Link> si elle t&apos;intéresse. Rien ne peut être enregistré tant que la marque blanche n&apos;est pas disponible sur ton compte.</span>
+            <span><b>Fonction non activée sur ton compte.</b> La marque blanche est incluse dans Pro et Illimité, proposée en option pour Solo à {brandOptionLabel()} ({brandOptionTotalLabel()}), et non comprise dans Découverte. {optionSold ? <>L&apos;option Solo se commande dans <Link href="/parametres#formule" style={{ textDecoration: "underline" }}>Paramètres › Formule</Link> (avec ta formule Solo, ou en l&apos;ajoutant à ton abonnement Solo).</> : <>L&apos;option Solo n&apos;est pas encore achetable en ligne : <Link href="/contact" style={{ textDecoration: "underline" }}>contacte-nous</Link> si elle t&apos;intéresse.</>} Rien ne peut être enregistré tant que la marque blanche n&apos;est pas disponible sur ton compte.</span>
           </div>
         )}
         {access === "error" && <div className="alert alert-bad bw-alert bw-alert-bad" role="alert"><span>Impossible de charger ta marque pour le moment. Réessaie plus tard.</span></div>}
