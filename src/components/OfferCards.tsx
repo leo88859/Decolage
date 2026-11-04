@@ -18,11 +18,11 @@ function features(k: Plan): { ok: boolean; t: string }[] {
     { ok: p.personnalisationAvancee, t: "Thèmes, logo importé, mises en page" },
     { ok: p.exportFichiers, t: "Export des fichiers" },
     { ok: p.duplication, t: "Duplication de projets" },
-    // Marque blanche : incluse Pro/Illimité (règle whiteLabelAllowed), option pour Solo (pas encore achetable en ligne), non comprise en Découverte.
+    // Marque blanche : incluse Pro/Illimité (règle whiteLabelAllowed), option facultative pour Solo, achetable en ligne, non comprise en Découverte.
     whiteLabelAllowed(k, false)
       ? { ok: true, t: "Marque blanche incluse" }
       : k === "solo"
-        ? { ok: false, t: `Marque blanche en option (${brandOptionLabel()}, ${brandOptionTotalLabel()}) : bientôt disponible à l'achat` }
+        ? { ok: false, t: `Marque blanche en option, facultative (${brandOptionLabel()}, ${brandOptionTotalLabel()})` }
         : { ok: false, t: "Marque blanche non comprise" },
   ];
 }

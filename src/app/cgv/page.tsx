@@ -2,11 +2,12 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { LegalPage, Mail } from "@/components/Legal";
 import { LEGAL } from "@/data/legal";
-import { brandOptionLabel, brandOptionTotalLabel, PAID_PLANS, PLANS, prixLabel, USAGE_RAISONNABLE } from "@/lib/plans";
+import { BRAND_OPTION_PRIX, brandOptionTotalSolo, PAID_PLANS, PLANS, prixLabel, USAGE_RAISONNABLE } from "@/lib/plans";
 
 export const metadata: Metadata = { title: "Conditions générales de vente" };
 
 const limite = (n: number) => (n === Infinity ? "illimités" : String(n));
+const eurMois = (n: number) => `${n.toLocaleString("fr-FR", { minimumFractionDigits: 2 })} €/mois`;
 
 export default function Cgv() {
   return (
@@ -28,7 +29,7 @@ export default function Cgv() {
         ))}
         <li>Entreprise : sur devis. Aucun tarif n&apos;est affiché, aucune souscription n&apos;est possible en ligne et rien n&apos;est facturé ni engagé tant qu&apos;un devis écrit n&apos;a pas été accepté ; pour une demande, écris-nous via la page <Link href="/contact">Contact</Link>.</li>
       </ul>
-      <p><b>Marque blanche.</b> Elle est incluse dans Pro et Illimité, proposée en option pour Solo ({brandOptionLabel()}, soit {brandOptionTotalLabel()} avec Solo), et n&apos;est pas comprise dans {PLANS.gratuit.nom}. Elle permet de retirer la mention « Créé avec Décollage » sur les boutiques publiées couvertes par la fonction ; le périmètre exact est indiqué sur la page Marque blanche des Paramètres. Elle n&apos;autorise pas à revendre {LEGAL.marque} lui-même ni à le présenter comme ton propre outil de création. L&apos;option de Solo n&apos;est pas encore achetable en ligne : tant que c&apos;est le cas, elle n&apos;est ni facturée ni accordée automatiquement.</p>
+      <p><b>Marque blanche.</b> Elle est incluse dans Pro et Illimité, sans supplément : elle n&apos;est jamais facturée en plus. Avec Solo, elle est proposée en option facultative, pour {eurMois(BRAND_OPTION_PRIX)} en plus du prix de Solo (soit {eurMois(brandOptionTotalSolo())} au total avec Solo) ; elle n&apos;est facturée que si tu la choisis, à la commande de Solo ou plus tard depuis Paramètres, et tu peux la retirer à tout moment. Elle n&apos;est pas comprise dans {PLANS.gratuit.nom}. Elle permet de retirer la mention « Créé avec Décollage » sur les boutiques publiées couvertes par la fonction ; le périmètre exact est indiqué sur la page Marque blanche des Paramètres. Elle n&apos;autorise pas à revendre {LEGAL.marque} lui-même ni à le présenter comme ton propre outil de création.</p>
       <p><b>Usage raisonnable (Illimité).</b> {USAGE_RAISONNABLE} À titre d&apos;exemple, des plafonds techniques existent : 500 produits par boutique et 2 000 par compte, 5 000 inscrits par liste d&apos;attente, 100 commandes par heure et par boutique. Aucun nom de domaine personnalisé n&apos;est inclus dans les formules.</p>
       <p>Prix en euros, payés chaque mois. {LEGAL.tva ? <>TVA : {LEGAL.tva}. </> : null} Le prix applicable est celui affiché au moment de ta commande, sur la page de paiement.</p>
 

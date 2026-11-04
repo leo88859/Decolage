@@ -55,7 +55,7 @@ export const VERSIONS: Record<LegalDoc, string> = {
   confidentialite: "2026-10-29",
   cookies: "2026-10-29",
   cgu: "2026-10-29",
-  cgv: "2026-10-30",
+  cgv: "2026-11-04",
   remboursement: "2026-10-29",
   accessibilite: "2026-10-29",
   contact: "2026-10-29",
