@@ -27,7 +27,7 @@ export default function Guide() {
         tone="paper"
         eyebrow="Apprendre"
         title={<>Du doute au lancement, <span className="serif">étape par étape</span>.</>}
-        lead="Quatre parcours pratiques pour valider ton idée, définir ton MVP, choisir ton prix et lancer ton produit, puis le guide pour le mettre en production. Coche au fur et à mesure : ta progression est enregistrée."
+        lead="Cinq parcours pratiques : valider ton idée, définir ton MVP, choisir ton prix, lancer ton produit, puis le mettre en production. Coche au fur et à mesure : ta progression est enregistrée."
         aside={<HeroFacts facts={[[PARCOURS.length + 1, "parcours"], [PARCOURS.reduce((n, p) => n + p.etapes.length, 0), "étapes"], [checks, "points à cocher"], ["Libre", "accès sans offre payante"]]} />}
       >
         <a href="#valider" className="btn">Commencer par valider mon idée <span className="arrow">→</span></a>

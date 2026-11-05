@@ -212,3 +212,7 @@
 .final::after { content: ""; position: absolute; width: 300px; height: 300px; border-radius: 50%; background: rgba(255, 255, 255, 0.18); bottom: -150px; left: -60px; z-index: -1; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .final h2 { font-size: clamp(36px, 6vw, 72px); letter-spacing: -0.045em; }
+
+/* Ligne de réassurance sous l'accroche de l'accueil */
+.hero-assure { max-width: 640px; margin: -12px auto 28px; font-size: 15px; color: rgba(255, 255, 255, 0.9); background: rgba(255, 255, 255, 0.07); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 14px; padding: 10px 16px; }
+.hero-assure a { color: #fff; text-decoration: underline; }

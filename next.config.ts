@@ -8,6 +8,13 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // Adresses que les visiteurs essaient de taper : on les mène aux bonnes pages.
+  async redirects() {
+    return [
+      { source: "/tarifs", destination: "/#offres", permanent: false },
+      { source: "/apprendre", destination: "/guide", permanent: false },
+    ];
+  },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },

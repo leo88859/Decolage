@@ -117,7 +117,7 @@ export function Overview({ project: p, go }: { project: Project; go: (t: TabId) 
             <ul>
               <li>Publication en ligne et vraie liste d&apos;attente : {!loaded ? "vérification…" : cloud ? <>Supabase configuré sur ce site · <button className="ov-link" onClick={() => go("enligne")}>publier</button></> : "Supabase non configuré sur ce site"}</li>
               {services.map((s) => <li key={s}>{s}</li>)}
-              <li>Hébergement d&apos;une application complète et nom de domaine</li>
+              <li>Hébergement d&apos;une application complète et nom de domaine (chez un prestataire externe, non fournis par Décollage)</li>
             </ul>
           </div>
         </div>

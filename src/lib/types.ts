@@ -188,7 +188,7 @@ export type Project = {
   activity: { date: string; label: string }[];
   /** Étapes cochées du guide de mise en production (absent sur les anciens projets). */
   guide?: Record<string, boolean>;
-  /** Contenu personnalisé (rempli par l'IA ou par les modèles) : remplace les données d'exemple du modèle. */
+  /** Contenu personnalisé (rempli par le moteur Décollage ou par les modèles) : remplace les données d'exemple du modèle. */
   contenu?: Contenu;
   /** Données saisies dans l'application du projet (ajouts, modifications, suppressions). */
   appData?: AppState;

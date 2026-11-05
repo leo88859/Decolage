@@ -140,7 +140,7 @@ function Publish({ p }: { p: Project }) {
             <span className="mut">{origin}/s/</span>
             <input id="slug" value={slug} maxLength={40} onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))} aria-invalid={!!slugError(slug)} />
           </div>
-          <span className="hint">Lettres minuscules, chiffres et tirets. Un nom de domaine personnalisé (ex. monsaas.fr) se branche à l&apos;étape « Mise en production ».</span>
+          <span className="hint">Lettres minuscules, chiffres et tirets. Ce site est publié à cette adresse. Décollage ne propose pas de nom de domaine personnalisé : le guide « Mise en production » explique comment en brancher un chez un prestataire externe pour ton projet exporté.</span>
         </div>
         {error && <div className="alert alert-bad" style={{ marginTop: 12 }} role="alert">{error}</div>}
         {site?.suspended_at && <div className="alert alert-warn" style={{ marginTop: 12 }} role="status">Ce site est suspendu : ta formule actuelle ne permet pas de le garder en ligne. Il n&apos;est plus accessible publiquement, mais il est conservé tel quel. Il sera de nouveau en ligne si tu reprends une formule qui le permet.</div>}

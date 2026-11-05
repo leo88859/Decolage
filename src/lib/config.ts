@@ -69,8 +69,8 @@ const DOMAIN = /^(?!-)[a-z0-9-]{1,63}(\.[a-z0-9-]{1,63})*\.[a-z]{2,}$/i;
 export function validateConfig(cfg: Config): Record<string, string> {
   const e: Record<string, string> = {};
   if (!TEMPLATE_BY_ID[cfg.templateId]) e.templateId = "Modèle inconnu.";
-  if (!(cfg.style in STYLE_PRESETS)) e.style = "Style inconnu.";
-  if (cfg.police !== undefined && !(cfg.police in POLICES)) e.police = "Police inconnue.";
+  if (!Object.hasOwn(STYLE_PRESETS, cfg.style)) e.style = "Style inconnu.";
+  if (cfg.police !== undefined && !Object.hasOwn(POLICES, cfg.police)) e.police = "Police inconnue.";
   if (cfg.design !== undefined && !DESIGN_BY_ID[cfg.design]) e.design = "Design inconnu.";
   if (cfg.extras !== undefined && (!Array.isArray(cfg.extras) || cfg.extras.length > 5 || !cfg.extras.every(isExtraKind) || new Set(cfg.extras).size !== cfg.extras.length)) e.extras = "Pages ajoutées invalides.";
   if (!["gratuit", "abonnement", "paiement-unique", "freemium", "commission"].includes(cfg.revenu)) e.revenu = "Modèle de revenus inconnu.";

@@ -1,6 +1,7 @@
 # Secrets — ne jamais publier
 .env
 .env*.local
+.env.production
 !.env.example
 
 node_modules/

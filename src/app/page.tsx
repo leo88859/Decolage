@@ -15,8 +15,8 @@ import "./marketing.css";
 const STEPS = [
   ["Décris ton idée", "Une phrase suffit. Décollage reconnaît le type de produit et ton métier, et te propose un nom."],
   ["Choisis ton design", "10 designs complets, chacun avec son menu, son tableau de bord et ses animations. Tu vois ton SaaS dedans avant de choisir."],
-  ["Ton projet est généré", "Application fonctionnelle, page de vente rédigée, données adaptées à ton métier, code exportable. Tout reste modifiable."],
-  ["Lance-le", "Publication en un clic, vraie liste d'attente, guide pas à pas pour Stripe, Supabase et le nom de domaine."],
+  ["Ton projet est généré", "Une démo cliquable de ton SaaS, une page de lancement rédigée, des données adaptées à ton métier et un projet Next.js à télécharger. Tout reste modifiable."],
+  ["Lance-le", "Publication en un clic de ta page de lancement (offre payante) avec une vraie liste d'attente, et un guide pas à pas pour brancher Stripe, Supabase et un nom de domaine chez des prestataires externes."],
 ];
 
 
@@ -24,7 +24,7 @@ const FAQ = [
   ["Décollage utilise-t-il une intelligence artificielle ?", "Non. Tout repose sur des modèles, des textes et des briques écrits à l'avance, et sur des règles programmées. Le résultat est instantané, et la même idée donne toujours le même SaaS."],
   ["Que puis-je faire sans payer ?", `Décrire ton idée, voir ton SaaS dans les 10 designs et l'essayer en aperçu interactif, et parcourir le catalogue d'idées. La formule Découverte te laisse créer, modifier et enregistrer 1 projet, et le prévisualiser. Pour le publier en ligne, il faut une offre payante, dès ${prixCourt("solo")} par mois`],
   ["Mon SaaS est-il vraiment en ligne ?", "Avec une offre payante, tu publies en un clic ta page de vente et ta démo sur une adresse publique, avec une vraie liste d'attente. Pour une application complète (comptes, base de données, paiements de tes clients), le guide de mise en production t'accompagne étape par étape."],
-  ["Puis-je créer n'importe quelle application ?", "Non, et on préfère être clairs : ton produit est assemblé à partir de 16 types de SaaS et de 17 briques réellement programmées. C'est ce qui rend le résultat fiable."],
+  ["Puis-je créer n'importe quelle application ?", "Non, et on préfère être clairs : ton produit est assemblé à partir de 16 types de SaaS et de 17 briques réellement programmées (des fonctions prêtes à activer : comptes, recherche, graphiques, abonnement…). C'est ce qui rend le résultat fiable."],
   ["Puis-je résilier quand je veux ?", "Oui. Sans engagement : tu changes d'offre ou tu résilies en ligne, à tout moment. Tes projets restent exportables."],
 ];
 
@@ -50,9 +50,10 @@ export default function Home() {
               <span className="word serif" style={{ "--w": 9 } as React.CSSProperties}>zéro.</span>
             </h1>
             <p className="lead">
-              Décollage transforme ton idée en projet SaaS : application fonctionnelle, tableau de bord, page de vente, code exportable et plan de lancement,
+              Décollage transforme ton idée en projet SaaS : démo cliquable, tableau de bord, page de lancement, projet Next.js à télécharger et plan de lancement,
               dans le design de ton choix.
             </p>
+            <p className="hero-assure">Sans IA : des modèles écrits à l&apos;avance, donc la même idée donne toujours le même résultat. Dès {prixCourt("solo")}, sans engagement. <a href="#faq">Voir la réponse complète</a></p>
             <IdeaBox />
           </div>
           <Reveal>
@@ -136,7 +137,7 @@ export default function Home() {
             </Reveal>
             <Reveal className="b-c" delay={2}>
               <h3>Constructeur en direct</h3>
-              <p className="mut small">Couleurs, logo, police, pages et briques : l&apos;aperçu change à chaque clic.</p>
+              <p className="mut small">Couleurs, logo, police, pages et briques (des fonctions à activer) : l&apos;aperçu change à chaque clic.</p>
             </Reveal>
             <Reveal className="b-d" delay={3}>
               <div className="big-num" style={{ fontSize: 56 }}>{DESIGNS.length}</div>
@@ -144,7 +145,7 @@ export default function Home() {
             </Reveal>
             <Reveal className="b-e" delay={1}>
               <h3>Labo des prix</h3>
-              <p className="mut small">Tes offres, la comparaison et des scénarios de revenus.</p>
+              <p className="mut small">Un outil pour fixer tes prix : tes offres, leur comparaison et des scénarios de revenus.</p>
               <div className="bars" aria-hidden="true">{[30, 45, 40, 62, 70, 88].map((h, i) => <i key={i} style={{ height: `${h}%`, animationDelay: `${i * 80}ms` }} />)}</div>
             </Reveal>
             <Reveal className="b-f" delay={2}>
@@ -169,9 +170,10 @@ export default function Home() {
           <Reveal>
             <OfferCards
               plans={PAID_PLANS}
-              cta={(k) => <Link href="/parametres#formule" className={`btn ${k === "pro" ? "btn-coral" : ""}`}>Choisir {PLANS[k].nom}</Link>}
+              cta={(k) => <Link href="/connexion?next=/parametres%23formule" className={`btn ${k === "pro" ? "btn-coral" : ""}`}>Choisir {PLANS[k].nom}</Link>}
             />
           </Reveal>
+          <p className="center mut small" style={{ marginTop: 18 }}>Pour choisir une offre : crée ton compte avec ton e-mail (un lien de connexion, sans mot de passe), puis choisis ta formule dans Paramètres.</p>
           <p className="center mut small" style={{ marginTop: 26 }}>Sans engagement, résiliable en ligne. <Link href="/creer" style={{ textDecoration: "underline" }}>Essayer d&apos;abord gratuitement →</Link></p>
         </div>
       </section>
@@ -206,7 +208,7 @@ export default function Home() {
       </section>
 
       <section className="sec">
-        <div className="container narrow faq">
+        <div className="container narrow faq" id="faq">
           <Reveal className="sec-head center center"><span className="eyebrow">FAQ</span><h2>Questions fréquentes</h2></Reveal>
           {FAQ.map(([q, r]) => (
             <details key={q}><summary>{q}</summary><p>{r}</p></details>
