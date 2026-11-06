@@ -13,7 +13,7 @@ const useReducedMotion = () => useSyncExternalStore(
 
 const EXEMPLE: Omit<IdeeInput, "design"> = { idee: "Une appli pour que les clients d'un coiffeur réservent en ligne", type: "rendez-vous", secteur: "coiffure", nom: "RésaCoiff" };
 
-/** Le même SaaS, présenté tour à tour dans chacun des 10 designs (vrais prototypes, pas des images). */
+/** Le même SaaS, présenté tour à tour dans chacun des 13 designs (vrais prototypes, pas des images). */
 export function DesignShowcase() {
   const [i, setI] = useState(0);
   const [paused, setPaused] = useState(false);
@@ -30,7 +30,7 @@ export function DesignShowcase() {
     <div className="show" onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
       <div className="show-device">
         <div className="device-bar"><i /><i /><i /><span className="url">resacoiff.fr · design {d.nom}</span></div>
-        <DesignThumb input={{ ...EXEMPLE, design: d.id }} width={1180} />
+        <DesignThumb input={{ ...EXEMPLE, design: d.id }} view="landing" width={1180} />
         {!paused && !reduced && <span key={i} className="show-timer" aria-hidden="true" />}
       </div>
       <div className="show-tabs" role="tablist" aria-label="Designs">

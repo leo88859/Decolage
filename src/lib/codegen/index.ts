@@ -1,5 +1,5 @@
 import { DEMO } from "@/data/demo";
-import { DESIGN_BY_ID } from "@/data/designs";
+import { DESIGN_BY_ID, designId } from "@/data/designs";
 import { TEMPLATE_BY_ID } from "@/data/templates";
 import { POLICES, policeOf } from "@/lib/config";
 import { PROTO_DESIGN_CSS } from "@/lib/design-css";
@@ -124,7 +124,7 @@ export function generateNextProject(p: Project, now = new Date()): GenFile[] {
   const isScreen = (g: GenPage) => g.zone === "app" && ARCH_VIEWS.has(String(g.kind));
   const extras = gen.filter((g) => g.zone === "app" && !isScreen(g));
   const arch = isArch ? {
-    id: a.id, frame: a.frame, home: HOME_LAYOUT[cfg.design ?? ""] ?? "centre", accounts: cfg.modules.includes("auth"), roles: { ...ROLES[cfg.templateId] },
+    id: a.id, frame: a.frame, home: HOME_LAYOUT[designId(cfg.design) ?? ""] ?? "centre", accounts: cfg.modules.includes("auth"), roles: { ...ROLES[cfg.templateId] },
     site: gen.filter((g) => g.zone === "site").map((g) => ({ id: g.id, titre: g.titre, href: g.href })),
     screens: gen.filter(isScreen).map((g) => ({ id: g.id, titre: g.titre, view: String(g.kind), href: g.href })),
     extras: extras.map((g) => ({ id: g.id, titre: g.titre, kind: g.kind, href: g.href, nav: true })),
@@ -158,7 +158,7 @@ export function generateNextProject(p: Project, now = new Date()): GenFile[] {
 ${PROTO_CSS}
 ${arch ? ARCH_CSS : ""}
 ${STYLE_EXTRA[cfg.style]}
-${(cfg.design && PROTO_DESIGN_CSS[cfg.design]) || ""}
+${PROTO_DESIGN_CSS[designId(cfg.design) ?? ""] ?? ""}
 ${REACT_CSS}
 ${arch ? ARCH_REACT_CSS : ""}
 `;

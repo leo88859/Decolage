@@ -215,8 +215,8 @@ export default function Dashboard() {
 
 function Welcome({ favorites }: { favorites: number }) {
   const paths = [
-    { href: "/creer", n: "01", t: "Décrire mon idée", d: "Une phrase : le type, le métier et les fonctions sont reconnus, et ton SaaS est assemblé.", design: "aurora" },
-    { href: "/nouveau", n: "02", t: "Construire pas à pas", d: "Type, design, personnalisation, fonctions, vérification : cinq étapes guidées.", design: "maison" },
+    { href: "/creer", n: "01", t: "Décrire mon idée", d: "Une phrase : le type, le métier et les fonctions sont reconnus, et ton SaaS est assemblé.", design: "clarte" },
+    { href: "/nouveau", n: "02", t: "Construire pas à pas", d: "Type, design, personnalisation, fonctions, vérification : cinq étapes guidées.", design: "studio" },
     { href: "/idees", n: "03", t: "Trouver une idée", d: `216 idées de micro-SaaS${favorites ? ` (${favorites} en favori)` : ""}, avec la première action de validation.`, design: "neon" },
   ];
   return (

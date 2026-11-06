@@ -44,7 +44,7 @@ describe("fonctions demandées dans le texte", () => {
     expect(detectFonctions("une carte de fidélité pour les cafés").map((x) => x.f.id)).not.toContain("carte");
   });
   it("active les briques et ajoute les pages", () => {
-    const p = newProjectFromIdee({ idee, type: "rendez-vous", secteur: "coiffure", nom: "Coiffio", design: "aurora", fonctions: ["paiement", "notifications", "carte", "messages"] });
+    const p = newProjectFromIdee({ idee, type: "rendez-vous", secteur: "coiffure", nom: "Coiffio", design: "clarte", fonctions: ["paiement", "notifications", "carte", "messages"] });
     expect(p.config.modules).toEqual(expect.arrayContaining(["abonnement", "notifications"]));
     expect(p.config.extras).toEqual(["carte", "conversation"]);
     expect(validateConfig(p.config)).toEqual({});
@@ -52,13 +52,13 @@ describe("fonctions demandées dans le texte", () => {
   });
   it("toutes les fonctions sur tous les types gardent une configuration valide", () => {
     for (const t of TEMPLATES) {
-      const p = newProjectFromIdee({ idee: "test", type: t.id, secteur: "general", nom: "Test", design: "aurora", fonctions: FONCTIONS.map((f) => f.id) });
+      const p = newProjectFromIdee({ idee: "test", type: t.id, secteur: "general", nom: "Test", design: "clarte", fonctions: FONCTIONS.map((f) => f.id) });
       expect(validateConfig(p.config), t.id).toEqual({});
     }
   });
   it("chaque métier a un design proposé", () => {
     for (const s of SECTEURS) expect(DESIGN_BY_ID[designFor("rendez-vous", s.id).id]).toBeDefined();
-    expect(analyse("logiciel de support pour une boîte informatique").design).toBe("terminal");
+    expect(analyse("logiciel de support pour une boîte informatique").design).toBe("console");
   });
 });
 
@@ -84,19 +84,19 @@ describe("contenu pour chaque type et chaque secteur", () => {
 });
 
 describe("projet créé à partir d'une idée", () => {
-  const p = newProjectFromIdee({ idee: "réservations pour un salon de coiffure", type: "rendez-vous", secteur: "coiffure", nom: "Coiffio", design: "neon" });
+  const p = newProjectFromIdee({ idee: "réservations pour un salon de coiffure", type: "rendez-vous", secteur: "coiffure", nom: "Coiffio", design: "minuit" });
   it("applique le design et reste valide", () => {
-    expect(p.config.design).toBe("neon");
+    expect(p.config.design).toBe("minuit");
     expect(p.config.style).toBe("neon");
     expect(validateConfig(p.config)).toEqual({});
-    expect(p.landing.layout).toBe("split");
+    expect(p.landing.layout).toBe("bento");
   });
   it("le prototype utilise les données et le design", () => {
     const d = prototypeData(p.config, "accueil", contenuOf(p));
     expect(d.rows).toEqual(p.contenu!.lignes);
-    expect(d.dash).toBe("rings");
+    expect(d.dash).toBe("bento");
     expect(d.features.some(([a, b]) => `${a}${b}`.includes("{nom}"))).toBe(false);
-    expect(renderPrototype(p.config, "accueil", p.contenu)).toContain("shell-top dash-rings anim-glow");
+    expect(renderPrototype(p.config, "accueil", p.contenu)).toContain("shell-top dash-bento anim-blur");
   });
   it("la landing utilise les textes remplis", () => {
     const html = renderLanding(p.config, p.landing, null, { inlineCss: true, contenu: p.contenu });
@@ -121,7 +121,7 @@ describe("projet créé à partir d'une idée", () => {
       const x = newProjectFromIdee({ idee: "boutique de bougies", type: "boutique", secteur: "artisanat", nom: "Bougie", design: d.id });
       return renderPrototype(x.config, "accueil", x.contenu).match(/class="(s-[^"]+)"/)![1];
     });
-    expect(new Set(classes).size).toBe(10);
+    expect(new Set(classes).size).toBe(DESIGNS.length);
   });
   it("publication : le contenu passe la validation, un contenu modifié est refusé", () => {
     const v = validateSiteData(siteData(p));

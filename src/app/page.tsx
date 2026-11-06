@@ -14,7 +14,7 @@ import "./marketing.css";
 
 const STEPS = [
   ["Décris ton idée", "Une phrase suffit. Décollage reconnaît le type de produit et ton métier, et te propose un nom."],
-  ["Choisis ton design", "10 designs complets, chacun avec son menu, son tableau de bord et ses animations. Tu vois ton SaaS dedans avant de choisir."],
+  ["Choisis ton design", "13 designs complets, chacun avec son menu, son tableau de bord et ses animations. Tu vois ton SaaS dedans avant de choisir."],
   ["Ton projet est généré", "Une démo cliquable de ton SaaS, une page de lancement rédigée, des données adaptées à ton métier et un projet Next.js à télécharger. Tout reste modifiable."],
   ["Lance-le", "Publication en un clic de ta page de lancement (offre payante) avec une vraie liste d'attente, et un guide pas à pas pour brancher Stripe, Supabase et un nom de domaine chez des prestataires externes."],
 ];
@@ -22,7 +22,7 @@ const STEPS = [
 
 const FAQ = [
   ["Décollage utilise-t-il une intelligence artificielle ?", "Non. Tout repose sur des modèles, des textes et des briques écrits à l'avance, et sur des règles programmées. Le résultat est instantané, et la même idée donne toujours le même SaaS."],
-  ["Que puis-je faire sans payer ?", `Décrire ton idée, voir ton SaaS dans les 10 designs et l'essayer en aperçu interactif, et parcourir le catalogue d'idées. La formule Découverte te laisse créer, modifier et enregistrer 1 projet, et le prévisualiser. Pour le publier en ligne, il faut une offre payante, dès ${prixCourt("solo")} par mois`],
+  ["Que puis-je faire sans payer ?", `Décrire ton idée, voir ton SaaS dans les 13 designs et l'essayer en aperçu interactif, et parcourir le catalogue d'idées. La formule Découverte te laisse créer, modifier et enregistrer 1 projet, et le prévisualiser. Pour le publier en ligne, il faut une offre payante, dès ${prixCourt("solo")} par mois`],
   ["Mon SaaS est-il vraiment en ligne ?", "Avec une offre payante, tu publies en un clic ta page de vente et ta démo sur une adresse publique, avec une vraie liste d'attente. Pour une application complète (comptes, base de données, paiements de tes clients), le guide de mise en production t'accompagne étape par étape."],
   ["Puis-je créer n'importe quelle application ?", "Non, et on préfère être clairs : ton produit est assemblé à partir de 16 types de SaaS et de 17 briques réellement programmées (des fonctions prêtes à activer : comptes, recherche, graphiques, abonnement…). C'est ce qui rend le résultat fiable."],
   ["Puis-je résilier quand je veux ?", "Oui. Sans engagement : tu changes d'offre ou tu résilies en ligne, à tout moment. Tes projets restent exportables."],
@@ -34,9 +34,17 @@ function Words({ text, start = 0 }: { text: string; start?: number }) {
 
 const euros = (n: number) => n.toLocaleString("fr-FR", { minimumFractionDigits: 2 });
 
+// Fiches pour les moteurs de recherche : le nom du site (sinon Google affiche « Vercel », l'hébergeur) et son logo.
+const SITE = "https://decollage.vercel.app";
+const DONNEES_STRUCTUREES = JSON.stringify([
+  { "@context": "https://schema.org", "@type": "WebSite", name: "Décollage", alternateName: ["Decollage", "Décollage SaaS"], url: `${SITE}/` },
+  { "@context": "https://schema.org", "@type": "Organization", name: "Décollage", url: `${SITE}/`, logo: `${SITE}/icon.png` },
+]).replace(/</g, "\\u003c");
+
 export default function Home() {
   return (
     <main>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: DONNEES_STRUCTUREES }} />
       <section className="hero">
         <div className="halo h1" />
         <div className="halo h2" />
@@ -87,7 +95,7 @@ export default function Home() {
         <div className="halo h2" style={{ top: -120, right: "-8%" }} />
         <div className="container">
           <Reveal className="sec-head center center">
-            <span className="eyebrow">10 designs</span>
+            <span className="eyebrow">13 designs</span>
             <h2>Chaque design a son <span className="serif">propre caractère</span>.</h2>
             <p>Un menu, un tableau de bord et des animations différents. Ci-dessous, 10 idées réelles, remplies automatiquement : ce sont de vrais prototypes, pas des images.</p>
           </Reveal>
@@ -97,7 +105,7 @@ export default function Home() {
               return (
                 <Reveal key={d.id} delay={i % 3}>
                   <Link href={`/creer?q=${encodeURIComponent(ex.idee)}&design=${d.id}`} className="dz-card">
-                    <DesignThumb input={{ ...ex, design: d.id }} />
+                    <DesignThumb input={{ ...ex, design: d.id }} view="landing" />
                     <div className="dz-meta">
                       <span className="dz-sw" style={{ background: `linear-gradient(135deg, ${d.couleurs.primaire}, ${d.couleurs.accent})` }} />
                       <span style={{ minWidth: 0 }}>
@@ -165,7 +173,7 @@ export default function Home() {
           <Reveal className="sec-head center center">
             <span className="eyebrow">Offres</span>
             <h2>Ton premier SaaS dès <span className="serif" style={{ whiteSpace: "nowrap" }}>{euros(PLANS.solo.prix)} €</span> par&nbsp;mois.</h2>
-            <p>Essaie gratuitement ton SaaS dans les 10 designs : la formule Découverte (0 €) garde 1 projet en aperçu. Pour le publier en ligne, choisis une offre payante ; les quantités (projets, sites publiés) changent selon la formule. La marque blanche est incluse dans Pro et Illimité. Entreprise : sur devis, <Link href="/contact" style={{ textDecoration: "underline" }}>contacte-nous</Link>.</p>
+            <p>Essaie gratuitement ton SaaS dans les 13 designs : la formule Découverte (0 €) garde 1 projet en aperçu. Pour le publier en ligne, choisis une offre payante ; les quantités (projets, sites publiés) changent selon la formule. La marque blanche est incluse dans Pro et Illimité. Entreprise : sur devis, <Link href="/contact" style={{ textDecoration: "underline" }}>contacte-nous</Link>.</p>
           </Reveal>
           <Reveal>
             <OfferCards
@@ -220,7 +228,7 @@ export default function Home() {
         <div className="container">
           <Reveal className="final">
             <h2>Ton SaaS commence <span className="serif">maintenant</span>.</h2>
-            <p style={{ fontSize: 18, margin: "18px auto 30px", maxWidth: 540 }}>Décris ton idée, regarde-la prendre vie dans 10 designs, et garde celle qui te ressemble.</p>
+            <p style={{ fontSize: 18, margin: "18px auto 30px", maxWidth: 540 }}>Décris ton idée, regarde-la prendre vie dans 13 designs, et garde celle qui te ressemble.</p>
             <div className="row" style={{ justifyContent: "center" }}>
               <Link href="/creer" className="btn btn-dark btn-lg">Décrire mon idée <span className="arrow">→</span></Link>
               <Link href="#offres" className="btn btn-light btn-lg">Voir les offres</Link>

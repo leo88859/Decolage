@@ -106,3 +106,86 @@ fieldset.vt-field { border: 0; padding: 0; margin: 0 0 14px; min-width: 0; }
 .vt-contact { display: flex; flex-wrap: wrap; gap: 8px; list-style: none; padding: 0; margin: 8px 0 0; }
 .vt-made { color: var(--vt-mut); font-size: .9rem; }
 .vt-empty { text-align: center; padding: 40px 0; color: var(--vt-mut); }
+
+/* ── Thèmes (colonne boutiques.theme, migration 0009) ─────────────────────────────────────────────────
+   « classique » = les règles ci-dessus. Chaque thème garde les deux couleurs du commerçant et change le reste.
+   Contrastes : textes et bordures restent au moins AA sur leur fond. */
+
+/* Vitrine : blanc, grandes photos arrondies, boutons ronds */
+.vt[data-theme="vitrine"] { --vt-soft: #f4f4f5; --vt-line: #e4e4e7; }
+.vt[data-theme="vitrine"] .vt-head { background: #fff; color: var(--vt-txt); border-bottom: 1px solid var(--vt-line); }
+.vt[data-theme="vitrine"] .vt-head a { color: var(--vt-txt); }
+.vt[data-theme="vitrine"] .vt-count { background: var(--vt-main); color: var(--vt-on-main); }
+.vt[data-theme="vitrine"] .vt-intro h1 { font-size: clamp(1.9rem, 5vw, 2.8rem) !important; letter-spacing: -.03em; }
+.vt[data-theme="vitrine"] .vt-card { border: 0; border-radius: 0; background: transparent; }
+.vt[data-theme="vitrine"] .vt-card .vt-img, .vt[data-theme="vitrine"] .vt-card .vt-noimg { border-radius: 18px; }
+.vt[data-theme="vitrine"] .vt-card-body { padding: 10px 2px 6px; }
+.vt[data-theme="vitrine"] .vt-card-foot { padding: 0 2px 8px; }
+.vt[data-theme="vitrine"] .vt-btn, .vt[data-theme="vitrine"] .vt-opt { border-radius: 999px; }
+.vt[data-theme="vitrine"] .vt-gallery-main { border-radius: 22px; }
+.vt[data-theme="vitrine"] .vt-box, .vt[data-theme="vitrine"] .vt-line { border-radius: 18px; }
+
+/* Atelier : crème, titres à empattements, cartes papier */
+.vt[data-theme="atelier"] { --vt-bg: #f6efe4; --vt-soft: #efe4d3; --vt-txt: #2b1a10; --vt-mut: #6b5444; --vt-line: #d9c8b0; }
+.vt[data-theme="atelier"] h1, .vt[data-theme="atelier"] h2, .vt[data-theme="atelier"] h3, .vt[data-theme="atelier"] .vt-brand { font-family: "Playfair Display", Georgia, "Times New Roman", serif; font-weight: 500; }
+.vt[data-theme="atelier"] .vt-head { background: var(--vt-bg); color: var(--vt-txt); border-bottom: 1px solid var(--vt-txt); }
+.vt[data-theme="atelier"] .vt-head a { color: var(--vt-txt); }
+.vt[data-theme="atelier"] .vt-count { background: var(--vt-txt); color: var(--vt-bg); }
+.vt[data-theme="atelier"] .vt-intro h1 { font-size: clamp(2rem, 5vw, 3rem) !important; }
+.vt[data-theme="atelier"] .vt-card, .vt[data-theme="atelier"] .vt-box, .vt[data-theme="atelier"] .vt-line { background: #fffaf2; border-radius: 4px; }
+.vt[data-theme="atelier"] .vt-btn { border-radius: 2px; text-transform: uppercase; letter-spacing: .08em; font-size: .9rem; }
+.vt[data-theme="atelier"] .vt-btn.alt, .vt[data-theme="atelier"] .vt-chip, .vt[data-theme="atelier"] .vt-opt { background: #fffaf2; }
+.vt[data-theme="atelier"] .vt-chip, .vt[data-theme="atelier"] .vt-opt, .vt[data-theme="atelier"] .vt-thumb { border-radius: 2px; }
+.vt[data-theme="atelier"] .vt-chip[aria-pressed="true"] { background: var(--vt-main); color: var(--vt-on-main); border-color: var(--vt-main); }
+.vt[data-theme="atelier"] .vt-gallery-main { border-radius: 4px; }
+.vt[data-theme="atelier"] .vt-foot { background: var(--vt-soft); border-top: 1px solid var(--vt-txt); }
+
+/* Marché : vert frais, cartes arrondies et gourmandes */
+.vt[data-theme="marche"] { --vt-bg: #f7fbf3; --vt-soft: #eaf4e2; --vt-txt: #14321d; --vt-mut: #44604d; --vt-line: #cfe3c4; }
+.vt[data-theme="marche"] .vt-head { border-bottom: 0; border-radius: 0 0 28px 28px; box-shadow: 0 10px 0 -4px var(--vt-accent); }
+.vt[data-theme="marche"] .vt-intro h1 { font-size: clamp(1.9rem, 5vw, 2.7rem) !important; font-weight: 900; }
+.vt[data-theme="marche"] .vt-card { border: 0; border-radius: 22px; box-shadow: 0 12px 28px -22px rgba(20, 50, 29, .55); }
+.vt[data-theme="marche"] .vt-card .vt-img, .vt[data-theme="marche"] .vt-card .vt-noimg { border-radius: 18px; margin: 8px 8px 0; width: calc(100% - 16px); }
+.vt[data-theme="marche"] .vt-btn, .vt[data-theme="marche"] .vt-opt { border-radius: 999px; }
+.vt[data-theme="marche"] .vt-box, .vt[data-theme="marche"] .vt-line, .vt[data-theme="marche"] .vt-gallery-main { border-radius: 22px; }
+.vt[data-theme="marche"] .vt-badge { border-radius: 8px; }
+
+/* Écrin : noir et or, beaucoup d'espace */
+.vt[data-theme="ecrin"] { --vt-bg: #0c0b09; --vt-soft: #1b1815; --vt-txt: #f3ece0; --vt-mut: #b3a998; --vt-line: #3a332a; }
+.vt[data-theme="ecrin"] a { color: #e6cf8a; }
+.vt[data-theme="ecrin"] h1, .vt[data-theme="ecrin"] h2, .vt[data-theme="ecrin"] h3, .vt[data-theme="ecrin"] .vt-brand { font-family: "Playfair Display", Georgia, "Times New Roman", serif; font-weight: 400; letter-spacing: .01em; }
+.vt[data-theme="ecrin"] .vt-head { background: var(--vt-bg); color: var(--vt-txt); border-bottom: 1px solid #e6cf8a; }
+.vt[data-theme="ecrin"] .vt-head a { color: var(--vt-txt); }
+.vt[data-theme="ecrin"] .vt-count { background: #e6cf8a; color: #0c0b09; }
+.vt[data-theme="ecrin"] .vt-intro h1 { font-size: clamp(2.1rem, 5.5vw, 3.4rem) !important; }
+.vt[data-theme="ecrin"] .vt-card, .vt[data-theme="ecrin"] .vt-box, .vt[data-theme="ecrin"] .vt-line, .vt[data-theme="ecrin"] .vt-chip,
+.vt[data-theme="ecrin"] .vt-opt, .vt[data-theme="ecrin"] .vt-thumb { background: #141210; color: var(--vt-txt); border-radius: 0; }
+.vt[data-theme="ecrin"] .vt-chip[aria-pressed="true"] { background: #e6cf8a; color: #0c0b09; border-color: #e6cf8a; }
+.vt[data-theme="ecrin"] .vt-btn { border-radius: 0; text-transform: uppercase; letter-spacing: .14em; font-size: .85rem; border-color: #e6cf8a; }
+.vt[data-theme="ecrin"] .vt-btn.alt { background: transparent; color: #e6cf8a; }
+.vt[data-theme="ecrin"] .vt-field input, .vt[data-theme="ecrin"] .vt-field textarea, .vt[data-theme="ecrin"] .vt-field select,
+.vt[data-theme="ecrin"] .vt-qty button, .vt[data-theme="ecrin"] .vt-qty input { background: #141210; color: var(--vt-txt); border-color: #8a7f6c; border-radius: 0; }
+.vt[data-theme="ecrin"] .vt-opt input { accent-color: #e6cf8a; }
+.vt[data-theme="ecrin"] .vt-gallery-main { border-radius: 0; }
+.vt[data-theme="ecrin"] .vt-total { border-top-color: #e6cf8a; }
+.vt[data-theme="ecrin"] .vt-err { color: #ff9aa6; }
+
+/* Street : contours noirs, ombres pleines, titres massifs */
+.vt[data-theme="street"] { --vt-bg: #f4f4f0; --vt-line: #111111; }
+.vt[data-theme="street"] h1, .vt[data-theme="street"] h2 { text-transform: uppercase; font-weight: 900; letter-spacing: -.03em; }
+.vt[data-theme="street"] .vt-head { background: #111; color: #fff; border-bottom: 5px solid var(--vt-accent); }
+.vt[data-theme="street"] .vt-head a { color: #fff; }
+.vt[data-theme="street"] .vt-count { background: var(--vt-accent); color: #111; }
+.vt[data-theme="street"] .vt-intro h1 { font-size: clamp(2.2rem, 7vw, 4rem) !important; line-height: .95; }
+.vt[data-theme="street"] .vt-card, .vt[data-theme="street"] .vt-box, .vt[data-theme="street"] .vt-line { border: 3px solid #111; border-radius: 0; box-shadow: 5px 5px 0 #111; }
+.vt[data-theme="street"] .vt-card .vt-img, .vt[data-theme="street"] .vt-card .vt-noimg { border-bottom: 3px solid #111; }
+.vt[data-theme="street"] .vt-btn { border: 3px solid #111; border-radius: 0; text-transform: uppercase; box-shadow: 3px 3px 0 #111; }
+.vt[data-theme="street"] .vt-chip, .vt[data-theme="street"] .vt-opt, .vt[data-theme="street"] .vt-thumb { border: 2px solid #111; border-radius: 0; }
+.vt[data-theme="street"] .vt-gallery-main { border: 3px solid #111; border-radius: 0; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .vt[data-theme="vitrine"] .vt-card .vt-img { transition: transform .3s; }
+  .vt[data-theme="vitrine"] .vt-card-link:hover .vt-img { transform: scale(1.02); }
+  .vt[data-theme="street"] .vt-card { transition: transform .15s, box-shadow .15s; }
+  .vt[data-theme="street"] .vt-card:hover { transform: translate(-2px, -2px); box-shadow: 7px 7px 0 #111; }
+}

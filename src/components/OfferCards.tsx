@@ -9,7 +9,7 @@ const prix = (n: number) => n.toLocaleString("fr-FR", { minimumFractionDigits: n
 function features(k: Plan): { ok: boolean; t: string }[] {
   const p = PLANS[k];
   return [
-    ...(k === "gratuit" ? [{ ok: true, t: "Aperçu de ton SaaS dans les 10 designs" }] : []),
+    ...(k === "gratuit" ? [{ ok: true, t: "Aperçu de ton SaaS dans les 13 designs" }] : []),
     { ok: true, t: `Catalogue de ${IDEAS.length} idées` },
     { ok: p.maxProjets > 0, t: p.maxProjets === Infinity ? "SaaS illimités (usage raisonnable)" : limiteLabel(p.maxProjets, "SaaS généré", "SaaS générés") },
     { ok: p.maxSites > 0, t: p.maxSites === 0 ? "Mise en ligne" : `Mise en ligne : ${limiteLabel(p.maxSites, "site", "sites")}` },

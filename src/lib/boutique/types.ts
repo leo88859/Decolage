@@ -39,6 +39,8 @@ export type Boutique = {
   modes: Mode[];
   statut: StatutBoutique;
   published_at: string | null;
+  /** Thème de la vitrine (migration 0009 ; absent avant elle = « classique »). */
+  theme?: string;
   /** Posé par le serveur quand la formule ne permet plus de garder la boutique en ligne (migration 0006). */
   suspended_at?: string | null;
   created_at: string;

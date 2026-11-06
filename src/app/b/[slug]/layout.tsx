@@ -5,6 +5,7 @@ import { CartProvider } from "@/components/vitrine/CartProvider";
 import { ContactLinks, VitrineHeader } from "@/components/vitrine/Chrome";
 import { chargerCatalogue } from "@/components/vitrine/load";
 import { readableOn, safeColor, textOnWhite } from "@/components/vitrine/logic";
+import { themeOf } from "@/lib/boutique/themes";
 import "@/components/vitrine/vitrine.css";
 
 /** Titres des pages enfants (panier, suivi) : « … · Décollage » par défaut ; avec la marque blanche, le nom de la boutique. */
@@ -41,7 +42,7 @@ export default async function VitrineLayout({ children, params }: { children: Re
 
   return (
     <CartProvider catalogue={r.data}>
-      <div className="vt" style={style}>
+      <div className="vt" data-theme={themeOf(b.theme)} style={style}>
         <a href="#vt-contenu" className="vt-skip">Aller au contenu</a>
         <VitrineHeader />
         <main className="vt-main" id="vt-contenu" tabIndex={-1}>

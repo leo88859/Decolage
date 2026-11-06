@@ -119,7 +119,9 @@ export type TaskStatus = "a-faire" | "en-cours" | "termine";
 
 export type VisualStyle = "moderne" | "minimal" | "audacieux" | "neon" | "pastel" | "luxe";
 export type Police = "systeme" | "arrondie" | "elegante" | "geometrique" | "mono";
-export type LandingLayout = "centre" | "split" | "editorial";
+/** Mises en page de la page de vente (liste blanche : publish.ts et landing.ts LAYOUTS). */
+export const LANDING_LAYOUTS = ["centre", "split", "editorial", "bento", "dashboard", "prestige", "immersif", "catalogue"] as const;
+export type LandingLayout = (typeof LANDING_LAYOUTS)[number];
 
 export type Config = {
   templateId: TemplateId;

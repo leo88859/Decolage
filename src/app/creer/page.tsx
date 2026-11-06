@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useDeferredValue, useMemo, useRef, useState } from "react";
 import { DesignThumb, showcasePage, type IdeeInput } from "@/components/DesignThumb";
 import { toast } from "@/components/ui";
-import { DESIGN_BY_ID, designFor, DESIGNS, type DesignDef } from "@/data/designs";
+import { cibleDuType, DESIGN_BY_ID, designFor, DESIGNS, designsPour, type DesignDef } from "@/data/designs";
 import { FONCTIONS } from "@/lib/fonctions";
 import { SECTEUR_BY_ID, SECTEUR_GENERAL, SECTEURS } from "@/data/secteurs";
 import { TEMPLATE_BY_ID, TEMPLATES } from "@/data/templates";
@@ -66,7 +66,8 @@ function Creer() {
   const fonctions = FONCTIONS.filter((f) => fx[f.id] ?? a.fonctions.includes(f.id)).map((f) => f.id);
   const fkey = fonctions.join(",");
   const template = TEMPLATE_BY_ID[type];
-  const chosen = DESIGNS.find((d) => d.id === design) ?? DESIGNS[0]!;
+  const chosen = DESIGN_BY_ID[design] ?? DESIGNS[0]!;
+  const boutique = cibleDuType(type) === "boutique";
   // Tout s'essaie gratuitement. La formule Découverte garde 1 projet (enregistré, modifiable, en aperçu) ; le publier en ligne demande une offre payante.
   const free = plan === "gratuit";
   const full = !canCreateProject(plan, projects.length);
@@ -174,13 +175,13 @@ function Creer() {
               <div className="row between" style={{ alignItems: "flex-end", marginBottom: 16 }}>
                 <div>
                   <span className="eyebrow">Étape 2 · Le design</span>
-                  <h2 className="h-sec" style={{ marginTop: 8 }}>10 designs, chacun avec son tableau de bord et ses animations</h2>
+                  <h2 className="h-sec" style={{ marginTop: 8 }}>{DESIGNS.length} designs{boutique ? " ; ceux pensés pour les boutiques en premier" : ", chacun avec son tableau de bord et ses animations"}</h2>
                 </div>
                 <span className="mut small">{designChoice ? "Chaque aperçu montre ton SaaS, avec tes données." : <>Choisi d&apos;office pour ton métier : <b>{chosen.nom}</b>. Tu peux en changer.</>}</span>
               </div>
               <div className="cr-grid">
-                {DESIGNS.map((d, i) => (
-                  <DesignCard key={d.id} d={d} i={i} on={d.id === design} input={input(d.id)} onPick={() => setDesign(d.id)} />
+                {designsPour(boutique ? "boutique" : "saas").map((d, i) => (
+                  <DesignCard key={d.id} d={d} i={i} on={d.id === chosen.id} input={input(d.id)} onPick={() => setDesign(d.id)} />
                 ))}
               </div>
             </section>
@@ -239,7 +240,7 @@ function DesignCard({ d, i, on, input, onPick }: { d: DesignDef; i: number; on: 
   return (
     <button className={`cr-card ${on ? "on" : ""}`} style={{ "--i": i } as React.CSSProperties} onClick={onPick} aria-pressed={on}>
       <div className="cr-thumb">
-        <DesignThumb input={input} />
+        <DesignThumb input={input} view="landing" />
         {on && <span className="cr-check">✓</span>}
       </div>
       <div className="cr-meta">

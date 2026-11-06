@@ -2,6 +2,8 @@ import { json, notFound } from "@/lib/boutique/api";
 import { marqueBlancheBoutique } from "@/lib/brand/public";
 import { isCloudConfigured } from "@/lib/env";
 import { createPublicClient } from "@/lib/supabase/server";
+import { colonneThemeAbsente } from "@/lib/boutique/themes";
+import type { BoutiquePub } from "@/components/vitrine/logic";
 
 /** Seuil « stock bas » (miroir de la vue SQL variantes_publiques, migration 0007). */
 const STOCK_BAS = 5;
@@ -19,12 +21,11 @@ export async function GET(_req: Request, { params }: { params: Promise<{ slug: s
   if (!isCloudConfigured()) return json({ error: "Non disponible.", code: "demo" }, 503);
   if (!/^[a-z0-9-]{3,40}$/.test(slug)) return notFound();
   const db = createPublicClient();
-  const { data: b, error } = await db
-    .from("boutiques")
-    .select("id, slug, nom, description, couleur_principale, couleur_accent, logo, adresse, whatsapp, email, telephone, modes, published_at")
-    .eq("slug", slug)
-    .eq("statut", "publiee")
-    .maybeSingle();
+  const COLONNES = "id, slug, nom, description, couleur_principale, couleur_accent, logo, adresse, whatsapp, email, telephone, modes, published_at";
+  const lire = (colonnes: string) => db.from("boutiques").select(colonnes).eq("slug", slug).eq("statut", "publiee").maybeSingle<BoutiquePub>();
+  let { data: b, error } = await lire(`${COLONNES}, theme`);
+  // Migration 0009 pas encore exécutée : la vitrine s'affiche quand même, en thème classique.
+  if (colonneThemeAbsente(error)) ({ data: b, error } = await lire(COLONNES));
   if (error) return json({ error: "Lecture impossible pour le moment.", code: "server" }, 500);
   if (!b) return notFound();
   const [cats, prods, vues, marqueBlanche] = await Promise.all([

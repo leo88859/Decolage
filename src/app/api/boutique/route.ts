@@ -1,5 +1,6 @@
 import { authorizeOwner, dbError, invalid, json, readJson } from "@/lib/boutique/api";
 import { validateBoutique } from "@/lib/boutique/validate";
+import { colonneThemeAbsente } from "@/lib/boutique/themes";
 
 // Mes boutiques. Les écritures passent par la session du commerçant : la RLS et les limites de formule de la base s'appliquent.
 
@@ -20,7 +21,14 @@ export async function POST(req: Request) {
   if (!body.ok) return body.res;
   const v = validateBoutique(body.body);
   if (!v.ok) return invalid(v.errors);
-  const { data, error } = await o.supabase.from("boutiques").insert({ ...v.value, proprietaire_id: o.userId }).select("*").single();
+  const creer = (champs: typeof v.value) => o.supabase.from("boutiques").insert({ ...champs, proprietaire_id: o.userId }).select("*").single();
+  let { data, error } = await creer(v.value);
+  // Migration 0009 pas encore exécutée : la boutique est créée sans le thème (elle reste en thème classique).
+  if (colonneThemeAbsente(error)) {
+    const sansTheme = { ...v.value };
+    delete sansTheme.theme;
+    ({ data, error } = await creer(sansTheme));
+  }
   if (error) return dbError(error);
   return json({ boutique: data }, 201);
 }

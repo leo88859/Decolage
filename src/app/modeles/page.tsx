@@ -16,7 +16,7 @@ export default function Modeles() {
       <PageHero
         tone="navy"
         eyebrow="Découvrir · Galerie"
-        title={<>{DESIGNS.length} designs, <span className="serif">10 caractères</span>.</>}
+        title={<>{DESIGNS.length} designs, <span className="serif">SaaS ou boutique</span>.</>}
         lead="Chaque design change le menu, le tableau de bord, les boutons, les formulaires, les fonds et les animations, sur toutes les pages de ton SaaS. Les aperçus sont de vrais prototypes cliquables."
         aside={<HeroFacts facts={[[DESIGNS.length, "designs complets"], [4, "structures de menu"], [10, "tableaux de bord"], [TEMPLATES.length, "types de SaaS"]]} />}
       >

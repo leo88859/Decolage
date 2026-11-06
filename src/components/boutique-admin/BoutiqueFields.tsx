@@ -2,6 +2,7 @@
 
 import type { Mode } from "@/lib/boutique/types";
 import type { Errors } from "@/lib/boutique/validate";
+import { THEMES } from "@/lib/boutique/themes";
 import { ETAPES, type BoutiqueForm } from "./logic";
 import { Field } from "./Field";
 
@@ -28,6 +29,28 @@ export function BoutiqueFields({ value: v, onChange, errors: e, etapes = [0, 1, 
       )}
       {etapes.includes(1) && (
         <>
+          <fieldset style={{ border: 0, padding: 0, margin: 0 }} aria-describedby={e.theme ? "theme-err" : undefined}>
+            <legend className="label" style={{ marginBottom: 8 }}>Le style de ta vitrine</legend>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(150px, 1fr))", gap: 10 }}>
+              {THEMES.map((t) => {
+                const on = v.theme === t.id;
+                return (
+                  <label key={t.id} style={{ display: "grid", gap: 6, padding: 10, borderRadius: 12, cursor: "pointer", border: `2px solid ${on ? v.couleur_principale : "var(--line, #d6d6de)"}` }}>
+                    <span aria-hidden="true" style={{ height: 46, borderRadius: 8, background: t.fond, border: "1px solid rgba(0,0,0,.12)", display: "flex", alignItems: "flex-end", gap: 6, padding: 8 }}>
+                      <i style={{ width: 22, height: 8, borderRadius: 4, background: t.encre }} />
+                      <i style={{ width: 14, height: 8, borderRadius: 4, background: v.couleur_principale }} />
+                      <i style={{ width: 10, height: 8, borderRadius: 4, background: v.couleur_accent }} />
+                    </span>
+                    <span style={{ display: "flex", alignItems: "center", gap: 6, fontWeight: 700 }}>
+                      <input type="radio" name="theme" value={t.id} checked={on} onChange={() => onChange({ theme: t.id })} />{t.nom}
+                    </span>
+                    <span className="tiny mut">{t.description}</span>
+                  </label>
+                );
+              })}
+            </div>
+            {e.theme ? <p id="theme-err" className="err" role="alert">{e.theme}</p> : null}
+          </fieldset>
           <div className="grid-2">
             <Field label="Couleur principale" error={e.couleur_principale}>{(p) => <input {...p} type="color" className="input" style={{ height: 46, padding: 4 }} value={v.couleur_principale} onChange={(x) => onChange({ couleur_principale: x.target.value })} />}</Field>
             <Field label="Couleur d'accent" error={e.couleur_accent}>{(p) => <input {...p} type="color" className="input" style={{ height: 46, padding: 4 }} value={v.couleur_accent} onChange={(x) => onChange({ couleur_accent: x.target.value })} />}</Field>

@@ -13,12 +13,12 @@ const projet = (type: TemplateId, nom: string, design: string, idee: string, sec
 // Applications de référence, compilées et testées pour de vrai (voir GEN_OUT ci-dessous) :
 // une par architecture, plus un type sans architecture dédiée.
 export const REFERENCES: [string, Project][] = [
-  ["taches", projet("taches", "Focus Équipe", "bento", "Organiser les tâches d'une petite équipe", "freelance")],
-  ["clients", projet("crm", "Atelier CRM", "papier", "Suivre les clients et les relances d'un artisan", "artisanat")],
-  ["revenus", projet("suivi-gains", "CréaCash", "ocean", "Suivre ses revenus de créateur de contenu", "createurs")],
-  ["cours", projet("formation", "Guitare Facile", "maison", "Cours de guitare en ligne pour débutants", "general")],
-  ["documents", projet("documents", "Cabinet Plume", "terminal", "Rédiger et classer les contrats d'un cabinet", "general")],
-  ["boutique", projet("boutique", "Bougies Lune", "brutal", "Vendre des bougies artisanales", "general")],
+  ["taches", projet("taches", "Focus Équipe", "douceur", "Organiser les tâches d'une petite équipe", "freelance")],
+  ["clients", projet("crm", "Atelier CRM", "zen", "Suivre les clients et les relances d'un artisan", "artisanat")],
+  ["revenus", projet("suivi-gains", "CréaCash", "flux", "Suivre ses revenus de créateur de contenu", "createurs")],
+  ["cours", projet("formation", "Guitare Facile", "studio", "Cours de guitare en ligne pour débutants", "general")],
+  ["documents", projet("documents", "Cabinet Plume", "console", "Rédiger et classer les contrats d'un cabinet", "general")],
+  ["boutique", projet("boutique", "Bougies Lune", "vitrine", "Vendre des bougies artisanales", "general")],
   ["rdv", projet("rendez-vous", "Salon Zen", "aurora", "Prise de rendez-vous pour un salon", "general")],
   ["annuaire", projet("annuaire", "Artisans Près", "maison", "Un annuaire des artisans de ma ville", "general")],
   ["attente", projet("liste-attente", "Bientôt Lancé", "pastel", "Une liste d'attente pour le lancement de mon appli", "general")],

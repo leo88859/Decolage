@@ -20,6 +20,8 @@ export type BoutiquePub = {
   couleur_principale: string; couleur_accent: string; logo: string | null; adresse: string;
   whatsapp: string | null; email: string | null; telephone: string | null;
   modes: ("retrait" | "livraison" | "contact")[]; published_at: string | null;
+  /** Thème de la vitrine (absent avant la migration 0009 = classique). */
+  theme?: string;
 };
 export type CataloguePub = { boutique: BoutiquePub; categories: { id: string; nom: string; position: number }[]; produits: ProduitPub[]; marque_blanche?: boolean };
 

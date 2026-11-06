@@ -15,7 +15,7 @@ const GROUPS: Group[] = [
     id: "decouvrir", label: "Découvrir", href: "/idees", match: ["/idees", "/modeles"],
     items: [
       { href: "/idees", label: "Catalogue d'idées", desc: "216 idées de micro-SaaS, filtres et favoris", ic: "✦" },
-      { href: "/modeles", label: "Galerie des designs", desc: "10 designs complets à essayer en grand", ic: "◐" },
+      { href: "/modeles", label: "Galerie des designs", desc: "13 designs complets à essayer en grand", ic: "◐" },
       { href: "/idees#categories", label: "Catégories", desc: "Explorer par univers : créateurs, étudiants…", ic: "▦" },
     ],
   },

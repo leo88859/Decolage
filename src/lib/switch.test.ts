@@ -6,14 +6,14 @@ import { newProjectFromIdee } from "@/lib/project";
 import { switchTemplate } from "@/lib/switch";
 
 describe("changer de type de SaaS", () => {
-  const p = newProjectFromIdee({ idee: "réservations coiffeur avec carte", type: "rendez-vous", secteur: "coiffure", nom: "Coiffio", design: "neon", fonctions: ["carte", "favoris"] });
+  const p = newProjectFromIdee({ idee: "réservations coiffeur avec carte", type: "rendez-vous", secteur: "coiffure", nom: "Coiffio", design: "minuit", fonctions: ["carte", "favoris"] });
   const cfg = { ...p.config, logo: "data:image/svg+xml;base64,AAAA", domaine: "coiffio.fr", couleurs: { primaire: "#123456", accent: "#abcdef" } };
 
   it("garde l'identité, l'apparence et les pages ajoutées", () => {
     const { config } = switchTemplate(cfg, "boutique");
     expect(config.templateId).toBe("boutique");
     expect(config.nom).toBe("Coiffio");
-    expect(config.design).toBe("neon");
+    expect(config.design).toBe("minuit");
     expect(config.style).toBe(cfg.style);
     expect(config.couleurs).toEqual(cfg.couleurs);
     expect(config.logo).toBe(cfg.logo);

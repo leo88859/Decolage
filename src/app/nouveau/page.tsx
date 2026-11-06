@@ -62,7 +62,7 @@ function Nouveau() {
 
         {full && limit === 0 && (
           <div className="alert alert-warn" style={{ marginBottom: 20 }}>
-            Tu peux parcourir les modèles librement. Pour générer ton SaaS, <Link href="/parametres#formule" style={{ textDecoration: "underline" }}>choisis une offre</Link> (dès {prixCourt("solo")}/mois), ou <Link href="/creer" style={{ textDecoration: "underline" }}>essaie d&apos;abord ton idée dans les 10 designs</Link>.
+            Tu peux parcourir les modèles librement. Pour générer ton SaaS, <Link href="/parametres#formule" style={{ textDecoration: "underline" }}>choisis une offre</Link> (dès {prixCourt("solo")}/mois), ou <Link href="/creer" style={{ textDecoration: "underline" }}>essaie d&apos;abord ton idée dans les 13 designs</Link>.
           </div>
         )}
         {full && limit > 0 && (

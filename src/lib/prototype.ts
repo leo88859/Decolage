@@ -6,7 +6,7 @@ import { PROTO_CSS } from "@/lib/proto-css";
 import { PROTO_DESIGN_CSS } from "@/lib/design-css";
 import { protoRuntime, type ProtoData } from "@/lib/proto-runtime";
 import { archOf, HOME_LAYOUT, ROLES } from "@/data/archetypes";
-import { DESIGN_BY_ID } from "@/data/designs";
+import { DESIGN_BY_ID, designId } from "@/data/designs";
 import { ARCH_CSS } from "@/lib/arch-css";
 import { protoArch } from "@/lib/proto-arch";
 import type { Config, Contenu } from "@/lib/types";
@@ -45,7 +45,7 @@ export function prototypeData(cfg: Config, start = "accueil", contenu?: Contenu,
   // Architecture dédiée : site public + espace utilisateur, avec le rôle de chaque colonne.
   const arch = a.id === "classic" ? null : {
     id: a.id, frame: a.frame, roles: { ...ROLES[cfg.templateId] } as Record<string, number>,
-    home: HOME_LAYOUT[cfg.design ?? ""] ?? "centre", accounts: cfg.modules.includes("auth"),
+    home: HOME_LAYOUT[designId(cfg.design) ?? ""] ?? "centre", accounts: cfg.modules.includes("auth"),
   };
   const heroTitre = (contenu?.copy.heroTitre ?? t.copy.heroTitre).replaceAll("{nom}", cfg.nom).replaceAll("{cible}", cfg.cible);
   return { ...baseData(cfg, start, contenu), arch, heroTitre, ...(opts.persist ? { persist: true, storeKey: opts.storeKey ?? cfg.nom } : {}), ...(opts.initial ? { initial: opts.initial } : {}) };
@@ -96,7 +96,7 @@ export function renderPrototype(cfg: Config, start = "accueil", contenu?: Conten
   const font = policeOf(cfg);
   return `<!doctype html><html lang="fr" class="s-${cfg.style} shell-${data.shell} dash-${data.dash} anim-${data.anim}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${esc(cfg.nom)} — prototype</title>
 ${font.url ? `<link rel="stylesheet" href="${font.url}">` : ""}${cfg.style === "luxe" ? `<link rel="stylesheet" href="${POLICES.elegante.url}">` : ""}
-<style>:root{--p:${cfg.couleurs.primaire};--a:${cfg.couleurs.accent};${STYLE_VARS[cfg.style]}${font.url ? `;--ff:${font.famille}` : ""}}${PROTO_CSS}${data.arch ? ARCH_CSS : ""}${STYLE_EXTRA[cfg.style]}${(cfg.design && PROTO_DESIGN_CSS[cfg.design]) || ""}</style></head>
+<style>:root{--p:${cfg.couleurs.primaire};--a:${cfg.couleurs.accent};${STYLE_VARS[cfg.style]}${font.url ? `;--ff:${font.famille}` : ""}}${PROTO_CSS}${data.arch ? ARCH_CSS : ""}${STYLE_EXTRA[cfg.style]}${PROTO_DESIGN_CSS[designId(cfg.design) ?? ""] ?? ""}</style></head>
 <body><noscript>Ce prototype a besoin de JavaScript.</noscript>
 <script>(${runtime})(${safeScript(JSON.stringify(data))}${data.arch ? `, ${protoArch.toString().replace(/<\/script/gi, "<\\/script")}` : ""});</script></body></html>`;
 }

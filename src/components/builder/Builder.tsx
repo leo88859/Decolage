@@ -7,7 +7,7 @@ import { useAppDataBridge } from "@/components/AppDataBridge";
 import { useHistory } from "@/components/builder/useHistory";
 import { LivePreview } from "@/components/LivePreview";
 import { Confirm, download, LogoMark, toast } from "@/components/ui";
-import { ANIM_LABEL, DASH_LABEL, DESIGN_BY_ID, DESIGNS, SHELL_LABEL } from "@/data/designs";
+import { ANIM_LABEL, cibleDuType, DASH_LABEL, DESIGN_BY_ID, designId, designsPour, SHELL_LABEL } from "@/data/designs";
 import { archOf } from "@/data/archetypes";
 import { EXTRA_PAGES } from "@/data/extras";
 import { IDEA_BY_ID } from "@/data/ideas";
@@ -95,7 +95,9 @@ export function Builder({ project, initialStep = "perso" }: { project: Project; 
     if (!c) return undefined;
     return c.type === cfg.templateId ? c : buildContenu(c.idee, cfg.templateId, c.secteur);
   }, [project.contenu, cfg.templateId]);
-  const baseLanding = syncLanding(cfg, project.landing, contenu);
+  // Un nouveau design apporte sa mise en page de vente (la mise en page reste modifiable ensuite dans « Page de vente »).
+  const layoutDuDesign = (l: Landing): Landing => (designId(cfg.design) !== designId(project.config.design) && DESIGN_BY_ID[cfg.design ?? ""] ? { ...l, layout: DESIGN_BY_ID[cfg.design!]!.layout } : l);
+  const baseLanding = layoutDuDesign(syncLanding(cfg, project.landing, contenu));
   const landing = texts ? withTexts(baseLanding, texts) : baseLanding;
   const shownTexts = texts ?? textsOf(baseLanding);
   const dirty = texts !== null || JSON.stringify(cfg) !== JSON.stringify(project.config);
@@ -135,7 +137,7 @@ export function Builder({ project, initialStep = "perso" }: { project: Project; 
       return;
     }
     updateProject(project.id, (p) => {
-      const base = syncLanding(cfg, p.landing, contenu);
+      const base = layoutDuDesign(syncLanding(cfg, p.landing, contenu));
       return { ...p, config: cfg, contenu: contenu ?? p.contenu, landing: texts ? withTexts(base, texts) : base };
     }, "Constructeur : configuration enregistrée");
     setTexts(null);
@@ -290,10 +292,10 @@ export function Builder({ project, initialStep = "perso" }: { project: Project; 
             {step === "design" && (
               <>
                 <div className="bz-designs big">
-                  {DESIGNS.map((d) => {
+                  {designsPour(cibleDuType(cfg.templateId)).map((d) => {
                     const locked = d.style !== "moderne" && !advanced;
                     return (
-                      <button key={d.id} aria-pressed={cfg.design === d.id} disabled={locked} title={d.description}
+                      <button key={d.id} aria-pressed={designId(cfg.design) === d.id} disabled={locked} title={d.description}
                         onClick={() => { set({ design: d.id, style: d.style, couleurs: { ...d.couleurs }, police: d.police }); setView("prototype"); }}>
                         <span className="bz-design-sw" style={{ background: `linear-gradient(135deg, ${d.couleurs.primaire}, ${d.couleurs.accent})` }} />
                         <b>{d.nom}</b>

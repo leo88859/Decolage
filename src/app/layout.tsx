@@ -15,7 +15,7 @@ const serif = Instrument_Serif({ variable: "--font-serif", subsets: ["latin"], w
 export const metadata: Metadata = {
   title: { default: "Décollage — De ton idée à ton SaaS. Sans partir de zéro.", template: "%s · Décollage" },
   description:
-    "Décris ton idée, choisis parmi 10 designs et assemble ton SaaS : application interactive, page de vente et plan de lancement. Sans IA ni clé API.",
+    "Décris ton idée, choisis parmi 13 designs et assemble ton SaaS : application interactive, page de vente et plan de lancement. Sans IA ni clé API.",
   applicationName: "Décollage",
   openGraph: { siteName: "Décollage", locale: "fr_FR", type: "website" },
 };

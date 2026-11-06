@@ -5,11 +5,12 @@ import { useMemo, useState } from "react";
 import { designDoc, DesignThumb, type IdeeInput, type PreviewView } from "@/components/DesignThumb";
 import { Modal } from "@/components/ui";
 import { AMBIANCES, ANIM_LABEL, DASH_LABEL, DESIGN_BY_ID, DESIGNS, SHELL_LABEL, type DesignDef } from "@/data/designs";
+import { LAYOUTS } from "@/lib/landing";
 import { EXEMPLES } from "@/data/exemples";
 import { POLICES, STYLE_PRESETS } from "@/lib/config";
 import { toggleDesignFav, useData } from "@/lib/store";
 
-const VIEWS: [PreviewView, string][] = [["dashboard", "Tableau de bord"], ["accueil", "Accueil"], ["liste", "Liste"], ["landing", "Page de vente"]];
+const VIEWS: [PreviewView, string][] = [["landing", "Page de vente"], ["dashboard", "Tableau de bord"], ["accueil", "Accueil"], ["liste", "Liste"]];
 const MAX_CMP = 3;
 
 const specs = (d: DesignDef): [string, string][] => [
@@ -18,7 +19,7 @@ const specs = (d: DesignDef): [string, string][] => [
   ["Animations", ANIM_LABEL[d.anim]],
   ["Style", STYLE_PRESETS[d.style].nom],
   ["Police", POLICES[d.police].nom],
-  ["Page de vente", d.layout === "split" ? "Deux colonnes" : d.layout === "editorial" ? "Éditoriale" : "Centrée"],
+  ["Page de vente", LAYOUTS[d.layout].nom],
 ];
 
 export function FavDesign({ id, nom }: { id: string; nom: string }) {
@@ -31,12 +32,12 @@ export function FavDesign({ id, nom }: { id: string; nom: string }) {
   );
 }
 
-/** Galerie des 10 designs : vrais prototypes, filtres, favoris, comparaison et aperçu détaillé. */
+/** Galerie des 13 designs (SaaS et boutiques) : vrais prototypes, filtres, favoris, comparaison et aperçu détaillé. */
 export function DesignGallery() {
   const { designFavs = [] } = useData();
   const [amb, setAmb] = useState("tous");
   const [ex, setEx] = useState(0);
-  const [view, setView] = useState<PreviewView>("dashboard");
+  const [view, setView] = useState<PreviewView>("landing");
   const [cmp, setCmp] = useState<string[]>([]);
   const [detail, setDetail] = useState<string | null>(null);
   const [comparing, setComparing] = useState(false);
@@ -133,7 +134,7 @@ export function DesignGallery() {
 /** Aperçu détaillé : le prototype en grand, interactif, sur ordinateur ou mobile, page par page. */
 function DesignDetail({ id, input, onClose }: { id: string | null; input: IdeeInput | null; onClose: () => void }) {
   const d = id ? DESIGN_BY_ID[id] : undefined;
-  const [view, setView] = useState<PreviewView>("dashboard");
+  const [view, setView] = useState<PreviewView>("landing");
   const [device, setDevice] = useState<"desktop" | "mobile">("desktop");
   const key = input ? JSON.stringify(input) : "";
   const mobileDoc = useMemo(() => (key && device === "mobile" ? designDoc(JSON.parse(key) as IdeeInput, view).html : ""), [key, device, view]);

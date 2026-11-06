@@ -96,7 +96,8 @@ export function sitePagesFor(revenu: string, hasAccounts: boolean): SitePage[] {
 
 /** Composition de la page d'accueil, propre à chaque design (structure, pas seulement couleurs). */
 export type HomeLayout = "centre" | "split" | "editorial" | "bento" | "asym" | "terminal";
+/** Par identifiant de design actuel : passer par designId() pour un projet qui garde un ancien identifiant. */
 export const HOME_LAYOUT: Record<string, HomeLayout> = {
-  aurora: "centre", neon: "split", pastel: "bento", maison: "editorial", brutal: "asym",
-  papier: "editorial", ocean: "split", sunset: "asym", terminal: "terminal", bento: "bento",
+  clarte: "centre", minuit: "split", studio: "editorial", pop: "asym", zen: "editorial", flux: "split", douceur: "bento", console: "terminal",
+  vitrine: "centre", atelier: "editorial", marche: "bento", ecrin: "editorial", street: "asym",
 };

@@ -2,6 +2,7 @@ import { eurosEnCentimes } from "@/lib/boutique/money";
 import { suggestSlug } from "@/lib/publish";
 import { validateBoutique, validateCategorie, validateProduit, validateVariante, type Errors } from "@/lib/boutique/validate";
 import { TRANSITIONS, type Mode, type StatutCommande, type Variante } from "@/lib/boutique/types";
+import { THEME_DEFAUT, type ThemeId } from "@/lib/boutique/themes";
 
 // Logique pure de l'espace commerçant (testée) : appels API, erreurs, formulaires, stock.
 
@@ -68,11 +69,11 @@ export const ACTION_LABEL: Record<StatutCommande, string> = {
 // ─── Formulaire boutique ───
 export type BoutiqueForm = {
   nom: string; slug: string; description: string; couleur_principale: string; couleur_accent: string; logo: string;
-  adresse: string; whatsapp: string; email: string; telephone: string; modes: Mode[];
+  adresse: string; whatsapp: string; email: string; telephone: string; modes: Mode[]; theme: ThemeId;
 };
 export const BOUTIQUE_VIDE: BoutiqueForm = {
   nom: "", slug: "", description: "", couleur_principale: "#0a1433", couleur_accent: "#ff6b4a", logo: "",
-  adresse: "", whatsapp: "", email: "", telephone: "", modes: ["retrait"],
+  adresse: "", whatsapp: "", email: "", telephone: "", modes: ["retrait"], theme: THEME_DEFAUT,
 };
 export const slugDepuisNom = (nom: string) => (nom.trim() ? suggestSlug(nom) : "");
 
@@ -81,7 +82,7 @@ export function boutiquePayload(f: BoutiqueForm): { ok: true; body: Record<strin
   const body: Record<string, unknown> = {
     slug: f.slug.trim().toLowerCase(), nom: f.nom, description: f.description, couleur_principale: f.couleur_principale,
     couleur_accent: f.couleur_accent, logo: f.logo.trim() || null, adresse: f.adresse, whatsapp: f.whatsapp.trim() || null,
-    email: f.email.trim() || null, telephone: f.telephone.trim() || null, modes: f.modes,
+    email: f.email.trim() || null, telephone: f.telephone.trim() || null, modes: f.modes, theme: f.theme,
   };
   const v = validateBoutique(body);
   return v.ok ? { ok: true, body } : { ok: false, errors: v.errors };
@@ -89,7 +90,7 @@ export function boutiquePayload(f: BoutiqueForm): { ok: true; body: Record<strin
 /** Champs du formulaire concernés par chaque étape de l'assistant. */
 export const ETAPES: { titre: string; champs: (keyof BoutiqueForm)[] }[] = [
   { titre: "Nom et adresse", champs: ["nom", "slug", "description"] },
-  { titre: "Look", champs: ["couleur_principale", "couleur_accent", "logo"] },
+  { titre: "Look", champs: ["theme", "couleur_principale", "couleur_accent", "logo"] },
   { titre: "Contact", champs: ["adresse", "whatsapp", "email", "telephone"] },
   { titre: "Commande", champs: ["modes"] },
 ];

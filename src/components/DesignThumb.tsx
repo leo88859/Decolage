@@ -28,10 +28,10 @@ export function showcasePage(p: Project, view: PreviewView = "dashboard") {
 }
 
 /** HTML complet d'une idée dans un design, prêt pour un iframe. */
-export function designDoc(input: IdeeInput, view: PreviewView = "dashboard") {
+export function designDoc(input: IdeeInput, view: PreviewView = "dashboard", demoScroll = false) {
   const p = newProjectFromIdee(input, EPOCH);
   const html = view === "landing"
-    ? renderLanding(p.config, p.landing, p.pricing.offres.length ? p.pricing : null, { inlineCss: true, contenu: p.contenu })
+    ? renderLanding(p.config, p.landing, p.pricing.offres.length ? p.pricing : null, { inlineCss: true, contenu: p.contenu, demoScroll })
     : renderPrototype(p.config, showcasePage(p, view), p.contenu);
   return { p, html };
 }
@@ -41,7 +41,8 @@ export function designDoc(input: IdeeInput, view: PreviewView = "dashboard") {
  * Chargée seulement quand elle approche de l'écran, avec un fond animé en attendant.
  */
 export function DesignThumb({ input, view = "dashboard", width = 1040, interactive = false, className = "" }: { input: IdeeInput; view?: PreviewView; width?: number; interactive?: boolean; className?: string }) {
-  return <ScaledFrame docKey={`${view}|${JSON.stringify(input)}`} make={() => designDoc(input, view).html} width={width} interactive={interactive} className={className} />;
+  // Une miniature qu'on ne peut pas faire défiler défile seule, pour montrer les animations de la page de vente.
+  return <ScaledFrame docKey={`${view}|${JSON.stringify(input)}`} make={() => designDoc(input, view, !interactive).html} width={width} interactive={interactive} className={className} />;
 }
 
 /** Miniature d'un projet enregistré, dans son design et avec ses données. */

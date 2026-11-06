@@ -2,7 +2,7 @@ import { TEMPLATE_BY_ID } from "@/data/templates";
 import { validateConfig } from "@/lib/config";
 import { slug as slugify } from "@/lib/export";
 import { contenuOf } from "@/lib/project";
-import type { Config, Contenu, Landing, Pricing, Project, TemplateId } from "@/lib/types";
+import { LANDING_LAYOUTS, type Config, type Contenu, type Landing, type Pricing, type Project, type TemplateId } from "@/lib/types";
 
 // Données d'un site publié. Le HTML n'est JAMAIS stocké : il est recalculé côté serveur à partir
 // de ces données validées, ce qui empêche d'injecter du code dans une page publique.
@@ -74,7 +74,7 @@ function validateSiteDataUnsafe(raw: unknown): { ok: true; data: SiteData } | { 
   const first = Object.values(errors)[0];
   if (first) return { ok: false, error: `Configuration invalide : ${first}` };
   const l = d.landing;
-  if (!["centre", "split", "editorial"].includes(l.layout) || !Array.isArray(l.sections) || l.sections.length > 12) return { ok: false, error: "Landing invalide." };
+  if (!(LANDING_LAYOUTS as readonly unknown[]).includes(l.layout) || !Array.isArray(l.sections) || l.sections.length > 12) return { ok: false, error: "Landing invalide." };
   if (!isStr(l.boutonPrincipal, 60) || !isStr(l.boutonSecondaire, 60)) return { ok: false, error: "Textes des boutons invalides." };
   for (const s of l.sections) {
     if (!s || typeof s !== "object" || !isStr(s.id, 40) || !SECTION_TYPES.includes(s.type) || typeof s.visible !== "boolean") return { ok: false, error: "Section invalide." };

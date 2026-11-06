@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Confirm, Modal, toast } from "@/components/ui";
 import type { Boutique } from "@/lib/boutique/types";
 import type { Errors } from "@/lib/boutique/validate";
+import { themeOf } from "@/lib/boutique/themes";
 import { ErrorBox, useBoutiqueCtx } from "./BoutiqueContext";
 import { BoutiqueFields } from "./BoutiqueFields";
 import { api, BOUTIQUE_VIDE, boutiquePayload, erreursEtape, ETAPES, isPlanLimit, slugDepuisNom, type BoutiqueForm } from "./logic";
@@ -23,6 +24,7 @@ function formDe(b: Boutique): BoutiqueForm {
   return {
     nom: b.nom, slug: b.slug, description: b.description, couleur_principale: b.couleur_principale, couleur_accent: b.couleur_accent,
     logo: b.logo ?? "", adresse: b.adresse, whatsapp: b.whatsapp ?? "", email: b.email ?? "", telephone: b.telephone ?? "", modes: b.modes,
+    theme: themeOf(b.theme),
   };
 }
 

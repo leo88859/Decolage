@@ -2,6 +2,7 @@ import { slugError, EMAIL_RE } from "@/lib/publish";
 import { validateColor } from "@/lib/brand/validate";
 import { isCentimes, QUANTITE_MAX, QUANTITE_TOTALE_MAX } from "./money";
 import { MODES, STATUTS_BOUTIQUE, STATUTS_COMMANDE, type Mode, type StatutBoutique, type StatutCommande } from "./types";
+import { THEME_IDS, type ThemeId } from "./themes";
 
 // Validation STRICTE des entrées de l'API boutique. Pure (sans serveur) : réutilisable côté navigateur pour les messages.
 // Règles communes : types exacts (pas de conversion silencieuse), champs inconnus refusés (sauf lignes de commande),
@@ -76,9 +77,9 @@ const optional = <T>(f: (v: string) => { ok: true; value: T } | { ok: false; err
 // ─── Boutique ────────────────────────────────────────────────────────────
 export type BoutiqueIn = {
   slug: string; nom: string; description: string; couleur_principale: string; couleur_accent: string; logo: string | null;
-  adresse: string; whatsapp: string | null; email: string | null; telephone: string | null; modes: Mode[]; statut: StatutBoutique;
+  adresse: string; whatsapp: string | null; email: string | null; telephone: string | null; modes: Mode[]; statut: StatutBoutique; theme: ThemeId;
 };
-const BOUTIQUE_KEYS = ["slug", "nom", "description", "couleur_principale", "couleur_accent", "logo", "adresse", "whatsapp", "email", "telephone", "modes", "statut"] as const;
+const BOUTIQUE_KEYS = ["slug", "nom", "description", "couleur_principale", "couleur_accent", "logo", "adresse", "whatsapp", "email", "telephone", "modes", "statut", "theme"] as const;
 
 export function validateBoutique(input: unknown, partial = false): Result<Partial<BoutiqueIn>> {
   const r = new Reader(input, BOUTIQUE_KEYS, partial, ["slug", "nom"]);
@@ -102,6 +103,7 @@ export function validateBoutique(input: unknown, partial = false): Result<Partia
     return { ok: true, value: v as Mode[] };
   });
   r.run("statut", (v) => ((STATUTS_BOUTIQUE as readonly unknown[]).includes(v) ? { ok: true, value: v as StatutBoutique } : { ok: false, error: "brouillon ou publiee attendu." }));
+  r.run("theme", (v) => ((THEME_IDS as readonly unknown[]).includes(v) ? { ok: true, value: v as ThemeId } : { ok: false, error: "Thème inconnu." }));
   return r.result();
 }
 
