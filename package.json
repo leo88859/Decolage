@@ -2,12 +2,15 @@
   "name": "decollage",
   "version": "0.2.0",
   "private": true,
+  "engines": {
+    "node": ">=20.9.0"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "next typegen && tsc --noEmit",
     "test": "vitest run",
     "check": "npm run typecheck && npm run lint && npm run test"
   },
