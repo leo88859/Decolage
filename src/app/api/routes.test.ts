@@ -47,6 +47,8 @@ function fakeTable(name: string) {
   q.select = self;
   q.eq = self;
   q.in = self;
+  q.order = self; // l'export pagine : order puis range (le faux renvoie toujours toutes les lignes, moins d'un bloc)
+  q.range = self;
   q.is = self;
   q.update = (v: unknown) => { h.log.push([name, "update", v]); return q; };
   q.upsert = (v: unknown) => { h.log.push([name, "upsert", v]); return Promise.resolve({ error: null }); };
@@ -228,7 +230,7 @@ describe("GET /api/account/export", () => {
 
   it("renvoie les données du compte sans secret Stripe", async () => {
     h.rows = {
-      profiles: [{ plan: "solo", favorites: ["i1"], subscription_status: "active", created_at: "2026-01-01", updated_at: "2026-02-01", stripe_customer_id: "cus_SECRET", stripe_subscription_id: "sub_SECRET" }],
+      profiles: [{ id: "u-a", plan: "solo", favorites: ["i1"], subscription_status: "active", created_at: "2026-01-01", updated_at: "2026-02-01", stripe_customer_id: "cus_SECRET", stripe_subscription_id: "sub_SECRET" }],
       projects: [{ id: "proja1", data: { x: 1 }, updated_at: "2026-02-01", user_id: "u-a" }],
       sites: [{ slug: "mon-site", user_id: "u-a", project_id: "proja1", data: {}, published_at: "2026-02-01", updated_at: "2026-02-01" }],
       legal_acceptances: [{ document: "cgu", version: "2026-10-29", accepted_at: "2026-10-29", contexte: "inscription", renonciation_retractation: false, formule: null, user_id: "u-a" }],
@@ -240,12 +242,15 @@ describe("GET /api/account/export", () => {
     const text = await r.text();
     expect(text).not.toMatch(/SECRET|cus_|sub_/);
     const j = JSON.parse(text);
-    expect(j.compte).toMatchObject({ id: "u-a", email: "a@exemple.fr" });
-    expect(j.profil).toMatchObject({ plan: "solo", favorites: ["i1"] });
-    expect(j.projets).toHaveLength(1);
-    expect(j.sites_publies[0]).toMatchObject({ slug: "mon-site" });
-    expect(j.sites_publies[0]).not.toHaveProperty("user_id");
-    expect(j.acceptations_des_conditions).toHaveLength(1);
+    // Étape 5 : les données du propriétaire et les données commerciales sont dans deux blocs séparés.
+    const o = j.donnees_du_proprietaire;
+    expect(o.compte).toMatchObject({ id: "u-a", email: "a@exemple.fr" });
+    expect(o.profil).toMatchObject({ plan: "solo", favorites: ["i1"] });
+    expect(o.projets).toHaveLength(1);
+    expect(o.sites_publies[0]).toMatchObject({ slug: "mon-site" });
+    expect(o.sites_publies[0]).not.toHaveProperty("user_id");
+    expect(o.acceptations_des_conditions).toHaveLength(1);
+    expect(j.donnees_commerciales_acheteurs_et_inscrits).toHaveProperty("commandes");
   });
 });
 
@@ -272,5 +277,40 @@ describe("POST /api/sites : écritures par le serveur", () => {
     const r = await publish(post("/api/sites", { projectId: "proja1", slug: "ancien", data: siteData(newProject("crm")) }));
     expect(r.status).toBe(403);
     expect(h.log.filter(([, op]) => op === "insert" || op === "update")).toHaveLength(0);
+  });
+});
+
+describe("GET /api/account/export : page et gros volumes", () => {
+  it("renvoie le bloc propriétaire et le bloc commercial séparés, avec un nom de fichier clair", async () => {
+    h.user = { id: "u-a", email: "a@exemple.fr" };
+    h.rows = {
+      boutiques: [{ id: "b1", proprietaire_id: "u-a", slug: "ma-boutique", nom: "Ma boutique" }],
+      commandes: [{ id: "o1", boutique_id: "b1", ref: "CMD-1", client_nom: "Awa", jeton_hash: "HASH-SECRET" }],
+    };
+    const r = await exportAccount(new Request("https://decollage.test/api/account/export") as never);
+    expect(r.headers.get("content-disposition")).toMatch(/filename="decollage-mes-donnees-\d{4}-\d{2}-\d{2}\.json"/);
+    const j = await r.json();
+    expect(j.donnees_du_proprietaire.boutiques[0]).toMatchObject({ slug: "ma-boutique" });
+    expect(j.donnees_commerciales_acheteurs_et_inscrits.commandes[0]).toMatchObject({ ref: "CMD-1" });
+    expect(JSON.stringify(j)).not.toContain("HASH-SECRET");
+  });
+
+  it("numéro de page invalide : 400 ; page valide : nom de fichier avec le numéro de page", async () => {
+    h.user = { id: "u-a", email: "a@exemple.fr" };
+    h.rows = {};
+    for (const bad of ["0", "-1", "abc", "51", "1.5"]) {
+      expect((await exportAccount(new Request(`https://decollage.test/api/account/export?page=${bad}`) as never)).status).toBe(400);
+    }
+    const ok = await exportAccount(new Request("https://decollage.test/api/account/export?page=2") as never);
+    expect(ok.status).toBe(200);
+    expect(ok.headers.get("content-disposition")).toMatch(/-page-2\.json"/);
+    expect(ok.headers.get("cache-control")).toBe("no-store");
+  });
+
+  it("sans connexion : 401 avec no-store, même avec un numéro de page", async () => {
+    h.user = null;
+    const r = await exportAccount(new Request("https://decollage.test/api/account/export?page=2") as never);
+    expect(r.status).toBe(401);
+    expect(r.headers.get("cache-control")).toBe("no-store");
   });
 });

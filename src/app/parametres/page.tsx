@@ -265,7 +265,7 @@ function Parametres() {
             <input ref={file} type="file" accept="application/json,.json" className="sr-only" onChange={onImport} aria-label="Fichier à importer" />
           </div>
           {error && <div className="alert alert-bad" role="alert">{error}</div>}
-          {session && <p className="hint">« Télécharger mes données » : copie complète de ton compte en ligne (profil, projets, sites publiés, acceptations des conditions), sans tes identifiants de paiement.</p>}
+          {session && <p className="hint">« Télécharger mes données » : copie de ton compte en ligne : tes données (profil, projets, sites, boutiques, marque blanche, acceptations des conditions) et, à part, celles de tes acheteurs et inscrits (commandes, listes d&apos;attente). Sans tes identifiants de paiement ni aucun jeton. Les très gros comptes se téléchargent par pages (« ?page=2 » à la fin de l&apos;adresse).</p>}
           <p className="hint">Format : JSON « decollage-projet » ou « decollage-donnees », version 2 (voir docs/FORMAT.md). Chaque projet est vérifié avant import.</p>
         </section>
 

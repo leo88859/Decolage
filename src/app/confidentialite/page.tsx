@@ -49,7 +49,7 @@ export default function Confidentialite() {
 
       <h2>Les inscrits aux listes d&apos;attente de sites publiés</h2>
       <p>
-        Si tu es utilisateur·rice et que tu publies un site avec une liste d&apos;attente, tu es responsable du traitement des adresses e-mail que tes visiteurs y laissent ; {LEGAL.marque} les héberge et les met à ta disposition pour ton compte (sous-traitant). Elles ne sont visibles que de toi. Aucun message n&apos;est envoyé par {LEGAL.marque} à tes inscrits. Pense à informer tes visiteurs et à pouvoir les désinscrire.
+        Si tu es utilisateur·rice et que tu publies un site avec une liste d&apos;attente, tu es responsable du traitement des adresses e-mail que tes visiteurs y laissent ; {LEGAL.marque} les héberge et les met à ta disposition pour ton compte (sous-traitant). Elles ne sont visibles que de toi. Pour s’inscrire, le visiteur doit cocher une case qui lui explique que son adresse est transmise à l’éditeur du site, pour le prévenir du lancement et pour rien d’autre ; la date de ce consentement est enregistrée. Les personnes inscrites avant cette règle sont marquées « à vérifier » : aucun consentement n’a été enregistré pour elles, et tu ne dois pas les considérer comme consentantes. Il n’y a pas de second e-mail de confirmation (aucun service d’envoi n’est connecté). Aucun message n&apos;est envoyé par {LEGAL.marque} à tes inscrits. Pense à informer tes visiteurs et à pouvoir les désinscrire.
       </p>
       <p>
         Si tu es visiteur·se d&apos;un site publié et que tu as laissé ton e-mail, adresse-toi d&apos;abord au propriétaire du site. Pour l&apos;instant, le formulaire n&apos;offre pas de désinscription automatique : tu peux nous écrire via la page <Link href="/contact">Contact</Link> en indiquant le site et ton adresse.
@@ -79,7 +79,7 @@ export default function Confidentialite() {
       <h2>Tes droits et comment les exercer</h2>
       <p>Tu peux demander l&apos;accès à tes données, leur rectification, leur effacement, la limitation du traitement, t&apos;y opposer, et récupérer tes données dans un format réutilisable (portabilité). Quand un traitement repose sur ton consentement, tu peux le retirer à tout moment.</p>
       <ul>
-        <li><b>Toi-même, dans le service</b> : Paramètres, « Exporter toutes mes données » (fichier JSON), supprimer un projet, dépublier un site, « Supprimer mon compte ».</li>
+        <li><b>Toi-même, dans le service</b> : Paramètres, « Exporter toutes mes données » (fichier JSON de tes projets) et « Télécharger mes données » (copie de ton compte en ligne : ton compte, tes projets, sites, boutiques, ta marque blanche et les conditions acceptées, puis, dans une partie séparée, les commandes de tes acheteurs et les inscrits à tes listes d’attente ; les très gros comptes se téléchargent par pages), supprimer un projet, dépublier un site, « Supprimer mon compte ».</li>
         <li><b>Par écrit</b> : via la page <Link href="/contact">Contact</Link>{LEGAL.email ? <> ou à <Mail /></> : null}. Si on a un doute sur ton identité, on peut te demander une preuve. La loi prévoit un délai de réponse d&apos;un mois, prolongeable dans certains cas.</li>
       </ul>
       <p>Si tu estimes que tes droits ne sont pas respectés, tu peux adresser une réclamation à la CNIL : <a href="https://www.cnil.fr/fr/plaintes">www.cnil.fr/fr/plaintes</a>.</p>

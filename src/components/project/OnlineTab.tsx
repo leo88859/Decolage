@@ -13,7 +13,7 @@ import { updateProject, useData } from "@/lib/store";
 import type { Project } from "@/lib/types";
 
 type Site = { slug: string; published_at: string; updated_at: string; suspended_at?: string | null } | null;
-type Entry = { id: number; email: string; created_at: string };
+type Entry = { id: number; email: string; created_at: string; consentement_statut?: string | null; consentement_le?: string | null };
 
 const fetchSite = (projectId: string): Promise<Site> =>
   fetch(`/api/sites?projectId=${projectId}`).then((x) => x.json()).then((r) => r.site ?? null, () => null);
@@ -21,10 +21,15 @@ const fetchSite = (projectId: string): Promise<Site> =>
 async function fetchWaitlist(slug: string): Promise<Entry[] | null> {
   const sb = getBrowserClient();
   if (!sb) return [];
-  const { data, error } = await sb.from("waitlist").select("id, email, created_at").eq("slug", slug).order("created_at", { ascending: false }).limit(1000);
-  return error ? null : (data as Entry[]);
+  const read = (cols: string) => sb.from("waitlist").select(cols).eq("slug", slug).order("created_at", { ascending: false }).limit(1000);
+  const full = await read("id, email, created_at, consentement_statut, consentement_le");
+  if (!full.error) return full.data as unknown as Entry[];
+  // Migration 0011 pas encore exécutée : les colonnes de consentement n'existent pas, on lit les colonnes d'origine.
+  const base = await read("id, email, created_at");
+  return base.error ? null : (base.data as unknown as Entry[]);
 }
 
+const consentLabel = (r: Entry) => (r.consentement_statut === undefined ? "Non renseigné" : r.consentement_statut === "recueilli" && r.consentement_le ? `Recueilli le ${fmt(r.consentement_le)}` : "À vérifier");
 const fmt = (iso: string) => new Date(iso).toLocaleString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
 
 export function OnlineTab({ project: p }: { project: Project }) {
@@ -218,12 +223,12 @@ function Waitlist({ slug, name }: { slug: string; name: string }) {
           ) : (
             <div className="scroll-x">
               <table className="table">
-                <thead><tr><th>Email</th><th>Inscrit le</th><th /></tr></thead>
-                <tbody>{rows.slice(0, 200).map((r) => <tr key={r.id}><td>{r.email}</td><td className="mut">{fmt(r.created_at)}</td><td style={{ textAlign: "right" }}><button className="btn btn-danger btn-sm" onClick={() => void remove(r.id)} aria-label={`Supprimer ${r.email}`}>✕</button></td></tr>)}</tbody>
+                <thead><tr><th>Email</th><th>Inscrit le</th><th>Consentement</th><th /></tr></thead>
+                <tbody>{rows.slice(0, 200).map((r) => <tr key={r.id}><td>{r.email}</td><td className="mut">{fmt(r.created_at)}</td><td className="mut">{consentLabel(r)}</td><td style={{ textAlign: "right" }}><button className="btn btn-danger btn-sm" onClick={() => void remove(r.id)} aria-label={`Supprimer ${r.email}`}>✕</button></td></tr>)}</tbody>
               </table>
             </div>
           )}
-          <p className="tiny mut" style={{ marginTop: 12 }}>Ces adresses sont des données personnelles : utilise-les seulement pour prévenir du lancement, et supprime celles qui le demandent.</p>
+          <p className="tiny mut" style={{ marginTop: 12 }}>Ces adresses sont des données personnelles : utilise-les seulement pour prévenir du lancement, et supprime celles qui le demandent. Chaque nouvelle inscription exige une case de consentement cochée par la personne (date enregistrée). « À vérifier » = inscrit avant cette règle : aucun consentement n&apos;a été enregistré, ne le considère pas comme acquis et ne lui écris pas sans l&apos;avoir obtenu. Décollage n&apos;envoie aucun e-mail à tes inscrits.</p>
         </>
       )}
     </section>

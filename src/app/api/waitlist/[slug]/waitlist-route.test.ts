@@ -39,11 +39,15 @@ vi.mock("@/lib/supabase/server", () => {
   };
 });
 import { resetRateLimit } from "@/lib/boutique/api";
+import { WAITLIST_CONSENT_VERSION } from "@/lib/waitlist-consent";
 import { POST } from "./route";
 
 let n = 0;
 const post = (email: string, extra: Record<string, string> = {}, ip = `10.0.0.${++n}`) => {
-  const body = new URLSearchParams({ email, ...extra });
+  // Par défaut la case de consentement est cochée ; "__absent__" supprime le champ du formulaire.
+  const fields: Record<string, string> = { email, consentement: "oui", ...extra };
+  for (const k of Object.keys(fields)) if (fields[k] === "__absent__") delete fields[k];
+  const body = new URLSearchParams(fields);
   return POST(
     new Request("https://app.test/api/waitlist/mon-saas", { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded", "x-forwarded-for": ip }, body }) as never,
     { params: Promise.resolve({ slug: "mon-saas" }) } as never,
@@ -62,11 +66,11 @@ beforeEach(() => {
 });
 
 describe("POST /api/waitlist/[slug]", () => {
-  it("inscrit par la fonction SQL waitlist_inscrire (clé serveur), jamais par insertion directe ni clé anonyme", async () => {
+  it("inscrit par la fonction SQL waitlist_inscrire_consent (clé serveur), jamais par insertion directe ni clé anonyme", async () => {
     const r = await post(" Marie@Exemple.fr ");
     expect(r.status).toBe(303);
     expect(where(r)).toContain("/s/mon-saas?merci=1");
-    expect(h.rpc).toHaveBeenCalledWith("waitlist_inscrire", { p_slug: "mon-saas", p_email: "marie@exemple.fr" });
+    expect(h.rpc).toHaveBeenCalledWith("waitlist_inscrire_consent", { p_slug: "mon-saas", p_email: "marie@exemple.fr", p_consentement: true, p_texte_version: WAITLIST_CONSENT_VERSION });
     expect(h.inserts).toHaveLength(0);
   });
 
@@ -86,7 +90,7 @@ describe("POST /api/waitlist/[slug]", () => {
   it("limite de débit partagée en base : au-delà, erreur sans inscription ; la limite mémoire (8 par minute) reste active", async () => {
     h.rpc.mockImplementation(reply("ok", true));
     expect(where(await post("a@exemple.fr"))).toContain("erreur=1");
-    expect(h.rpc.mock.calls.some(([name]) => name === "waitlist_inscrire")).toBe(false);
+    expect(h.rpc.mock.calls.some(([name]) => name === "waitlist_inscrire_consent")).toBe(false);
     h.rpc.mockImplementation(reply("ok"));
     const ip = "11.1.1.1";
     const res: string[] = [];
@@ -100,17 +104,34 @@ describe("POST /api/waitlist/[slug]", () => {
     expect(h.rpc).not.toHaveBeenCalled();
   });
 
-  it("migration 0007 pas exécutée : repli par insertion serveur, doublon confirmé, site suspendu refusé", async () => {
+  it("migration 0011 pas exécutée (fonction absente) : AUCUNE inscription enregistrée, aucune insertion de repli", async () => {
     h.rpc.mockImplementation(async (name: string) => ({ data: null, error: { code: "PGRST202", message: `Could not find the function public.${name}` } }));
-    expect(where(await post("a@exemple.fr"))).toContain("merci=1");
-    expect(h.inserts).toEqual([["waitlist", { slug: "mon-saas", email: "a@exemple.fr" }]]);
-    h.insertError = { code: "23505" };
-    expect(where(await post("a@exemple.fr"))).toContain("merci=1"); // doublon : même réponse
-    h.insertError = null;
-    h.siteFound = false;
-    h.inserts = [];
-    expect(where(await post("b@exemple.fr"))).toContain("erreur=1");
+    expect(where(await post("a@exemple.fr"))).toContain("erreur=1");
     expect(h.inserts).toHaveLength(0);
+  });
+
+  it("consentement ABSENT : refus 400 côté serveur, aucun appel à la base, aucune écriture", async () => {
+    for (const extra of [{ consentement: "__absent__" }, { consentement: "" }, { consentement: "non" }, { consentement: "false" }]) {
+      const r = await post("a@exemple.fr", extra);
+      expect(r.status).toBe(400);
+      expect(r.headers.get("location")).toBeNull();
+      expect(await r.text()).toContain("Consentement nécessaire");
+    }
+    expect(h.rpc).not.toHaveBeenCalled();
+    expect(h.inserts).toHaveLength(0);
+  });
+
+  it("consentement valide : inscription acceptée, version du texte transmise pour l'horodatage en base", async () => {
+    const r = await post("a@exemple.fr", { consentement: "oui" });
+    expect(r.status).toBe(303);
+    expect(where(r)).toContain("merci=1");
+    const call = h.rpc.mock.calls.find(([name]) => name === "waitlist_inscrire_consent");
+    expect(call?.[1]).toMatchObject({ p_consentement: true, p_texte_version: WAITLIST_CONSENT_VERSION });
+  });
+
+  it("la base répond « consentement_requis » (deuxième verrou) : refus 400", async () => {
+    h.rpc.mockImplementation(reply("consentement_requis"));
+    expect((await post("a@exemple.fr")).status).toBe(400);
   });
 
   it("sans clé serveur : erreur, aucune écriture", async () => {
