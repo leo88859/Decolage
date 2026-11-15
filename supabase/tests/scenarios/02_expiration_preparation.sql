@@ -4,6 +4,9 @@
 -- ATTENTION : base de TEST uniquement. Les données sont supprimées par concurrence/verifier.sql.
 delete from public.boutiques where slug like 'test-conc-%';
 
+-- Le propriétaire de test doit pouvoir publier (sinon 0006 refuse la commande comme « boutique introuvable »).
+update public.profiles set plan = 'illimite' where id = (select id from auth.users limit 1);
+
 insert into public.boutiques (proprietaire_id, slug, nom, statut, modes, delai_expiration_h, quantite_max_article)
 select id, 'test-conc-1', 'Test concurrence', 'publiee', '{retrait}', 48, 10
 from auth.users limit 1;

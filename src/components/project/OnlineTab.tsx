@@ -214,6 +214,11 @@ function Waitlist({ slug, name }: { slug: string; name: string }) {
       {error && <div className="alert alert-bad" style={{ marginTop: 12 }}>{error}</div>}
       {rows === null ? <div className="skeleton" style={{ height: 120, marginTop: 14 }} /> : (
         <>
+          {(rows.filter((r) => r.consentement_statut !== "recueilli").length > 0) && (
+            <div className="alert alert-warn" data-testid="rappel-a-verifier" style={{ marginTop: 12 }}>
+              <strong>{rows.filter((r) => r.consentement_statut !== "recueilli").length} inscrit(s) « à vérifier »</strong> : leur consentement n&apos;a pas été enregistré (inscrits avant la case de consentement). Ne les contacte pas dans une campagne sans avoir obtenu leur accord. Supprime ceux qui le demandent, et ceux dont tu ne peux pas prouver l&apos;accord.
+            </div>
+          )}
           <div className="row" style={{ gap: 28, margin: "16px 0" }}>
             <div><span className="tiny mut">Inscrits</span><div style={{ font: "600 40px var(--display)" }}>{rows.length}</div></div>
             <div><span className="tiny mut">7 derniers jours</span><div style={{ font: "600 40px var(--display)", color: "var(--ok)" }}>+{week}</div></div>

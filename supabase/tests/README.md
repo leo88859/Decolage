@@ -56,9 +56,27 @@ TEST_PG_URL=postgres://postgres:test@localhost:54329/postgres node supabase/test
 | `concurrence/expirer.sql` | lancé par DEUX sessions simultanées |
 | `concurrence/verifier.sql` | une seule annulation, une seule remise en stock (stock attendu 11), commandes protégées et confirmée intactes ; nettoyage |
 
+## Exécution réalisée (environnement local isolé)
+
+- PostgreSQL 18.6 local (binaires du paquet npm `embedded-postgres`, installés HORS du dépôt), serveur sur `127.0.0.1` uniquement,
+  base `decollage_test` jetable. Aucune base Supabase, aucune production.
+- Mise en place : `setup-local-pg.mjs up` (variables `PG_BIN`, `PG_DATA`, `PG_PORT`, `TEST_PG_MODULE`). Migrations 0001 à 0011 appliquées sans erreur.
+- Pilote : `psql` absent sur la machine ; la suite utilise donc le paquet `pg` désigné par `TEST_PG_MODULE`, une connexion par session.
+- Résultats : permissions OK ; RLS liste d'attente OK ; consentement OK ; expiration simultanée (2 sessions) OK sur 10 tours ;
+  limites concurrentes (contact 3 sessions, stock 2 sessions) OK sur 3 tours ; pg_cron IGNORÉ (extension non installée, volontairement).
+
+### Contrôles négatifs (la suite doit échouer si la règle est cassée)
+
+Exécutés sur des COPIES jetables de la base de test, supprimées ensuite :
+- remise en stock DOUBLÉE à l'annulation : `ECHEC : stock total 12 au lieu de 11` ;
+- garde `expiration_eligible` retirée : `ECHEC : une commande ANCIENNE protégée a été annulée`.
+
 ## Limites connues
 
-- Les scénarios de concurrence ne testent que deux sessions : un test plus dur (N sessions, répétition) reste à écrire.
-- Le scénario de consentement ne couvre pas l'inscription réussie (il faudrait un site publié de test).
-- Turnstile, Stripe, Vercel ne sont pas testés ici.
-- Rien de cette suite n'a été exécuté dans l'environnement de développement : aucun PostgreSQL réel n'était disponible.
+- **Un seul moteur PostgreSQL testé (18.6)**, alors que Supabase tourne sur une autre version : des écarts sont possibles.
+- **pg_cron n'est pas testé** : son extension n'est pas disponible dans ce paquet. Le scénario 04 le signale comme ignoré, il ne le valide pas.
+- La concurrence est testée par deux ou trois sessions, en répétition : ce n'est pas une preuve exhaustive de tous les entrelacements.
+- Le scénario de consentement ne couvre pas l'inscription réussie complète (la RLS de suppression, elle, est testée).
+- Turnstile (réseau Cloudflare), Stripe et Vercel ne sont pas testés ici.
+- Le paquet `pg` est pris hors du dépôt (`TEST_PG_MODULE`) : aucune dépendance n'est ajoutée au projet.
+- L'authentification « trust » du serveur local est acceptable uniquement sur un poste de test, lié à `127.0.0.1`.
