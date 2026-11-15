@@ -205,3 +205,38 @@ export function brandItemsToDrop(status: string | null | undefined, a: Subscript
   if (a.plan !== "pro" && a.plan !== "illimite") return [];
   return items.filter((i) => i.price?.id === brandPriceId).map((i) => i.id);
 }
+
+/** UUID (toute version) : seul format accepté pour un user_id lu dans les métadonnées Stripe avant de s'en servir dans une requête. */
+export const isUuid = (v: unknown): v is string => typeof v === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+
+export type ProfileLinkInput = {
+  /** Identifiant du client Stripe de l'abonnement. */
+  customerId: string;
+  /** `sub.metadata.user_id` tel que reçu (peut être absent ou invalide). */
+  subUserId: unknown;
+  /** `customer.metadata.user_id` relu DIRECTEMENT chez Stripe ; null = client non relu ou supprimé. */
+  customerUserId: unknown;
+  /** Profil retrouvé par `subUserId` (null = aucun compte). */
+  profile: { id: string; stripe_customer_id: string | null } | null;
+};
+export type ProfileLinkDecision =
+  | { action: "lier_deja"; userId: string }
+  | { action: "reparer"; userId: string }
+  | { action: "alerter_autre_lien"; userId: string }
+  | { action: "ignorer"; reason: "metadonnees_absentes" | "metadonnees_invalides" | "client_incoherent" | "compte_absent" };
+
+/**
+ * Secours quand aucun compte n'est lié au client Stripe : décision PURE (aucune écriture ici). Un abonnement n'est jamais attribué
+ * sans que les métadonnées de l'abonnement ET du client (relu chez Stripe) désignent exactement le même compte ; un lien existant
+ * vers un autre client n'est jamais écrasé (alerte pour réconciliation manuelle).
+ */
+export function resolveProfileLink(i: ProfileLinkInput): ProfileLinkDecision {
+  if (i.subUserId === undefined || i.subUserId === null || i.subUserId === "") return { action: "ignorer", reason: "metadonnees_absentes" };
+  if (!isUuid(i.subUserId)) return { action: "ignorer", reason: "metadonnees_invalides" };
+  if (typeof i.customerUserId !== "string" || i.customerUserId !== i.subUserId) return { action: "ignorer", reason: "client_incoherent" };
+  if (!i.profile || i.profile.id !== i.subUserId) return { action: "ignorer", reason: "compte_absent" };
+  const linked = i.profile.stripe_customer_id;
+  if (!linked) return { action: "reparer", userId: i.profile.id };
+  if (linked === i.customerId) return { action: "lier_deja", userId: i.profile.id };
+  return { action: "alerter_autre_lien", userId: i.profile.id };
+}

@@ -5,7 +5,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 // Bout en bout « webhook -> profiles.plan / brand_entitlements -> limites et droit », dans un vrai PostgreSQL en mémoire (PGlite) avec
 // les migrations 0001 à 0008. Le vrai code de la route webhook s'exécute ; SEUL Stripe est simulé, et le client Supabase est
 // remplacé par un petit adaptateur qui exécute les requêtes dans PGlite (jamais de base distante, jamais de réseau).
-const db = vi.hoisted(() => ({ pg: null as unknown as import("@electric-sql/pglite").PGlite, stripe: { retrieve: vi.fn(), constructEvent: vi.fn(), itemDel: vi.fn() } }));
+const db = vi.hoisted(() => ({ pg: null as unknown as import("@electric-sql/pglite").PGlite, stripe: { retrieve: vi.fn(), constructEvent: vi.fn(), itemDel: vi.fn(), customerRetrieve: vi.fn() } }));
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/lib/env", () => ({
@@ -16,7 +16,7 @@ vi.mock("@/lib/env", () => ({
   stripeLegacyPrices: () => ({}),
   stripeWebhookSecret: () => "whsec_test",
 }));
-vi.mock("@/lib/stripe", () => ({ getStripe: () => ({ subscriptions: { retrieve: db.stripe.retrieve }, subscriptionItems: { del: db.stripe.itemDel }, webhooks: { constructEvent: db.stripe.constructEvent } }) }));
+vi.mock("@/lib/stripe", () => ({ getStripe: () => ({ customers: { retrieve: db.stripe.customerRetrieve }, subscriptions: { retrieve: db.stripe.retrieve }, subscriptionItems: { del: db.stripe.itemDel }, webhooks: { constructEvent: db.stripe.constructEvent } }) }));
 
 const TABLES = new Set(["profiles", "sites", "boutiques", "brand_entitlements"]);
 function adapter(table: string) {
@@ -31,6 +31,7 @@ function adapter(table: string) {
   q.insert = (v: Record<string, unknown>) => { op = "insert"; vals = v; return q; };
   q.update = (v: Record<string, unknown>) => { op = "update"; vals = v; return q; };
   q.eq = (c: string, v: unknown) => { params.push(v); where.push(`${c} = $${params.length}`); return q; };
+  q.is = (c: string, v: null) => { if (v !== null) throw new Error("is(null) seulement"); where.push(`${c} is null`); return q; };
   q.in = (c: string, v: unknown[]) => { params.push(v); where.push(`${c} = any($${params.length})`); return q; };
   const run = async () => {
     try {
@@ -182,5 +183,45 @@ describe("webhook -> brand_entitlements -> droit marque blanche lu par la base (
   it("rejeu : mêmes écritures, une seule ligne de droit", async () => {
     for (let i = 0; i < 3; i++) expect((await event("active", ["price_solo", "price_brand"])).status).toBe(200);
     expect((await db.pg.query("select 1 from public.brand_entitlements where user_id = $1", [U])).rows).toHaveLength(1);
+  });
+});
+
+describe("webhook -> récupération du lien client Stripe (base réelle en mémoire)", () => {
+  const linkInDb = async () => (await db.pg.query<{ c: string | null }>("select stripe_customer_id as c from public.profiles where id = $1", [U])).rows[0]!.c;
+  const hook = (subMeta: Record<string, string>, customerMeta: Record<string, string>) => {
+    db.stripe.customerRetrieve.mockResolvedValue({ id: "cus_1", metadata: customerMeta });
+    db.stripe.retrieve.mockResolvedValue({ id: "sub_1", customer: "cus_1", status: "active", metadata: subMeta, items: { data: [{ id: "si_1", price: { id: "price_pro" } }] } });
+    db.stripe.constructEvent.mockReturnValue({ id: "evt", type: "customer.subscription.updated", data: { object: { id: "sub_1" } } });
+    return webhook(new Request("https://app.test/api/stripe/webhook", { method: "POST", headers: { "stripe-signature": "x" }, body: "{}" }));
+  };
+  beforeEach(async () => { db.stripe.customerRetrieve.mockReset(); await db.pg.query("update public.profiles set stripe_customer_id = null where id = $1", [U]); });
+
+  it("lien absent + métadonnées concordantes : lien réparé et formule accordée (base réelle)", async () => {
+    expect((await hook({ user_id: U }, { user_id: U })).status).toBe(200);
+    expect(await linkInDb()).toBe("cus_1");
+    expect(await planInDb()).toBe("pro");
+  });
+  it("rejeu : même état, lien inchangé", async () => {
+    await hook({ user_id: U }, { user_id: U });
+    expect((await hook({ user_id: U }, { user_id: U })).status).toBe(200);
+    expect(await linkInDb()).toBe("cus_1");
+    expect(await planInDb()).toBe("pro");
+  });
+  it("client et abonnement en désaccord : rien n'est écrit", async () => {
+    await hook({ user_id: U }, { user_id: "00000000-0000-4000-8000-00000000000b" });
+    expect(await linkInDb()).toBeNull();
+    expect(await planInDb()).toBe("gratuit");
+  });
+  it("compte lié à un autre client Stripe : lien et formule intacts", async () => {
+    await db.pg.query("update public.profiles set stripe_customer_id = 'cus_AUTRE' where id = $1", [U]);
+    expect((await hook({ user_id: U }, { user_id: U })).status).toBe(200);
+    expect(await linkInDb()).toBe("cus_AUTRE");
+    expect(await planInDb()).toBe("gratuit");
+  });
+  it("métadonnées absentes ou non UUID : ignoré, rien d'écrit", async () => {
+    expect((await hook({}, {})).status).toBe(200);
+    expect((await hook({ user_id: "pas-un-uuid" }, { user_id: "pas-un-uuid" })).status).toBe(200);
+    expect(await linkInDb()).toBeNull();
+    expect(await planInDb()).toBe("gratuit");
   });
 });

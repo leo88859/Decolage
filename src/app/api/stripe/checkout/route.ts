@@ -85,7 +85,19 @@ async function openCheckout(userId: string, email: string | undefined, customerI
     const customer = await stripe.customers.create({ email, metadata: { user_id: userId } }, { idempotencyKey: `decollage-customer-${userId}` });
     customerId = customer.id;
     // Le lien client Stripe → utilisateur est enregistré par le serveur : le webhook s'y fie.
-    await admin.from("profiles").upsert({ id: userId, stripe_customer_id: customerId, updated_at: new Date().toISOString() }, { onConflict: "id" });
+    // Sans ce lien, un paiement réussi ne pourrait pas être rattaché au compte : échec = on s'arrête AVANT toute session de paiement.
+    // Une nouvelle tentative réutilise le même client Stripe (clé d'idempotence ci-dessus) : aucun doublon.
+    let linkFailed = false;
+    try {
+      const { error } = await admin.from("profiles").upsert({ id: userId, stripe_customer_id: customerId, updated_at: new Date().toISOString() }, { onConflict: "id" });
+      linkFailed = Boolean(error);
+    } catch {
+      linkFailed = true;
+    }
+    if (linkFailed) {
+      console.error("[stripe/checkout] enregistrement du lien client impossible : paiement non ouvert");
+      return Response.json({ error: "Nous n'avons pas pu préparer ton compte de paiement, donc le paiement n'a pas été ouvert. Rien n'a été débité : réessaie dans un instant." }, { status: 503 });
+    }
   }
 
   // Clé d'idempotence : deux clics (ou deux onglets) sur la même formule dans les mêmes 10 minutes obtiennent LA MÊME session

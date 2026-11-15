@@ -51,6 +51,9 @@ function Parametres() {
   const [optionError, setOptionError] = useState("");
   const file = useRef<HTMLInputElement>(null);
   const paiement = params.get("paiement");
+  // Vrai dès que le serveur confirme une formule payante : arrête la relecture après paiement.
+  const planActive = useRef(false);
+  useEffect(() => { planActive.current = serverPlan !== null && serverPlan !== "gratuit"; }, [serverPlan]);
   // Retour vers l'idée en cours après le choix d'une offre (chemin interne uniquement).
   const retourRaw = params.get("retour") ?? "";
   const retour = /^\/creer(\?|$)/.test(retourRaw) ? retourRaw : "";
@@ -58,9 +61,16 @@ function Parametres() {
   // Retour de Stripe : le webhook peut mettre quelques secondes, on relit la formule plusieurs fois.
   useEffect(() => {
     if (paiement !== "ok" || !session) return;
+    // Environ 60 s au total, espacement croissant (2, 3, 4, 6, 8, 10, 12, 15 s) pour limiter les requêtes ; arrêt dès que la formule est active.
+    const delays = [2000, 3000, 4000, 6000, 8000, 10000, 12000, 15000];
     let n = 0;
-    const id = setInterval(() => { n++; void refreshPlan(); if (n >= 6) clearInterval(id); }, 2000);
-    return () => clearInterval(id);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const next = () => {
+      if (n >= delays.length || planActive.current) return;
+      timer = setTimeout(() => { void refreshPlan(); next(); }, delays[n++]);
+    };
+    next();
+    return () => clearTimeout(timer);
   }, [paiement, session]);
 
   const loadBrand = () => { fetch("/api/stripe/option", { cache: "no-store" }).then((r) => r.json()).then(setBrand).catch(() => setBrand(null)); };
@@ -146,7 +156,9 @@ function Parametres() {
           </nav>
         </div>
         {hasStorageError() && <div className="alert alert-bad">Le navigateur refuse d&apos;enregistrer les données (stockage plein ou bloqué). Exporte tes projets pour ne pas les perdre.</div>}
-        {paiement === "ok" && <div className="alert alert-ok">Merci ! Ton paiement est confirmé. Ta formule s&apos;active dans quelques secondes{plan !== "gratuit" ? ` : ${PLANS[plan].nom} est active ✓` : "…"}</div>}
+        {paiement === "ok" && (plan !== "gratuit"
+          ? <div className="alert alert-ok">Merci ! Ta formule {PLANS[plan].nom} est active ✓</div>
+          : <div className="alert alert-warn">Paiement reçu, activation en attente. Si rien dans 5 min, contacte-nous.</div>)}
         {retour && plan !== "gratuit" && (
           <div className="alert alert-ok row between">
             <span>Ta formule {PLANS[plan].nom} est active : tu peux générer ton SaaS.</span>
