@@ -1,7 +1,9 @@
 import "server-only";
+import { getEffectiveBrand } from "@/lib/brand/effective";
+import { siteBrandFrom, type SiteBrand } from "@/lib/brand/site-brand";
 import { isCloudConfigured } from "@/lib/env";
 import { validateSiteData, type SiteData } from "@/lib/publish";
-import { createPublicClient } from "@/lib/supabase/server";
+import { createAdminClient, createPublicClient } from "@/lib/supabase/server";
 
 /** Données validées d'un site publié, ou null. */
 export async function loadSite(slug: string): Promise<SiteData | null> {
@@ -15,6 +17,23 @@ export async function loadSite(slug: string): Promise<SiteData | null> {
   if (!data || (data as { suspended_at?: string | null }).suspended_at) return null;
   const v = validateSiteData(data.data);
   return v.ok ? v.data : null;
+}
+
+/**
+ * Identité de marque blanche du propriétaire d'un site publié, ou null.
+ * Droit calculé côté serveur (effective.ts) ; FAIL-CLOSED : pas de clé, lecture en échec, droit refusé -> null (rendu habituel).
+ */
+export async function loadSiteBrand(slug: string): Promise<SiteBrand | null> {
+  try {
+    if (!isCloudConfigured() || !/^[a-z0-9-]{3,40}$/.test(slug)) return null;
+    const admin = createAdminClient();
+    const r = await admin.from("sites").select("user_id").eq("slug", slug).maybeSingle();
+    const owner = (r.data as { user_id?: unknown } | null)?.user_id;
+    if (r.error || typeof owner !== "string" || !owner) return null;
+    return siteBrandFrom(await getEffectiveBrand(admin, owner));
+  } catch {
+    return null;
+  }
 }
 
 /** En-têtes des pages publiées : uniquement nos scripts en ligne, aucune ressource externe sauf images et polices. */

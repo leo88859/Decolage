@@ -3,6 +3,7 @@ import { DESIGN_BY_ID, type Anim } from "@/data/designs";
 import { POLICES, policeOf } from "@/lib/config";
 import { LANDING_DESIGN_CSS } from "@/lib/design-css";
 import { TEMPLATE_BY_ID } from "@/data/templates";
+import { applyBrandToConfig, renameInTexts, type SiteBrand } from "@/lib/brand/site-brand";
 import { WAITLIST_CONSENT_FIELD, waitlistConsentText } from "@/lib/waitlist-consent";
 import type { Config, Contenu, Landing, LandingLayout, LandingSection, LandingSectionType, Pricing, VisualStyle } from "@/lib/types";
 
@@ -267,10 +268,16 @@ addEventListener("load",function(){setTimeout(function(){requestAnimationFrame(f
 /** Liste d'attente : `action` = URL d'envoi du formulaire (null = aperçu, rien n'est envoyé). */
 export type WaitlistOpts = { action: string | null; merci?: boolean; erreur?: boolean; appHref?: string };
 
-export function renderLanding(cfg: Config, landing: Landing, pricing: Pricing | null, opts: { inlineCss: boolean; waitlist?: WaitlistOpts; contenu?: Contenu; demoScroll?: boolean }): string {
+export function renderLanding(cfg0: Config, landing0: Landing, pricing: Pricing | null, opts0: { inlineCss: boolean; waitlist?: WaitlistOpts; contenu?: Contenu; demoScroll?: boolean; marque?: SiteBrand | null }): string {
+  // Marque blanche : décidée côté serveur (null = pas de droit, rien n'est imposé, rendu identique à avant).
+  const marque = opts0.marque ?? null;
+  const cfg = applyBrandToConfig(cfg0, marque);
+  // Les textes générés contiennent le nom du projet : on y met le nom commercial.
+  const landing = renameInTexts(landing0, cfg0.nom, cfg.nom);
+  const opts = marque && opts0.contenu ? { ...opts0, contenu: renameInTexts(opts0.contenu, cfg0.nom, cfg.nom) } : opts0;
   const wl = opts.waitlist;
   const form = (id: string) =>
-    `<form class="wl" id="${id}" method="post" ${wl!.action ? `action="${esc(wl!.action)}"` : `onsubmit="event.preventDefault();this.querySelector('.wl-note').textContent='Aperçu : rien n’est envoyé tant que le site n’est pas publié.'"`}><input type="email" name="email" required maxlength="254" placeholder="ton@email.fr" aria-label="Ton adresse email"><input type="text" name="site" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true"><label class="wl-consent"><input type="checkbox" name="${WAITLIST_CONSENT_FIELD}" value="oui" required><span>${esc(waitlistConsentText(cfg.nom))}</span></label><button class="btn primary">${esc(landing.boutonPrincipal)}</button><p class="wl-note muted">Inscris-toi pour être prévenu·e du lancement.</p><p class="wl-rgpd muted">Ton adresse e-mail sert uniquement à te prévenir du lancement de ${esc(cfg.nom)} : elle est collectée pour le compte de l’éditeur de ce site. Pour exercer tes droits (accès, suppression…), utilise le contact indiqué dans la <a href="/confidentialite" target="_blank" rel="noopener">politique de confidentialité</a> de Décollage, qui héberge ce site.</p></form>`;
+    `<form class="wl" id="${id}" method="post" ${wl!.action ? `action="${esc(wl!.action)}"` : `onsubmit="event.preventDefault();this.querySelector('.wl-note').textContent='Aperçu : rien n’est envoyé tant que le site n’est pas publié.'"`}><input type="email" name="email" required maxlength="254" placeholder="ton@email.fr" aria-label="Ton adresse email"><input type="text" name="site" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true"><label class="wl-consent"><input type="checkbox" name="${WAITLIST_CONSENT_FIELD}" value="oui" required><span>${esc(waitlistConsentText(cfg.nom, Boolean(marque)))}</span></label><button class="btn primary">${esc(landing.boutonPrincipal)}</button><p class="wl-note muted">Inscris-toi pour être prévenu·e du lancement.</p><p class="wl-rgpd muted">Ton adresse e-mail sert uniquement à te prévenir du lancement de ${esc(cfg.nom)} : elle est collectée pour le compte de l’éditeur de ce site. Pour exercer tes droits (accès, suppression…), utilise le contact indiqué dans la <a href="/confidentialite" target="_blank" rel="noopener">politique de confidentialité</a> ${marque ? "de la plateforme" : "de Décollage,"} qui héberge ce site.</p></form>`;
   const t = TEMPLATE_BY_ID[cfg.templateId];
   const mark = cfg.logo ? `<img src="${esc(cfg.logo)}" alt="">` : esc(cfg.initiales);
   const head = `<div class="wrap top"><div class="brand"><span class="mark">${mark}</span>${esc(cfg.nom)}</div><a class="btn primary" href="#cta">${esc(landing.boutonPrincipal)}</a></div>`;
@@ -356,11 +363,12 @@ export function renderLanding(cfg: Config, landing: Landing, pricing: Pricing | 
   }).join("\n");
 
   const foot = `<footer><div class="wrap" style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap"><span>© ${new Date().getFullYear()} ${esc(cfg.nom)}</span><span>${cfg.domaine ? esc(cfg.domaine) : ""}</span></div></footer>`;
+  const marqueCss = marque ? `<style>:root{${marque.cssVars}}.orb.o2{background:var(--brand-secondary)}.brand,.mark{min-width:0}.brand{overflow-wrap:anywhere}.mark img{max-width:100%;height:100%;object-fit:contain}</style>` : "";
   const css = opts.inlineCss ? `<style>${landingCss(cfg, landing)}</style>` : `<link rel="stylesheet" href="style.css">`;
   const hero = landing.sections.find((s) => s.type === "hero");
   return `<!doctype html>
 <html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${esc(cfg.nom)}</title><meta name="description" content="${esc(hero?.texte ?? cfg.description)}">${fontLinks(cfg)}${css}</head>
+<title>${esc(cfg.nom)}</title><meta name="description" content="${esc(marque ? hero?.texte || cfg.description || cfg.nom : hero?.texte ?? cfg.description)}">${marque ? `<meta property="og:title" content="${esc(cfg.nom)}"><meta property="og:site_name" content="${esc(cfg.nom)}"><meta property="og:type" content="website">${marque.favicon ? `<link rel="icon" type="image/png" href="${esc(marque.favicon)}">` : ""}` : ""}${fontLinks(cfg)}${css}${marqueCss}</head>
 <body>${wl?.merci ? `<div class="wl-banner ok" role="status">✓ Merci ! Ton inscription est enregistrée.</div>` : wl?.erreur ? `<div class="wl-banner bad" role="alert">Adresse invalide ou inscription impossible. Réessaie.</div>` : ""}${head}
 ${body}
 ${foot}${REVEAL_SCRIPT}${opts.demoScroll ? DEMO_SCROLL : ""}</body></html>`;

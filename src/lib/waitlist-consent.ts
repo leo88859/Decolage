@@ -6,8 +6,9 @@ export const WAITLIST_CONSENT_VERSION = "2026-11-15";
 export const WAITLIST_CONSENT_FIELD = "consentement";
 
 /** Texte de la case à cocher. `nom` = nom du site ou du produit, qui désigne ici l'éditeur à qui l'adresse est destinée. */
-export function waitlistConsentText(nom: string): string {
-  return `J’accepte que mon adresse e-mail soit transmise à l’éditeur de « ${nom} », propriétaire de ce site. Il la reçoit pour pouvoir me prévenir du lancement de ce produit, et pour rien d’autre. Ce site est hébergé par Décollage, qui ne m’écrit pas.`;
+/** `marqueBlanche` : le site porte l'identité de son éditeur, le nom de l'hébergeur n'y figure pas. */
+export function waitlistConsentText(nom: string, marqueBlanche = false): string {
+  return `J’accepte que mon adresse e-mail soit transmise à l’éditeur de « ${nom} », propriétaire de ce site. Il la reçoit pour pouvoir me prévenir du lancement de ce produit, et pour rien d’autre. Ce site est hébergé par ${marqueBlanche ? "une plateforme tierce" : "Décollage"}, qui ne m’écrit pas.`;
 }
 
 /** Vrai seulement si la case a été cochée (valeur envoyée par le navigateur : « oui », « on » ou « 1 »). */
