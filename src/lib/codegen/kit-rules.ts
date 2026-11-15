@@ -1,3 +1,4 @@
+import "server-only";
 // Kit du générateur : lib/rules.ts du projet généré. Fonctions pures (aucune dépendance) :
 // lecture et affichage des valeurs, validation, créneaux et doubles réservations, doublons, totaux.
 // Testé tel quel par rules.test.ts. Mêmes règles que kit-data.ts : pas d'accent grave ni de « ${ ».

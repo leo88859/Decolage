@@ -1,3 +1,4 @@
+import "server-only";
 // Kit du générateur pour les SaaS à architecture dédiée (espace de travail, finance, formation,
 // relation client, création, e-commerce) : site public + cadre de l'espace utilisateur + écrans.
 // Même rôle que proto-arch.ts pour les aperçus, écrit en React. Écrit à l'avance, sans IA.

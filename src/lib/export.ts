@@ -79,7 +79,7 @@ export function projectFiles(p: Project): { name: string; content: string }[] {
 
 type ImportResult = { ok: true; projects: Project[]; favorites: string[] } | { ok: false; error: string };
 
-function checkProject(x: unknown): string | null {
+export function checkProject(x: unknown): string | null {
   const p = x as Project;
   if (!p || typeof p !== "object" || typeof p.id !== "string" || !p.config || !p.landing) return "Structure de projet invalide.";
   if (!TEMPLATE_BY_ID[p.config.templateId]) return `Modèle inconnu : ${String(p.config.templateId)}.`;

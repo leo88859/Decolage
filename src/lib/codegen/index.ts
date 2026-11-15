@@ -1,16 +1,18 @@
+import "server-only";
 import { DEMO } from "@/data/demo";
 import { DESIGN_BY_ID, designId } from "@/data/designs";
 import { TEMPLATE_BY_ID } from "@/data/templates";
 import { POLICES, policeOf } from "@/lib/config";
 import { PROTO_DESIGN_CSS } from "@/lib/design-css";
 import { slug } from "@/lib/export";
-import { activePages } from "@/lib/modules";
 import { contenuOf } from "@/lib/project";
 import { PROTO_CSS } from "@/lib/proto-css";
 import { STYLE_EXTRA, STYLE_VARS } from "@/lib/prototype";
-import { archOf, ARCHETYPES, HOME_LAYOUT, ROLES } from "@/data/archetypes";
+import { archOf, HOME_LAYOUT, ROLES } from "@/data/archetypes";
 import { ARCH_CSS } from "@/lib/arch-css";
-import type { ArchPageKind, PageKind, Project } from "@/lib/types";
+import type { Project } from "@/lib/types";
+import { ARCH_VIEWS, generationPlan, KIND_MAP, type GenKind, type GenPage } from "./plan";
+export { generationPlan, KIND_MAP };
 import { ARCH_KIT_TSX, ARCH_REACT_CSS, FRAME_TSX, SCREENS_TSX, SITE_TSX } from "./kit-arch";
 import { STORE_TS, TYPES_TS } from "./kit-data";
 import { RULES_TS } from "./kit-rules";
@@ -21,23 +23,13 @@ import { REACT_CSS, SHELL_TSX } from "./kit-ui";
 import { VIEWS_TSX } from "./kit-views";
 import { CLOUD_TS, CLOUD_TSX, WAITLIST_SQL } from "./kit-cloud";
 
-/** Écrans d'architecture (rendus par components/screens.tsx). */
-const ARCH_VIEWS = new Set<string>(Object.values(ARCHETYPES).flatMap((a) => a.screens.map((s) => s.view)));
 
 // Générateur de projet Next.js, sans IA : un kit de composants écrit à l'avance (kit-*.ts) + la
 // configuration du projet (nom, couleurs, design, type, pages, données) sérialisée en JSON.
 // Le résultat est une vraie application : les données sont enregistrées dans le navigateur.
 
 export type GenFile = { name: string; content: string };
-type GenKind = "accueil" | "dashboard" | "table" | "cards" | "grid" | "kanban" | "agenda" | "form" | "todo" | "goals" | "settings" | "pricing" | "login" | "activity" | "waitlist";
 
-/** Pages du prototype et leur équivalent dans le projet généré. Les autres ne sont pas générées. */
-export const KIND_MAP: Partial<Record<PageKind, GenKind>> = {
-  accueil: "accueil", dashboard: "dashboard", graphique: "dashboard", resultats: "dashboard",
-  tableau: "table", liste: "cards", grille: "grid", kanban: "kanban", calendrier: "agenda", mois: "agenda",
-  formulaire: "form", relances: "todo", objectifs: "goals", parametres: "settings", profil: "settings",
-  tarifs: "pricing", facturation: "pricing", connexion: "login", historique: "activity", notifications: "activity", waitlist: "waitlist",
-};
 const VIEW: Record<GenKind, string> = {
   accueil: "Home", dashboard: "Dashboard", table: "TableView", cards: "CardsView", grid: "CardsView", kanban: "KanbanView", agenda: "AgendaView",
   form: "FormView", todo: "TodoView", goals: "GoalsView", settings: "SettingsView", pricing: "PricingView", login: "LoginView", activity: "ActivityView", waitlist: "WaitlistView",
@@ -47,42 +39,8 @@ const VIEW: Record<GenKind, string> = {
 export const VERSIONS = { next: "16.4.2", react: "19.3.0", typescript: "^5", "@types/react": "^19", "@types/react-dom": "^19", "@types/node": "^24", "@supabase/supabase-js": "^2.118.0" };
 
 const js = (x: unknown) => JSON.stringify(x, null, 2);
-const routeId = (id: string) => id.toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "") || "page";
 
-type GenPage = { id: string; titre: string; kind: GenKind | ArchPageKind; href: string; nav: boolean; zone?: "site" | "app" };
 
-/** Ce que le générateur produit, et ce qu'il laisse de côté (affiché dans Décollage et le README). */
-export function generationPlan(p: Project): { gen: GenPage[]; skipped: string[] } {
-  const pages = activePages(p.config);
-  const gen: GenPage[] = [];
-  const skipped: string[] = [];
-  // Architecture dédiée : site public à la racine, espace utilisateur sous /app.
-  if (archOf(p.config.templateId).id !== "classic") {
-    for (const pg of pages) {
-      const k = String(pg.kind);
-      if (k.startsWith("site-")) gen.push({ id: pg.id, titre: pg.titre, kind: pg.kind as ArchPageKind, href: pg.id === "accueil" ? "/" : `/${routeId(pg.id)}`, nav: true, zone: "site" });
-      else if (ARCH_VIEWS.has(k)) gen.push({ id: pg.id, titre: pg.titre, kind: pg.kind as ArchPageKind, href: pg.id === "app" ? "/app" : `/app/${routeId(pg.id)}`, nav: true, zone: "app" });
-      else {
-        const kind = KIND_MAP[pg.kind as PageKind];
-        if (kind) gen.push({ id: routeId(pg.id), titre: pg.titre, kind, href: `/app/${routeId(pg.id)}`, nav: true, zone: "app" });
-        else if (pg.kind !== "detail") skipped.push(pg.titre);
-      }
-    }
-    return { gen, skipped };
-  }
-  const used = new Set<string>();
-  for (const pg of pages) {
-    const kind = KIND_MAP[pg.kind as PageKind];
-    if (!kind) { if (pg.kind !== "detail") skipped.push(pg.titre); continue; }
-    let id = kind === "accueil" ? "" : routeId(pg.id);
-    while (id && used.has(id)) id += "-2";
-    used.add(id);
-    gen.push({ id: id || "accueil", titre: pg.titre, kind, href: id ? `/${id}` : "/", nav: pg.nav || kind === "settings" });
-  }
-  // Une page « Paramètres » est toujours présente : c'est là que se trouvent l'import et l'export CSV.
-  if (!gen.some((g) => g.kind === "settings")) gen.push({ id: "donnees", titre: "Données", kind: "settings", href: "/donnees", nav: true });
-  return { gen, skipped };
-}
 
 /** Réservations : colonne date et heure, ressource éventuelle, statuts qui libèrent le créneau, horaires par défaut. */
 function bookingOf(templateId: string, types: FieldType[], statuts: string[]): Booking | undefined {

@@ -1,3 +1,4 @@
+import "server-only";
 // Kit du générateur : composants React copiés tels quels dans chaque projet généré.
 // Mêmes règles que kit-data.ts : pas d'accent grave ni de « ${ » dans ces textes.
 

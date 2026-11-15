@@ -1,3 +1,4 @@
+import "server-only";
 // Kit du générateur : base de données Supabase facultative, pour la liste d'attente.
 // Sans variables d'environnement, l'application reste en mode local (rien ne change).
 // Avec elles, les inscriptions sont enregistrées dans la base et le propriétaire les consulte

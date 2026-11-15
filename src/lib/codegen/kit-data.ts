@@ -1,3 +1,4 @@
+import "server-only";
 // Kit du générateur : fichiers source copiés tels quels dans chaque projet Next.js généré.
 // Écrits à l'avance (aucune IA). Contrainte : pas d'accent grave ni de « ${ » dans ces textes,
 // car ils sont stockés dans des gabarits JavaScript.
