@@ -117,7 +117,9 @@ export async function POST(req: Request) {
     }
     return Response.json({ received: true });
   } catch (e) {
-    console.error(`[stripe] échec du traitement de ${event.id} (${event.type}) : ${(e as Error).message}`);
+    // Pas de message d'erreur journalisé (peut contenir des données) : seulement le nom et le code de l'erreur.
+    const info = e as { name?: string; code?: string };
+    console.error(`[stripe] échec du traitement de ${event.id} (${event.type}) : erreur ${info.name ?? "inconnue"} ${info.code ?? "sans_code"}`);
     // 500 : Stripe renverra l'événement plus tard.
     return Response.json({ error: "Traitement impossible" }, { status: 500 });
   }
@@ -146,6 +148,6 @@ async function syncBrandOption(admin: ReturnType<typeof createAdminClient>, user
     const err = e as Error & { code?: string };
     // Migration 0006 absente : on journalise et on continue. Toute autre erreur remonte (500) pour que Stripe rejoue l'événement.
     if (!isMissingSchema(err)) throw err;
-    console.error(`[stripe] option marque blanche non synchronisée (migration 0006 exécutée ?) : ${err.message}`);
+    console.error(`[stripe] option marque blanche non synchronisée (migration 0006 exécutée ?) : code ${err.code ?? "sans_code"}`);
   }
 }

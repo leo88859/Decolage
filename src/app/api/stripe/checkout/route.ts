@@ -64,8 +64,9 @@ export async function POST(req: Request) {
     return await openCheckout(user.id, user.email, knownCustomer, built.lines, built.brandOption, body.plan, retour, admin);
   } catch (err) {
     // Détail complet dans les journaux serveur (Vercel), message neutre pour le navigateur.
-    const e = err as { type?: string; code?: string; message?: string };
-    console.error("[stripe/checkout]", e.type, e.code, e.message);
+    // Seuls le type et le code sont journalisés : jamais le message (il peut reprendre une valeur saisie).
+    const e = err as { type?: string; code?: string };
+    console.error("[stripe/checkout] erreur", e.type ?? "inconnue", e.code ?? "sans_code");
     const { status, error } = stripeErrorMessage(err);
     return Response.json({ error }, { status });
   }
@@ -87,10 +88,17 @@ async function openCheckout(userId: string, email: string | undefined, customerI
     // Le lien client Stripe → utilisateur est enregistré par le serveur : le webhook s'y fie.
     // Sans ce lien, un paiement réussi ne pourrait pas être rattaché au compte : échec = on s'arrête AVANT toute session de paiement.
     // Une nouvelle tentative réutilise le même client Stripe (clé d'idempotence ci-dessus) : aucun doublon.
+    // Mise à jour CONDITIONNELLE : n'écrit que si aucun identifiant n'est encore enregistré (jamais d'écrasement).
     let linkFailed = false;
     try {
-      const { error } = await admin.from("profiles").upsert({ id: userId, stripe_customer_id: customerId, updated_at: new Date().toISOString() }, { onConflict: "id" });
-      linkFailed = Boolean(error);
+      const { data: linked, error } = await admin.from("profiles").update({ stripe_customer_id: customerId, updated_at: new Date().toISOString() }).eq("id", userId).is("stripe_customer_id", null).select("id");
+      if (error) {
+        linkFailed = true;
+      } else if (!(Array.isArray(linked) && linked.length === 1)) {
+        // Aucune ligne modifiée : relire. Lien identique = concurrence bénigne ; tout autre cas (autre client, profil absent, lecture en erreur) = arrêt.
+        const { data: current, error: readError } = await admin.from("profiles").select("stripe_customer_id").eq("id", userId).maybeSingle();
+        linkFailed = Boolean(readError) || (current?.stripe_customer_id as string | null | undefined) !== customerId;
+      }
     } catch {
       linkFailed = true;
     }

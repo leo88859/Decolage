@@ -43,7 +43,7 @@ function table(name: string) {
   const run = () => {
     const key = `${name}:${op === "select" ? "read" : "write"}`;
     if (h.fail[key]) return { data: null, error: { message: "panne simulée" } };
-    if (op === "update") { match().forEach((r) => Object.assign(r, vals)); h.writes.push(`update ${JSON.stringify(vals)}`); return { data: null, error: null }; }
+    if (op === "update") { const m = match(); m.forEach((r) => Object.assign(r, vals)); h.writes.push(`update ${JSON.stringify(vals)}`); return { data: m.map((r) => ({ id: r.id })), error: null }; }
     if (op === "upsert") { h.writes.push(`upsert ${JSON.stringify(vals)}`); return { data: null, error: null }; }
     return { data: match(), error: null };
   };
@@ -187,5 +187,61 @@ describe("resolveProfileLink (fonction pure)", () => {
     expect(resolveProfileLink({ ...base, customerUserId: OTHER })).toEqual({ action: "ignorer", reason: "client_incoherent" });
     expect(resolveProfileLink({ ...base, customerUserId: null })).toEqual({ action: "ignorer", reason: "client_incoherent" });
     expect(resolveProfileLink({ ...base, profile: null })).toEqual({ action: "ignorer", reason: "compte_absent" });
+  });
+});
+
+describe("revue finale : écriture concurrente du lien client, identifiant existant et journaux", () => {
+  it("deux demandes concurrentes avec deux clients Stripe différents : un seul lien enregistré, l'autre arrêté en 503 sans session", async () => {
+    h.stripe.customersCreate.mockResolvedValueOnce({ id: "cus_A" }).mockResolvedValueOnce({ id: "cus_B" });
+    const [r1, r2] = await Promise.all([pay(), pay()]);
+    const statuses = [r1.status, r2.status];
+    expect(statuses.filter((s) => s === 503)).toHaveLength(1);
+    expect(h.stripe.sessionsCreate).toHaveBeenCalledTimes(1);
+    const stored = profile().stripe_customer_id as string;
+    expect(["cus_A", "cus_B"]).toContain(stored);
+    expect(JSON.stringify(h.stripe.sessionsCreate.mock.calls[0])).toContain(stored);
+  });
+
+  it("deux demandes concurrentes avec le même client Stripe : aucun 503, un seul lien, jamais écrasé", async () => {
+    h.stripe.customersCreate.mockResolvedValue({ id: "cus_A" });
+    const [r1, r2] = await Promise.all([pay(), pay()]);
+    expect(r1.status).not.toBe(503);
+    expect(r2.status).not.toBe(503);
+    expect(profile().stripe_customer_id).toBe("cus_A");
+  });
+
+  it("un identifiant Stripe déjà enregistré n'est jamais écrasé (aucune écriture de stripe_customer_id)", async () => {
+    profile().stripe_customer_id = "cus_EXISTANT";
+    await pay();
+    expect(profile().stripe_customer_id).toBe("cus_EXISTANT");
+    expect(h.writes.filter((w) => w.includes("stripe_customer_id"))).toHaveLength(0);
+  });
+
+  it("erreur de base pendant la mise à jour conditionnelle : 503 et aucune session de paiement", async () => {
+    h.fail["profiles:write"] = true;
+    const r = await pay();
+    expect(r.status).toBe(503);
+    expect(h.stripe.sessionsCreate).not.toHaveBeenCalled();
+  });
+
+  it("journaux du checkout : ni e-mail ni message brut, seulement type et code", async () => {
+    h.stripe.sessionsCreate.mockRejectedValue(Object.assign(new Error("Invalid value a@exemple.fr"), { type: "StripeInvalidRequestError", code: "parameter_invalid_string" }));
+    const r = await pay();
+    expect(r.status).toBeGreaterThanOrEqual(400);
+    const logs = JSON.stringify(vi.mocked(console.error).mock.calls);
+    expect(logs).not.toContain("exemple");
+    expect(logs).not.toContain("Invalid value");
+    expect(logs).toContain("StripeInvalidRequestError");
+  });
+
+  it("journaux du webhook : ni e-mail ni message brut en cas d'erreur", async () => {
+    h.stripe.retrieve.mockRejectedValue(Object.assign(new Error("secret a@exemple.fr"), { name: "StripeAPIError", code: "api_error" }));
+    h.stripe.constructEvent.mockReturnValue({ id: "evt_1", type: "customer.subscription.updated", data: { object: { id: "sub_1" } } });
+    const r = await webhook(new Request("https://app.test/api/stripe/webhook", { method: "POST", headers: { "stripe-signature": "x" }, body: "{}" }));
+    expect(r.status).toBe(500);
+    const logs = JSON.stringify(vi.mocked(console.error).mock.calls);
+    expect(logs).not.toContain("exemple");
+    expect(logs).not.toContain("secret");
+    expect(logs).toContain("StripeAPIError");
   });
 });
