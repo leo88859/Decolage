@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useParams, useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { ProjectMissing } from "@/components/project/ProjectMissing";
 import { DESIGN_BY_ID } from "@/data/designs";
 import { SECTEUR_BY_ID } from "@/data/secteurs";
@@ -42,7 +42,10 @@ function SitePage() {
 
 function Site({ p, fresh }: { p: Project; fresh: boolean }) {
   const { plan } = useData();
-  useAppDataBridge(p.id);
+  const frameRef = useRef<HTMLIFrameElement>(null);
+  const frameWindows = useRef<() => Array<Window | null>>(() => []);
+  useEffect(() => { frameWindows.current = () => [frameRef.current?.contentWindow ?? null]; }, []);
+  useAppDataBridge(p.id, frameWindows);
   const t = TEMPLATE_BY_ID[p.config.templateId];
   const pages = activePages(p.config);
   const tasks = roadmapFor(p.config, can(plan, "plansDetailles")).reduce((n, s) => n + s.tasks.length, 0);
@@ -129,7 +132,7 @@ function Site({ p, fresh }: { p: Project; fresh: boolean }) {
 
         <div className={`device ${device} fade`} style={{ height: device === "mobile" ? 760 : "min(820px, calc(100vh - 140px))" }}>
           <div className="device-bar"><i /><i /><i /><span className="url">{p.config.domaine || `${slug(p.config.nom)}.exemple`}{view === "app" ? " · application" : ""}</span></div>
-          <iframe key={`${view}-${reload}`} title={view === "app" ? "Ton application" : "Ta page de vente"} srcDoc={doc} sandbox="allow-scripts allow-forms allow-downloads" />
+          <iframe ref={frameRef} key={`${view}-${reload}`} title={view === "app" ? "Ton application" : "Ta page de vente"} srcDoc={doc} sandbox="allow-scripts allow-forms allow-downloads" />
         </div>
         <p className="center tiny mut" style={{ marginTop: 12 }}>
           {view === "app"

@@ -21,7 +21,8 @@ export async function loadSite(slug: string): Promise<SiteData | null> {
 export const SITE_HEADERS = {
   "content-type": "text/html; charset=utf-8",
   "content-security-policy":
-    "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data: https:; form-action 'self'; base-uri 'none'; frame-ancestors 'self'",
+    "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data: https:; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
+  "x-frame-options": "DENY",
   "x-content-type-options": "nosniff",
   "referrer-policy": "strict-origin-when-cross-origin",
   "cache-control": "public, max-age=0, s-maxage=60",
