@@ -1,17 +1,28 @@
 -- Décollage : migration 0010, expiration réglable des commandes « nouvelle » (48 h par défaut) et limites anti-abus.
 -- À exécuter UNE FOIS À LA MAIN dans Supabase : SQL Editor -> New query -> coller -> Run. (NON exécutée par le développeur.)
 -- Rejouable sans erreur (idempotente). Ne supprime et ne modifie AUCUNE commande ni AUCUN stock existant.
--- Prérequis : 0001 à 0009 déjà exécutées, dans l'ordre. Ne rejoue jamais 0007 APRÈS elle (0007 remettrait l'ancienne
--- fonction de création de commande) : si tu le fais, rejoue 0010.
+--
+-- ORDRE D'EXÉCUTION DES MIGRATIONS DE CETTE ÉTAPE : 0010 -> 0010b (si pg_cron) -> 0011 -> (plus tard) 0011b.
+-- PRÉREQUIS : 0001 à 0009 déjà exécutées, dans l'ordre.
+-- NE JAMAIS REJOUER 0007 NI 0008 APRÈS CETTE MIGRATION : elles remettraient l'ancienne création de commande (0007) et
+--   les anciennes fonctions d'expiration (0008, sans garde expiration_eligible : annulerait les anciennes commandes).
+--   Si cela arrive par erreur, rejoue 0010 immédiatement (elle remet les bonnes versions).
 -- La PLANIFICATION (pg_cron, toutes les 15 minutes) est dans un fichier séparé : 0010b_planification_pg_cron.sql.
+-- Contrôle conseillé AVANT d'exécuter : supabase/0010_controle_lecture_seule.sql (lecture seule, compte les anciennes
+--   commandes « nouvelle » de plus de 48 h qui NE seront PAS annulées).
+--
+-- 0. commandes.expiration_eligible (booléen, défaut FALSE) : seules les commandes créées APRÈS cette migration (la création de
+--    commande l'enregistre à TRUE) peuvent être annulées automatiquement. Toutes les commandes existantes restent à FALSE :
+--    elles ne sont JAMAIS annulées automatiquement (le commerçant les traite à la main). Aucune ancienne commande n'est modifiée.
 --
 -- 1. boutiques.delai_expiration_h : délai avant annulation automatique d'une commande « nouvelle » (défaut 48, de 6 à 168).
 --    Les boutiques existantes passent à 48 h (avant : 72 h pour l'appel sans argument, jamais planifié).
 -- 2. boutiques.quantite_max_article : quantité maximale par article et par commande (défaut 10, de 1 à 99).
 -- 3. boutique_expirer_commandes_nouvelles() (sans argument) : chaque boutique est traitée avec SON délai, indépendamment
---    des autres. N'annule que « nouvelle » ET non payée ; une commande confirmée n'est jamais touchée. Le stock est remis
+--    des autres. N'annule que « nouvelle » ET non payée ET expiration_eligible ; une commande confirmée n'est jamais touchée. Le stock est remis
 --    par le déclencheur commande_transition (0005) au passage à « annulee » : une seule fois, même si deux appels se
---    chevauchent (verrou de ligne + UPDATE conditionnel sur le statut). La version à argument (0008) reste inchangée.
+--    chevauchent (verrou de ligne + UPDATE conditionnel sur le statut). La version à argument (0008, appelée par la route avec ?heures=N)
+--    est redéfinie ici avec la MÊME garde expiration_eligible (même signature) : aucun chemin ne contourne la garde.
 -- 4. boutique_creer_commande : limites anti-abus en base (mêmes valeurs que src/lib/boutique/money.ts) :
 --      quantité par article : quantite_max_article (10 par défaut, 99 au plus)      -> E_QUANTITE_MAX
 --      articles par commande : 50                                                    -> E_ARTICLES_MAX
@@ -31,6 +42,9 @@ do $$ begin
     alter table public.boutiques add constraint boutiques_quantite_max_check check (quantite_max_article between 1 and 99);
   end if;
 end $$;
+-- Garde d'expiration : FALSE pour toutes les commandes déjà présentes (ajout de colonne avec défaut : aucune ligne réécrite à la main).
+alter table public.commandes add column if not exists expiration_eligible boolean not null default false;
+
 -- Le public lit les deux réglages d'une vitrine publiée (affichage du délai et de la quantité maximale) ;
 -- le propriétaire les règle à la création et ensuite.
 grant select (delai_expiration_h, quantite_max_article) on public.boutiques to anon;
@@ -52,7 +66,7 @@ begin
       -- Une erreur sur UNE boutique (sous-transaction) ne bloque ni n'annule le travail des autres.
       with cibles as (
         select id from public.commandes
-        where boutique_id = b.id and statut = 'nouvelle' and paiement = 'non_payee'
+        where boutique_id = b.id and statut = 'nouvelle' and paiement = 'non_payee' and expiration_eligible
           and created_at < now() - make_interval(hours => b.delai_expiration_h)
         order by id
         for update skip locked
@@ -74,6 +88,34 @@ end;
 $$;
 revoke all on function public.boutique_expirer_commandes_nouvelles() from public, anon, authenticated;
 grant execute on function public.boutique_expirer_commandes_nouvelles() to service_role;
+
+-- Version à argument (route /api/boutique/expiration?heures=N) : même signature que 0007/0008, avec la garde expiration_eligible.
+create or replace function public.boutique_expirer_commandes_nouvelles(p_age interval) returns integer
+language plpgsql security definer set search_path = public as $$
+declare
+  n integer;
+begin
+  if p_age is null or p_age < interval '1 hour' then
+    raise exception 'E_AGE_INVALIDE';
+  end if;
+  with cibles as (
+    select id from public.commandes
+    where statut = 'nouvelle' and paiement = 'non_payee' and expiration_eligible and created_at < now() - p_age
+    order by id
+    for update skip locked
+  ), annulees as (
+    update public.commandes c
+       set statut = 'annulee', annulee_le = now(), annulation_motif = 'expiree_automatiquement'
+      from cibles
+     where c.id = cibles.id and c.statut = 'nouvelle'
+    returning 1
+  )
+  select count(*) into n from annulees;
+  return n;
+end;
+$$;
+revoke all on function public.boutique_expirer_commandes_nouvelles(interval) from public, anon, authenticated;
+grant execute on function public.boutique_expirer_commandes_nouvelles(interval) to service_role;
 
 -- ═══ 3. Création de commande avec limites anti-abus ═══════════════════════════════════════════
 create or replace function public.boutique_creer_commande(p_slug text, p_cle text, p_client jsonb, p_mode text, p_lignes jsonb)
@@ -182,9 +224,10 @@ begin
     cref := public.boutique_generer_ref();
     begin
       insert into public.commandes (id, ref, boutique_id, cle_idempotence, client_nom, client_email, client_telephone,
-                                    adresse_livraison, note, mode, jeton_hash, client_email_norm, client_tel_norm)
+                                    adresse_livraison, note, mode, jeton_hash, client_email_norm, client_tel_norm,
+                                    expiration_eligible)
       values (cid, cref, b.id, p_cle, nom, email, tel, adresse, note, p_mode,
-              encode(sha256(convert_to(token, 'UTF8')), 'hex'), email_n, tel_n);
+              encode(sha256(convert_to(token, 'UTF8')), 'hex'), email_n, tel_n, true);
       exit;
     exception when unique_violation then
       -- Référence déjà prise (collision) : on en tire une autre.

@@ -29,7 +29,7 @@ Le principe : plusieurs couches indépendantes, la base ayant le dernier mot. Au
 | Lire une page publique `/s/{slug}` | `loadSite` refuse `suspended_at` | politique « lecture publique des sites publiables » : visible seulement si `suspended_at` est nul **et** si le propriétaire a une formule qui publie (`owner_can_publish`) |
 | Lire `/b/{slug}`, `/api/boutique/catalogue/{slug}` | filtre `statut = 'publiee'` | politique de lecture : `statut = 'publiee'` ET non suspendue ET propriétaire autorisé ; idem pour catégories, produits, variantes (`boutique_publiee`). Sinon 404. |
 | Commander dans une boutique | `/api/boutique/commande` : 404 `boutique_introuvable` | `boutique_creer_commande` + déclencheur `commandes_boutique_publiable` : aucune commande sur une boutique non publique, stock intact |
-| Liste d'attente d'un site | `/api/waitlist/{slug}` (seule voie d'inscription depuis la migration 0007, clé serveur) | fonction `waitlist_inscrire` : le site doit être non suspendu ET lisible par le public (donc propriétaire autorisé) ; plus aucune insertion directe par le navigateur (0006 : politique d'inscription ; 0007 : retirée) |
+| Liste d'attente d'un site | `/api/waitlist/{slug}` (seule voie d'inscription depuis la migration 0007, clé serveur) | fonction `waitlist_inscrire_consent` (migration 0011 ; l'ancienne `waitlist_inscrire` est retirée par 0011b après déploiement) : refus sans consentement, le site doit être non suspendu ET lisible par le public (donc propriétaire autorisé) ; plus aucune insertion directe par le navigateur (0006 : politique d'inscription ; 0007 : retirée) |
 
 Conséquence importante : si un compte repasse en Gratuit, ses anciennes URL publiques répondent 404 **immédiatement**, sans attendre le webhook Stripe (la lecture publique dépend de la formule courante dans `profiles`).
 
@@ -147,6 +147,6 @@ Le code généré pour l'utilisateur du SaaS (`src/lib/codegen/kit-cloud.ts`) é
 | 2 000 produits / compte | idem (boutiques cumulées) | `seuils-0008.test.ts` |
 | 50 variantes / produit | validation de la route (400) ET déclencheur (403 `plafond_variantes`) | `seuils-0008.test.ts` |
 | 50 catégories / boutique | déclencheur (403 `plafond_categories`) | `seuils-0008.test.ts` |
-| 5 000 inscrits / liste d'attente | `waitlist_inscrire` (`liste_pleine`) ET déclencheur `waitlist_plafond` | `seuils-0008.test.ts`, `waitlist-route.test.ts` |
+| 5 000 inscrits / liste d'attente | `waitlist_inscrire_consent` (`liste_pleine`) ET déclencheur `waitlist_plafond` | `seuils-0008.test.ts`, `waitlist-route.test.ts` |
 
-Vérification : aucun de ces seuils n'était contourné ; aucune correction de code n'a été nécessaire pour eux. Expiration des commandes (72 h) : voir `docs/EXPIRATION-COMMANDES.md`.
+Vérification : aucun de ces seuils n'était contourné ; aucune correction de code n'a été nécessaire pour eux. Expiration des commandes (48 h par défaut, réglable de 6 à 168 h par boutique, uniquement pour les commandes créées après la migration 0010) : voir `docs/EXPIRATION-COMMANDES.md`.

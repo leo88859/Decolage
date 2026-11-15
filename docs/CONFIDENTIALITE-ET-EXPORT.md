@@ -78,8 +78,11 @@ consentement) sont d'abord demandées, puis, en cas d'erreur, seules les colonne
 
 Tant que la migration 0011 n'est pas exécutée, la fonction `waitlist_inscrire_consent` n'existe pas et **aucune inscription n'est enregistrée**
 (la page affiche l'erreur habituelle) : c'est volontaire, car sans la base on ne pourrait pas prouver le consentement. L'ancien chemin de
-repli (insertion directe sans consentement) a été supprimé. **Exécuter 0011 avant de déployer ce code.** La migration supprime l'ancienne
-fonction `waitlist_inscrire(text, text)`. Elle ne touche à aucune politique RLS ni à aucun droit de table, et peut être rejouée.
+repli (insertion directe sans consentement) a été supprimé. **Exécuter 0011 avant de déployer ce code.** La migration 0011 **ne supprime plus**
+l'ancienne fonction `waitlist_inscrire(text, text)` : elle reste en place pendant le déploiement, puis la migration `0011b_retrait_waitlist_inscrire.sql`
+la retire, une fois le nouveau code en production. Elle ne touche à aucune politique RLS ni à aucun droit de table, et peut être rejouée.
+**Retrait du consentement** : il n'y a pas de lien de désinscription (aucun e-mail n'est envoyé). Le propriétaire du site supprime l'inscrit
+depuis sa liste (suppression individuelle, protégée par la RLS : il ne peut supprimer que les inscrits de SON site). Aucune purge automatique n'existe.
 
 ## 3. Pas de double confirmation par e-mail
 

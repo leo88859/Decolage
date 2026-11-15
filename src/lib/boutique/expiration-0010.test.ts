@@ -3,7 +3,7 @@ import { PGlite, type Transaction } from "@electric-sql/pglite";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { dateExpiration, delaiValide, quantiteMaxValide, restantMs, tempsRestantLabel, texteExpirationAcheteur } from "./expiration";
 import { QUANTITE_TOTALE_MAX } from "./money";
-import { turnstileActif, verifierTurnstile } from "./turnstile";
+import { etatTurnstile, turnstileActif, verifierTurnstile } from "./turnstile";
 import { validateBoutique, validateCommande } from "./validate";
 
 // Étape 2 : migration 0010 (expiration réglable + limites anti-abus) dans un VRAI PostgreSQL (PGlite) ; validations, Turnstile
@@ -140,6 +140,23 @@ describe("expiration automatique (fonction SQL)", () => {
     await vieillir(l.ref, 169);
     await expirer();
     expect(await statut(l.ref)).toBe("annulee");
+  });
+  it("ANCIENNES commandes (expiration_eligible = false) : jamais annulées, ni par le cron ni par la version à argument", async () => {
+    const s = await seed({ stock: 20 });
+    const ancienne = await order(s.slug, [ligne(s.variante, 2)]);
+    await q("update public.commandes set expiration_eligible = false where ref = $1", [ancienne.ref]);
+    await vieillir(ancienne.ref, 500);
+    // Les deux fonctions agissent sur TOUTES les boutiques de la base de test : on ne vérifie pas leur compte total,
+    // seulement que CETTE commande ancienne n'est jamais touchée.
+    await expirer();
+    await as("service_role", null, "select public.boutique_expirer_commandes_nouvelles(interval '1 hour') as n");
+    expect(await statut(ancienne.ref)).toBe("nouvelle");
+    expect(await stock(s.variante)).toBe(18);
+  });
+  it("le fichier de contrôle est en LECTURE SEULE : aucune écriture, aucune migration", () => {
+    const code = sql("0010_controle_lecture_seule.sql").split("\n").filter((l) => !l.trim().startsWith("--")).join("\n");
+    expect(code).not.toMatch(/\b(insert|update|delete|alter|create|grant|revoke|drop|truncate)\b/i);
+    expect(code).toMatch(/expiration_eligible/);
   });
   it("ne touche JAMAIS une commande confirmée (ni prête, ni terminée), même très ancienne ; son stock reste pris", async () => {
     const s = await seed({ stock: 10 });
@@ -328,12 +345,14 @@ describe("Cloudflare Turnstile (vérification serveur, faux Cloudflare)", () => 
   });
   it("activé : jeton absent ou vide = refus, sans appeler Cloudflare", async () => {
     vi.stubEnv("TURNSTILE_SECRET_KEY", "secret-de-test");
+    vi.stubEnv("NEXT_PUBLIC_TURNSTILE_SITE_KEY", "site-de-test");
     const f = cf({ success: true });
     for (const t of [undefined, null, "", "   ", 42]) expect(await verifierTurnstile(t, "1.2.3.4", f)).toEqual({ ok: false, reason: "absent" });
     expect(f).not.toHaveBeenCalled();
   });
   it("activé : jeton invalide = refus ; jeton valide = autorisé ; la clé secrète part vers Cloudflare seulement", async () => {
     vi.stubEnv("TURNSTILE_SECRET_KEY", "secret-de-test");
+    vi.stubEnv("NEXT_PUBLIC_TURNSTILE_SITE_KEY", "site-de-test");
     expect(await verifierTurnstile("mauvais", "1.2.3.4", cf({ success: false, "error-codes": ["invalid-input-response"] }))).toEqual({ ok: false, reason: "invalide" });
     const f = cf({ success: true });
     expect(await verifierTurnstile("bon-jeton", "1.2.3.4", f)).toEqual({ ok: true, skipped: false });
@@ -346,13 +365,48 @@ describe("Cloudflare Turnstile (vérification serveur, faux Cloudflare)", () => 
   });
   it("erreurs temporaires (Cloudflare en panne, réseau, erreur interne) : refus « indisponible », jamais un passage", async () => {
     vi.stubEnv("TURNSTILE_SECRET_KEY", "secret-de-test");
+    vi.stubEnv("NEXT_PUBLIC_TURNSTILE_SITE_KEY", "site-de-test");
     expect(await verifierTurnstile("j", "1.1.1.1", cf({}, 500))).toEqual({ ok: false, reason: "indisponible" });
     expect(await verifierTurnstile("j", "1.1.1.1", (async () => { throw new Error("réseau"); }) as unknown as typeof fetch)).toEqual({ ok: false, reason: "indisponible" });
     expect(await verifierTurnstile("j", "1.1.1.1", cf({ success: false, "error-codes": ["internal-error"] }))).toEqual({ ok: false, reason: "indisponible" });
     expect(await verifierTurnstile("j", "1.1.1.1", (async () => new Response("pas du json", { status: 200 })) as unknown as typeof fetch)).toEqual({ ok: false, reason: "invalide" });
   });
+  it("clé PUBLIQUE seule : configuration incomplète, commande bloquée, Cloudflare jamais appelé (pas de faux passage)", async () => {
+    vi.stubEnv("TURNSTILE_SECRET_KEY", "");
+    vi.stubEnv("NEXT_PUBLIC_TURNSTILE_SITE_KEY", "site-de-test");
+    const f = cf({ success: true });
+    expect(etatTurnstile()).toBe("configuration_incomplete");
+    expect(turnstileActif()).toBe(false);
+    expect(await verifierTurnstile("un-jeton", "1.1.1.1", f)).toEqual({ ok: false, reason: "configuration" });
+    expect(f).not.toHaveBeenCalled();
+  });
+  it("clé SECRÈTE seule : configuration incomplète, commande bloquée, Cloudflare jamais appelé", async () => {
+    vi.stubEnv("TURNSTILE_SECRET_KEY", "secret-de-test");
+    vi.stubEnv("NEXT_PUBLIC_TURNSTILE_SITE_KEY", "site-de-test");
+    vi.stubEnv("NEXT_PUBLIC_TURNSTILE_SITE_KEY", "");
+    const f = cf({ success: true });
+    expect(etatTurnstile()).toBe("configuration_incomplete");
+    expect(await verifierTurnstile(undefined, "1.1.1.1", f)).toEqual({ ok: false, reason: "configuration" });
+    expect(f).not.toHaveBeenCalled();
+  });
+  it("aucune clé : désactivée (état « desactive ») ; deux clés : « actif » ; l'état ne contient jamais une valeur de clé", () => {
+    vi.stubEnv("TURNSTILE_SECRET_KEY", "");
+    vi.stubEnv("NEXT_PUBLIC_TURNSTILE_SITE_KEY", "");
+    expect(etatTurnstile()).toBe("desactive");
+    vi.stubEnv("TURNSTILE_SECRET_KEY", "secret-de-test-xyz");
+    vi.stubEnv("NEXT_PUBLIC_TURNSTILE_SITE_KEY", "site-de-test-xyz");
+    expect(etatTurnstile()).toBe("actif");
+    expect(JSON.stringify(etatTurnstile())).not.toContain("xyz");
+  });
+  it("jeton expiré ou déjà utilisé (timeout-or-duplicate) : refus du jeton, sans passage", async () => {
+    vi.stubEnv("TURNSTILE_SECRET_KEY", "secret-de-test");
+    vi.stubEnv("NEXT_PUBLIC_TURNSTILE_SITE_KEY", "site-de-test");
+    vi.stubEnv("NEXT_PUBLIC_TURNSTILE_SITE_KEY", "site-de-test");
+    expect(await verifierTurnstile("vieux", "1.1.1.1", cf({ success: false, "error-codes": ["timeout-or-duplicate"] }))).toEqual({ ok: false, reason: "invalide" });
+  });
   it("jeton démesuré refusé sans appel réseau", async () => {
     vi.stubEnv("TURNSTILE_SECRET_KEY", "secret-de-test");
+    vi.stubEnv("NEXT_PUBLIC_TURNSTILE_SITE_KEY", "site-de-test");
     const f = cf({ success: true });
     expect(await verifierTurnstile("x".repeat(5000), "1.1.1.1", f)).toEqual({ ok: false, reason: "invalide" });
     expect(f).not.toHaveBeenCalled();

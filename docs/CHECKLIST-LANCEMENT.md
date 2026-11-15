@@ -51,7 +51,7 @@ Séquence sûre :
 1. **Déployer d'abord le code** (il a des replis si 0007/0008 manquent : catalogue, création de produit, liste d'attente, limites). Exécuter 0007 AVANT le code casserait l'ancien code (accès direct à la liste d'attente et au stock retirés).
 2. Exécuter `supabase/A-COLLER-0007.sql` (copie identique à `0007_durcissement.sql`, vérifié par diff), puis vérifier :
    ```sql
-   select to_regclass('public.limites_debit') is not null as limites, to_regprocedure('public.waitlist_inscrire(text,text)') is not null as liste, to_regclass('public.variantes_publiques') is not null as vue;  -- attendu : true, true, true
+   select to_regclass('public.limites_debit') is not null as limites, to_regprocedure('public.waitlist_inscrire_consent(text,text,boolean,text)') is not null as liste, to_regclass('public.variantes_publiques') is not null as vue;  -- attendu : true, true, true
    ```
 3. Exécuter `supabase/A-COLLER-0008.sql` (identique à `0008_suspendus_et_expiration.sql`, vérifié par diff), puis vérifier :
    ```sql

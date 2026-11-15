@@ -164,6 +164,11 @@ function Apercu({ boutique: b, nbProduits, nbCategories, reload }: { boutique: B
       </div>
       <Link href="/boutique/commandes" className="panel">Voir les commandes <span className="mut">(sans paiement en ligne)</span>{attente !== null && <> · <strong data-testid="attente-vue">{attente} en attente de confirmation</strong></>} →</Link>
       <p className="mut" style={{ margin: 0 }}>Une commande non confirmée sous {delaiValide(b.delai_expiration_h)} heures est annulée automatiquement (réglable dans « Modifier les infos »).</p>
+      {b.protection_anti_robot === "configuration_incomplete" && (
+        <p className="alert alert-warn" data-testid="turnstile-configuration" style={{ margin: 0 }}>
+          Protection anti-robot mal configurée : une seule des deux clés Turnstile est définie, donc tes clients ne peuvent pas commander. Il faut définir les deux clés (publique et secrète) côté hébergement.
+        </p>
+      )}
 
       <div><button className="btn btn-danger btn-sm" onClick={() => setDel(true)}>Supprimer la boutique</button></div>
 

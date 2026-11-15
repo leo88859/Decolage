@@ -46,6 +46,11 @@ export async function POST(req: Request) {
   const jeton = typeof body.body === "object" && body.body !== null ? (body.body as Record<string, unknown>).turnstile : undefined;
   const t = await verifierTurnstile(jeton, ip);
   if (!t.ok) {
+    if (t.reason === "configuration") {
+      // Une seule des deux clés est définie : la protection ne vérifierait rien. On bloque et on journalise (sans valeur de clé).
+      console.error("[boutique/commande] Turnstile : configuration incomplète (une seule clé définie) : commandes bloquées");
+      return json({ error: "Commandes temporairement indisponibles. Réessaie plus tard.", code: "configuration_turnstile" }, 500);
+    }
     if (t.reason === "absent") return json({ error: "Vérification anti-robot requise. Recharge la page puis réessaie.", code: "turnstile_requis" }, 400);
     if (t.reason === "invalide") return json({ error: "Vérification anti-robot refusée. Réessaie.", code: "turnstile_invalide" }, 403);
     return json({ error: "Vérification anti-robot indisponible pour le moment. Réessaie dans un instant.", code: "turnstile_indisponible" }, 503);

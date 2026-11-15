@@ -176,8 +176,10 @@ describe("0011 : inscription avec consentement obligatoire (côté base)", () =>
     expect((await waitlist("site-de-a")).find((x) => x.email === "ancien2@exemple.fr")?.consentement_statut).toBe("a_verifier");
   });
 
-  it("l'ancienne fonction sans consentement n'existe plus ; la nouvelle n'est exécutable que par service_role", async () => {
-    expect(await q("select 1 from pg_proc where proname = 'waitlist_inscrire'")).toHaveLength(0);
+  it("pendant la transition, l'ancienne fonction existe encore, réservée à service_role ; la nouvelle n'est exécutable que par service_role", async () => {
+    expect(await q("select 1 from pg_proc where proname = 'waitlist_inscrire'")).toHaveLength(1);
+    await expect(as("authenticated", B, "select public.waitlist_inscrire('site-de-a','x@exemple.fr')")).rejects.toThrow(DENIED);
+    await expect(as("anon", null, "select public.waitlist_inscrire('site-de-a','x@exemple.fr')")).rejects.toThrow(DENIED);
     await expect(as("anon", null, "select public.waitlist_inscrire_consent('site-de-a','x@exemple.fr',true,'v')")).rejects.toThrow(DENIED);
     await expect(as("authenticated", B, "select public.waitlist_inscrire_consent('site-de-a','x@exemple.fr',true,'v')")).rejects.toThrow(DENIED);
   });
@@ -193,6 +195,38 @@ describe("0011 : inscription avec consentement obligatoire (côté base)", () =>
     expect(await as("authenticated", B, "select consentement_statut from public.waitlist where slug = 'site-de-a'")).toEqual([]);
     await expect(as("anon", null, "select consentement_statut from public.waitlist")).rejects.toThrow(DENIED);
     await expect(as("authenticated", A, "update public.waitlist set consentement_statut = 'recueilli', consentement_le = now(), consentement_texte = 'x' where slug = 'site-de-a'")).rejects.toThrow(DENIED);
+  });
+});
+
+describe("0011 : suppression individuelle par le propriétaire (retrait du consentement, sans e-mail)", () => {
+  it("le propriétaire supprime UNE inscription de SA liste ; un autre compte ne supprime rien, sans erreur", async () => {
+    expect(await inscrire("site-de-a", "a-supprimer@exemple.fr", true, "2026-11-15")).toBe("ok");
+    await as("authenticated", B, "delete from public.waitlist where email = 'a-supprimer@exemple.fr'");
+    expect(await q("select 1 from public.waitlist where email = 'a-supprimer@exemple.fr'")).toHaveLength(1);
+    await as("authenticated", A, "delete from public.waitlist where email = 'a-supprimer@exemple.fr'");
+    expect(await q("select 1 from public.waitlist where email = 'a-supprimer@exemple.fr'")).toHaveLength(0);
+  });
+  it("un ancien inscrit « a_verifier » peut être supprimé par son propriétaire (aucune purge automatique)", async () => {
+    await q("insert into public.waitlist (slug, email) values ('site-de-a', 'ancien3@exemple.fr')"); // ligne dédiée : les autres anciens servent aux tests suivants
+    await as("authenticated", A, "delete from public.waitlist where email = 'ancien3@exemple.fr'");
+    expect(await q("select 1 from public.waitlist where email = 'ancien3@exemple.fr'")).toHaveLength(0);
+    expect(await q("select 1 from public.waitlist where email = 'ancien2@exemple.fr'")).toHaveLength(1);
+  });
+});
+
+describe("0011b : retrait de l'ancienne fonction après déploiement", () => {
+  it("0011b retire waitlist_inscrire, sans toucher aux inscrits ni à la nouvelle fonction ; rejouable", async () => {
+    const avant = (await q<{ n: number }>("select count(*)::int n from public.waitlist"))[0]!.n;
+    await db.exec(sql("0011b_retrait_waitlist_inscrire.sql"));
+    await db.exec(sql("0011b_retrait_waitlist_inscrire.sql"));
+    expect(await q("select 1 from pg_proc where proname = 'waitlist_inscrire'")).toHaveLength(0);
+    expect(await q("select 1 from pg_proc where proname = 'waitlist_inscrire_consent'")).toHaveLength(1);
+    expect((await q<{ n: number }>("select count(*)::int n from public.waitlist"))[0]!.n).toBe(avant);
+  });
+  it("0011b ne contient aucune suppression de données", () => {
+    const code = sql("0011b_retrait_waitlist_inscrire.sql").split("\n").filter((l) => !l.trim().startsWith("--")).join("\n");
+    expect(code).not.toMatch(/\b(delete\s+from|truncate|drop\s+table|drop\s+column|update\s+public)\b/i);
+    expect(code).toMatch(/drop function if exists public\.waitlist_inscrire\(text, text\)/i);
   });
 });
 

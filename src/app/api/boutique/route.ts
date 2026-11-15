@@ -1,6 +1,7 @@
 import { authorizeOwner, colonne0010Absente, dbError, invalid, json, readJson, sans0010 } from "@/lib/boutique/api";
 import { validateBoutique } from "@/lib/boutique/validate";
 import { colonneThemeAbsente } from "@/lib/boutique/themes";
+import { etatTurnstile } from "@/lib/boutique/turnstile";
 
 // Mes boutiques. Les écritures passent par la session du commerçant : la RLS et les limites de formule de la base s'appliquent.
 
@@ -10,7 +11,9 @@ export async function GET(req: Request) {
   if (o instanceof Response) return o;
   const { data, error } = await o.supabase.from("boutiques").select("*").eq("proprietaire_id", o.userId).order("created_at");
   if (error) return json({ error: "Lecture impossible pour le moment.", code: "server" }, 500);
-  return json({ boutiques: data ?? [] });
+  // État de la protection anti-robot, par boutique (aucune valeur de clé n'est renvoyée).
+  const protection = etatTurnstile();
+  return json({ boutiques: (data ?? []).map((b) => ({ ...b, protection_anti_robot: protection })) });
 }
 
 /** Crée une boutique (brouillon par défaut). Le propriétaire est TOUJOURS celui de la session. */

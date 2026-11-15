@@ -30,6 +30,8 @@ export type Boutique = {
   nom: string;
   description: string;
   couleur_principale: string;
+  /** Renseigné par la liste « mes boutiques » : état de la protection anti-robot (jamais une valeur de clé). */
+  protection_anti_robot?: "desactive" | "actif" | "configuration_incomplete";
   couleur_accent: string;
   logo: string | null;
   adresse: string;

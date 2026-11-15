@@ -116,8 +116,29 @@ describe("POST /api/boutique/commande : Cloudflare Turnstile", () => {
     expect((await passerCommande(req(CMD, ip(1)))).status).toBe(201);
     expect(f).not.toHaveBeenCalled();
   });
+  it("une SEULE clé (publique) : commande bloquée 500 « configuration_turnstile », Cloudflare jamais appelé, aucune commande", async () => {
+    vi.stubEnv("TURNSTILE_SECRET_KEY", "");
+    vi.stubEnv("NEXT_PUBLIC_TURNSTILE_SITE_KEY", "site-de-test");
+    const f = cf({ success: true });
+    vi.stubGlobal("fetch", f);
+    const r = await passerCommande(req({ ...CMD, turnstile: "bon" }, ip(9)));
+    expect(r.status).toBe(500);
+    expect((await r.json()).code).toBe("configuration_turnstile");
+    expect(f).not.toHaveBeenCalled();
+    expect(appelsCommande()).toBe(0);
+  });
+  it("une SEULE clé (secrète) : commande bloquée 500 « configuration_turnstile », aucune commande", async () => {
+    vi.stubEnv("TURNSTILE_SECRET_KEY", "secret-de-test");
+    vi.stubEnv("NEXT_PUBLIC_TURNSTILE_SITE_KEY", "");
+    vi.stubGlobal("fetch", cf({ success: true }));
+    const r = await passerCommande(req({ ...CMD, turnstile: "bon" }, ip(10)));
+    expect(r.status).toBe(500);
+    expect((await r.json()).code).toBe("configuration_turnstile");
+    expect(appelsCommande()).toBe(0);
+  });
   it("activé, jeton absent : refus 400, aucune commande créée", async () => {
     vi.stubEnv("TURNSTILE_SECRET_KEY", "secret-de-test");
+    vi.stubEnv("NEXT_PUBLIC_TURNSTILE_SITE_KEY", "site-de-test");
     vi.stubGlobal("fetch", cf({ success: true }));
     const r = await passerCommande(req(CMD, ip(2)));
     expect(r.status).toBe(400);
@@ -126,6 +147,7 @@ describe("POST /api/boutique/commande : Cloudflare Turnstile", () => {
   });
   it("activé, jeton invalide : refus 403, aucune commande créée", async () => {
     vi.stubEnv("TURNSTILE_SECRET_KEY", "secret-de-test");
+    vi.stubEnv("NEXT_PUBLIC_TURNSTILE_SITE_KEY", "site-de-test");
     vi.stubGlobal("fetch", cf({ success: false, "error-codes": ["invalid-input-response"] }));
     const r = await passerCommande(req({ ...CMD, turnstile: "mauvais" }, ip(3)));
     expect(r.status).toBe(403);
@@ -134,12 +156,14 @@ describe("POST /api/boutique/commande : Cloudflare Turnstile", () => {
   });
   it("activé, jeton valide : la commande est créée", async () => {
     vi.stubEnv("TURNSTILE_SECRET_KEY", "secret-de-test");
+    vi.stubEnv("NEXT_PUBLIC_TURNSTILE_SITE_KEY", "site-de-test");
     vi.stubGlobal("fetch", cf({ success: true }));
     expect((await passerCommande(req({ ...CMD, turnstile: "bon" }, ip(4)))).status).toBe(201);
     expect(appelsCommande()).toBe(1);
   });
   it("activé, Cloudflare injoignable ou en panne : 503 temporaire, aucune commande créée", async () => {
     vi.stubEnv("TURNSTILE_SECRET_KEY", "secret-de-test");
+    vi.stubEnv("NEXT_PUBLIC_TURNSTILE_SITE_KEY", "site-de-test");
     vi.stubGlobal("fetch", vi.fn(async () => { throw new Error("réseau"); }));
     const r = await passerCommande(req({ ...CMD, turnstile: "bon" }, ip(5)));
     expect(r.status).toBe(503);
@@ -150,6 +174,7 @@ describe("POST /api/boutique/commande : Cloudflare Turnstile", () => {
   });
   it("le champ piège « site » rempli ne déclenche aucune vérification ni création", async () => {
     vi.stubEnv("TURNSTILE_SECRET_KEY", "secret-de-test");
+    vi.stubEnv("NEXT_PUBLIC_TURNSTILE_SITE_KEY", "site-de-test");
     const f = cf({ success: true });
     vi.stubGlobal("fetch", f);
     expect((await passerCommande(req({ ...CMD, site: "http://spam" }, ip(7)))).status).toBe(201);

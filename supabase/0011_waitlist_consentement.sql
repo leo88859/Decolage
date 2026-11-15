@@ -13,8 +13,11 @@
 --   2. TOUS les inscrits existants prennent la valeur par défaut 'a_verifier' : AUCUN ancien inscrit n'est jamais marqué
 --      comme ayant consenti automatiquement. Aucune ligne n'est supprimée ni modifiée dans ses autres colonnes.
 --   3. ajoute des contraintes de cohérence : 'recueilli' exige un horodatage et une version de texte ; 'a_verifier' n'en a pas.
---   4. crée waitlist_inscrire_consent(slug, email, consentement, version_texte) et SUPPRIME l'ancienne waitlist_inscrire(text, text),
---      qui permettait de s'inscrire sans consentement.
+--   4. crée waitlist_inscrire_consent(slug, email, consentement, version_texte). L'ancienne waitlist_inscrire(text, text), qui permettait
+--      de s'inscrire sans consentement, reste TEMPORAIREMENT en place : l'ancien code déployé l'appelle encore pendant la transition.
+--      Elle est retirée par 0011b_retrait_waitlist_inscrire.sql, à exécuter SEULEMENT après déploiement complet du nouveau code.
+--
+-- ORDRE : 0010 -> 0010b (si pg_cron) -> 0011 -> déploiement du nouveau code -> 0011b. Ne jamais rejouer 0007 ni 0008 après 0011.
 -- Aucun e-mail n'est envoyé par cette migration ni par le produit.
 
 alter table public.waitlist add column if not exists consentement_statut text not null default 'a_verifier';
@@ -80,5 +83,5 @@ $$;
 revoke all on function public.waitlist_inscrire_consent(text, text, boolean, text) from public, anon, authenticated;
 grant execute on function public.waitlist_inscrire_consent(text, text, boolean, text) to service_role;
 
--- L'ancienne fonction (sans consentement) disparaît : plus aucune inscription sans consentement par cette voie.
-drop function if exists public.waitlist_inscrire(text, text);
+-- L'ancienne fonction waitlist_inscrire(text, text) n'est PAS supprimée ici (voir 0011b, après déploiement).
+-- Tant qu'elle existe, elle reste réservée à service_role, comme avant ; le nouveau code ne l'appelle plus.
