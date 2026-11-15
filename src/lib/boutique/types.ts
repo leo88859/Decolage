@@ -43,6 +43,9 @@ export type Boutique = {
   theme?: string;
   /** Posé par le serveur quand la formule ne permet plus de garder la boutique en ligne (migration 0006). */
   suspended_at?: string | null;
+  /** Migration 0010 (absents avant elle : 48 h et 10 par article). */
+  delai_expiration_h?: number;
+  quantite_max_article?: number;
   created_at: string;
   updated_at: string;
 };

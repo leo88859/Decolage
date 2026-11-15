@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Confirm, Modal, toast } from "@/components/ui";
 import type { Boutique } from "@/lib/boutique/types";
 import type { Errors } from "@/lib/boutique/validate";
 import { themeOf } from "@/lib/boutique/themes";
+import { delaiValide, quantiteMaxValide } from "@/lib/boutique/expiration";
 import { ErrorBox, useBoutiqueCtx } from "./BoutiqueContext";
 import { BoutiqueFields } from "./BoutiqueFields";
 import { api, BOUTIQUE_VIDE, boutiquePayload, erreursEtape, ETAPES, isPlanLimit, slugDepuisNom, type BoutiqueForm } from "./logic";
@@ -25,6 +26,7 @@ function formDe(b: Boutique): BoutiqueForm {
     nom: b.nom, slug: b.slug, description: b.description, couleur_principale: b.couleur_principale, couleur_accent: b.couleur_accent,
     logo: b.logo ?? "", adresse: b.adresse, whatsapp: b.whatsapp ?? "", email: b.email ?? "", telephone: b.telephone ?? "", modes: b.modes,
     theme: themeOf(b.theme),
+    delai_expiration_h: String(delaiValide(b.delai_expiration_h)), quantite_max_article: String(quantiteMaxValide(b.quantite_max_article)),
   };
 }
 
@@ -103,6 +105,12 @@ function Apercu({ boutique: b, nbProduits, nbCategories, reload }: { boutique: B
   const suspendue = b.statut === "publiee" && Boolean(b.suspended_at);
   const publiee = b.statut === "publiee" && !suspendue;
   const lien = `/b/${b.slug}`;
+  const [attente, setAttente] = useState<number | null>(null);
+  useEffect(() => {
+    let vivant = true;
+    void api<{ commandes: unknown[] }>(`/${b.id}/commandes?statut=nouvelle`).then((r) => { if (vivant) setAttente(r.ok ? r.data.commandes.length : null); });
+    return () => { vivant = false; };
+  }, [b.id]);
 
   async function basculer() {
     setBusy(true);
@@ -154,7 +162,8 @@ function Apercu({ boutique: b, nbProduits, nbCategories, reload }: { boutique: B
         <Link href="/boutique/produits" className="panel"><strong>{nbProduits}</strong> produit{nbProduits > 1 ? "s" : ""} <span className="mut">→ gérer le catalogue</span></Link>
         <Link href="/boutique/categories" className="panel"><strong>{nbCategories}</strong> catégorie{nbCategories > 1 ? "s" : ""} <span className="mut">→ organiser</span></Link>
       </div>
-      <Link href="/boutique/commandes" className="panel">Voir les commandes <span className="mut">(sans paiement en ligne)</span> →</Link>
+      <Link href="/boutique/commandes" className="panel">Voir les commandes <span className="mut">(sans paiement en ligne)</span>{attente !== null && <> · <strong data-testid="attente-vue">{attente} en attente de confirmation</strong></>} →</Link>
+      <p className="mut" style={{ margin: 0 }}>Une commande non confirmée sous {delaiValide(b.delai_expiration_h)} heures est annulée automatiquement (réglable dans « Modifier les infos »).</p>
 
       <div><button className="btn btn-danger btn-sm" onClick={() => setDel(true)}>Supprimer la boutique</button></div>
 

@@ -115,3 +115,16 @@ export async function ownedBoutique(o: Owner, id: string): Promise<{ row: Record
   if (error) return { row: null, failed: true };
   return { row: (data as Record<string, unknown> | null) ?? null, failed: false };
 }
+
+/**
+ * Migration 0010 pas encore exécutée : une des colonnes delai_expiration_h / quantite_max_article n'existe pas.
+ * Code PostgREST PGRST204 (colonne inconnue du cache de schéma) ou Postgres 42703. Le code repasse alors sans ces champs.
+ */
+export const colonne0010Absente = (e: { code?: string; message?: string } | null | undefined) =>
+  !!e && (e.code === "PGRST204" || e.code === "42703") && /delai_expiration_h|quantite_max_article/i.test(e.message ?? "");
+export const sans0010 = <T extends Record<string, unknown>>(champs: T): Omit<T, "delai_expiration_h" | "quantite_max_article"> => {
+  const o: Record<string, unknown> = { ...champs };
+  delete o.delai_expiration_h;
+  delete o.quantite_max_article;
+  return o as Omit<T, "delai_expiration_h" | "quantite_max_article">;
+};

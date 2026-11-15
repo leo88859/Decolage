@@ -7,6 +7,8 @@ import { useVitrine } from "./CartProvider";
 import { PROBLEME_LABEL, hasProbleme, imagesSures, mapCommandeError, parseCommandeSuccess, resolveCart, totalIndicatif } from "./logic";
 import { formatEuros } from "@/lib/boutique/money";
 import { validateCommande } from "@/lib/boutique/validate";
+import { quantiteMaxValide, texteExpirationAcheteur } from "@/lib/boutique/expiration";
+import { TURNSTILE_SITE_KEY, TurnstileWidget } from "./TurnstileWidget";
 import type { Mode } from "@/lib/boutique/types";
 
 const MODE_LABEL: Record<Mode, string> = {
@@ -19,7 +21,10 @@ export function PanierView() {
   const { catalogue, lignes, pret, fixer, retirer, assurerCle, vider } = useVitrine();
   const router = useRouter();
   const b = catalogue.boutique;
-  const items = resolveCart(lignes, catalogue.produits);
+  const qmax = quantiteMaxValide(b.quantite_max_article);
+  const items = resolveCart(lignes, catalogue.produits).map((it) => (it.max > 0 ? { ...it, max: Math.min(it.max, qmax) } : it));
+  const [tsToken, setTsToken] = useState("");
+  const [tsReset, setTsReset] = useState(0);
   const probleme = hasProbleme(items);
   const modes = b.modes;
   const [mode, setMode] = useState<Mode | "">("");
@@ -47,6 +52,8 @@ export function PanierView() {
     setErreur("");
     if (!modeEff) { setErreur("Cette boutique ne prend pas de commande en ligne pour le moment."); return; }
     if (probleme) { setErreur("Retire ou ajuste les articles signalés avant de commander."); return; }
+    if (lignes.some((l) => l.quantite > qmax)) { setErreur(`Quantité maximale par article dans cette boutique : ${qmax}. Ajuste ton panier.`); return; }
+    if (TURNSTILE_SITE_KEY && !tsToken) { setErreur("Valide la vérification anti-robot avant d'envoyer ta commande."); return; }
     const payload = {
       slug: b.slug,
       cle: assurerCle(),
@@ -54,8 +61,9 @@ export function PanierView() {
       client: { nom: f.nom, email: f.email, telephone: f.telephone, adresse: modeEff === "livraison" ? f.adresse : "", note: f.note },
       lignes: lignes.map((l) => ({ variante_id: l.variante_id, quantite: l.quantite })),
       site: f.site, // champ piège : reste vide pour un humain
+      turnstile: tsToken, // jeton Cloudflare Turnstile (vide si non configuré) : vérifié côté serveur
     };
-    const v = validateCommande(payload);
+    const v = validateCommande(payload, qmax);
     if (!v.ok) {
       setErrs(v.errors);
       setErreur("Corrige les champs indiqués puis valide de nouveau.");
@@ -89,6 +97,7 @@ export function PanierView() {
         setErreur(m.message);
         setErrs(m.champs);
         if (m.rafraichir) router.refresh();
+        setTsReset((n) => n + 1); // un jeton Turnstile ne sert qu'une fois
       }
       verrou.current = false;
       setEnvoi(false);
@@ -132,8 +141,8 @@ export function PanierView() {
                     {it.probleme === "retire" || it.probleme === "indisponible" ? null : (
                       <div className="vt-qty" role="group" aria-label={`Quantité de ${nom}`}>
                         <button type="button" aria-label={`Diminuer la quantité de ${nom}`} onClick={() => fixer(id, it.ligne.quantite - 1)}>−</button>
-                        <input aria-label={`Quantité de ${nom}`} inputMode="numeric" value={it.ligne.quantite} onChange={(e) => fixer(id, Number(e.target.value.replace(/\D/g, "")))} />
-                        <button type="button" aria-label={`Augmenter la quantité de ${nom}`} onClick={() => fixer(id, it.ligne.quantite + 1)} disabled={it.max > 0 && it.ligne.quantite >= it.max}>+</button>
+                        <input aria-label={`Quantité de ${nom}`} inputMode="numeric" value={it.ligne.quantite} onChange={(e) => fixer(id, Math.min(qmax, Number(e.target.value.replace(/\D/g, ""))))} />
+                        <button type="button" aria-label={`Augmenter la quantité de ${nom}`} onClick={() => fixer(id, Math.min(qmax, it.ligne.quantite + 1))} disabled={it.max > 0 && it.ligne.quantite >= it.max}>+</button>
                       </div>
                     )}
                     <button type="button" className="vt-btn sm alt" onClick={() => retirer(id)}>Retirer<span className="sr-only"> {nom}</span></button>
@@ -155,6 +164,7 @@ export function PanierView() {
         ) : (
           <form onSubmit={envoyer} noValidate>
             <p className="vt-hint">Commande enregistrée sans paiement en ligne : le règlement se fait directement avec le commerçant.</p>
+            <p className="vt-hint" data-testid="expiration-acheteur">{texteExpirationAcheteur(b.delai_expiration_h)}</p>
             {erreur ? <div className="vt-alert bad" role="alert" tabIndex={-1}>{erreur}</div> : null}
 
             {modes.length > 1 ? (
@@ -202,6 +212,7 @@ export function PanierView() {
             <div className="vt-trap" aria-hidden="true">
               <label>Ne pas remplir<input name="site" tabIndex={-1} autoComplete="off" value={f.site} onChange={set("site")} /></label>
             </div>
+            <TurnstileWidget onToken={setTsToken} resetKey={tsReset} />
             {fe("lignes") ? <p className="vt-err">{fe("lignes")}</p> : null}
             <button type="submit" className="vt-btn full" disabled={envoi || probleme} aria-disabled={envoi || probleme}>
               {envoi ? "Envoi en cours…" : "Envoyer ma commande"}

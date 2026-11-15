@@ -230,9 +230,9 @@ describe("POST /api/boutique/commande : public, anti-spam, prix ignorés", () =>
     expect(h.rpc).not.toHaveBeenCalled();
   });
 
-  it("limite par IP : la 6e demande en une minute est refusée (429), pas celle d'une autre IP", async () => {
+  it("limite par IP : la 4e demande en une minute (étape 2 : 3 par minute) est refusée (429), pas celle d'une autre IP", async () => {
     const from = (ip: string) => ({ origin: ORIGIN, "x-forwarded-for": ip });
-    for (let i = 0; i < 5; i++) expect((await passerCommande(req("POST", CMD, from("1.1.1.1")))).status).toBe(201);
+    for (let i = 0; i < 3; i++) expect((await passerCommande(req("POST", CMD, from("1.1.1.1")))).status).toBe(201);
     expect((await passerCommande(req("POST", CMD, from("1.1.1.1")))).status).toBe(429);
     expect((await passerCommande(req("POST", CMD, from("2.2.2.2")))).status).toBe(201);
   });

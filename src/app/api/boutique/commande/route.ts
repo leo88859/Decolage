@@ -1,5 +1,7 @@
 import { adminClient, clientIp, dbTooMany, json, invalid, originOk, readJson, tooMany } from "@/lib/boutique/api";
 import { validateCommande } from "@/lib/boutique/validate";
+import { COMMANDES_IP_HEURE_MAX, COMMANDES_IP_MINUTE_MAX } from "@/lib/boutique/money";
+import { verifierTurnstile } from "@/lib/boutique/turnstile";
 import { isCloudConfigured } from "@/lib/env";
 
 const FAKE_OK = { commande: { ref: "CMD-00000000", statut: "nouvelle", paiement: "non_payee" }, rejouee: false };
@@ -10,18 +12,21 @@ const SQL_ERRORS: Record<string, [number, string, string]> = {
   E_BOUTIQUE_INTROUVABLE: [404, "boutique_introuvable", "Cette boutique n'existe pas ou n'est pas ouverte."],
   E_MODE_INVALIDE: [400, "mode_invalide", "Ce mode de commande n'est pas proposé par la boutique."],
   E_CLIENT_INVALIDE: [400, "client_invalide", "Les coordonnées sont incomplètes ou invalides."],
-  E_QUANTITE_INVALIDE: [400, "quantite_invalide", "Le panier est invalide (quantité entre 1 et 99 par article, 200 articles au maximum, 20 lignes au maximum)."],
+  E_QUANTITE_INVALIDE: [400, "quantite_invalide", "Le panier est invalide (quantité entière positive, 20 lignes au maximum)."],
   E_CLE_INVALIDE: [400, "cle_invalide", "Clé de commande invalide."],
-  E_CONTACT_TROP_DE_COMMANDES: [429, "trop_de_commandes_contact", "Tu as déjà plusieurs commandes en attente de confirmation dans cette boutique. Attends qu'elles soient traitées ou contacte la boutique."],
+  E_QUANTITE_MAX: [400, "quantite_max", "Tu dépasses la quantité maximale autorisée par article dans cette boutique. Réduis la quantité."],
+  E_ARTICLES_MAX: [400, "articles_max", "Une commande peut contenir 50 articles au maximum."],
+  E_CONTACT_TROP_DE_COMMANDES: [429, "trop_de_commandes_contact", "Tu as déjà 2 commandes en attente de confirmation dans cette boutique. Attends qu'elles soient traitées ou expirées, ou contacte la boutique."],
+  E_TROP_DE_NOUVELLES: [429, "trop_de_nouvelles", "Cette boutique a trop de commandes en attente de confirmation. Réessaie plus tard."],
   E_TROP_DE_COMMANDES: [429, "trop_de_commandes", "Cette boutique reçoit trop de commandes en ce moment. Réessaie plus tard."],
 };
 
 /**
  * Passe une commande SANS paiement en ligne (publique). Le navigateur n'envoie que les identifiants de variantes et les
  * quantités : prix, stock et total sont relus/recalculés en base par boutique_creer_commande (clé service_role).
- * Anti-spam : Origin, champ piège « site », 5 envois/minute et 30/heure par IP (en mémoire, puis en base : migration 0007,
+ * Anti-spam : Origin, champ piège « site », 3 envois/minute et 10/heure par IP (en mémoire, puis en base : migration 0007,
  * valable entre plusieurs instances), clé d'idempotence obligatoire. La base plafonne aussi les commandes « nouvelle » par
- * contact et par boutique et à 100 par heure et par boutique, et annule les commandes « nouvelle » trop anciennes.
+ * contact et par boutique à 2 commandes « nouvelle » en attente par contact, 50 simultanées par boutique, 100 par heure ; la quantité par article (réglage de la boutique) et 50 articles par commande y sont vérifiés. Les commandes « nouvelle » expirent seules (migration 0010). Cloudflare Turnstile (jeton « turnstile ») est vérifié ici si TURNSTILE_SECRET_KEY est défini.
  */
 export async function POST(req: Request) {
   if (!isCloudConfigured()) return json({ error: "Les commandes ne sont pas disponibles pour le moment.", code: "demo" }, 503);
@@ -31,16 +36,24 @@ export async function POST(req: Request) {
   // Champ piège invisible : un humain ne le remplit jamais. On répond « ok » sans rien enregistrer.
   if (typeof body.body === "object" && body.body !== null && String((body.body as Record<string, unknown>).site ?? "") !== "") return json(FAKE_OK, 201);
   const ip = clientIp(req);
-  if (tooMany(ip, 5, 60_000, "cmd-min") || tooMany(ip, 30, 3_600_000, "cmd-h")) return json({ error: "Trop de tentatives. Réessaie dans une minute.", code: "rate_limit" }, 429);
+  if (tooMany(ip, COMMANDES_IP_MINUTE_MAX, 60_000, "cmd-min") || tooMany(ip, COMMANDES_IP_HEURE_MAX, 3_600_000, "cmd-h")) return json({ error: "Trop de tentatives. Réessaie dans une minute.", code: "rate_limit" }, 429);
 
   const v = validateCommande(body.body);
   if (!v.ok) return invalid(v.errors);
   const admin = adminClient();
   if (!admin) return json({ error: "Les commandes ne sont pas encore configurées sur ce site.", code: "server" }, 503);
+  // Cloudflare Turnstile : non configuré = ignoré (local) ; configuré = jeton obligatoire et vérifié ici (jamais côté navigateur).
+  const jeton = typeof body.body === "object" && body.body !== null ? (body.body as Record<string, unknown>).turnstile : undefined;
+  const t = await verifierTurnstile(jeton, ip);
+  if (!t.ok) {
+    if (t.reason === "absent") return json({ error: "Vérification anti-robot requise. Recharge la page puis réessaie.", code: "turnstile_requis" }, 400);
+    if (t.reason === "invalide") return json({ error: "Vérification anti-robot refusée. Réessaie.", code: "turnstile_invalide" }, 403);
+    return json({ error: "Vérification anti-robot indisponible pour le moment. Réessaie dans un instant.", code: "turnstile_indisponible" }, 503);
+  }
 
   const { slug, cle, mode, client, lignes } = v.value;
   // Limite partagée en base (tient même si les requêtes arrivent sur des instances différentes).
-  if ((await dbTooMany(admin, "cmd-min", ip, 5, 60)) || (await dbTooMany(admin, "cmd-h", ip, 30, 3600))) return json({ error: "Trop de tentatives. Réessaie dans une minute.", code: "rate_limit" }, 429);
+  if ((await dbTooMany(admin, "cmd-min", ip, COMMANDES_IP_MINUTE_MAX, 60)) || (await dbTooMany(admin, "cmd-h", ip, COMMANDES_IP_HEURE_MAX, 3600))) return json({ error: "Trop de tentatives. Réessaie dans une minute.", code: "rate_limit" }, 429);
   const { data, error } = await admin.rpc("boutique_creer_commande", {
     p_slug: slug,
     p_cle: cle,

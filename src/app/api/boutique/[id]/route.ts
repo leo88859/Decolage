@@ -1,4 +1,4 @@
-import { authorizeOwner, dbError, invalid, json, notFound, ownedBoutique, readJson } from "@/lib/boutique/api";
+import { authorizeOwner, colonne0010Absente, dbError, invalid, json, notFound, ownedBoutique, readJson, sans0010 } from "@/lib/boutique/api";
 import { validateBoutique } from "@/lib/boutique/validate";
 import { colonneThemeAbsente } from "@/lib/boutique/themes";
 
@@ -33,12 +33,19 @@ export async function PATCH(req: Request, { params }: Ctx) {
   if (b.failed) return json({ error: "Lecture impossible pour le moment.", code: "server" }, 500);
   if (!b.row) return notFound();
   const maj = (champs: typeof v.value) => o.supabase.from("boutiques").update(champs).eq("id", id).eq("proprietaire_id", o.userId).select("*");
-  let { data, error } = await maj(v.value);
+  let champs = v.value;
+  let { data, error } = await maj(champs);
   // Migration 0009 pas encore exécutée : on enregistre le reste, sans le thème.
   if (colonneThemeAbsente(error) && "theme" in v.value) {
-    const sansTheme = { ...v.value };
+    const sansTheme = { ...champs };
     delete sansTheme.theme;
+    champs = sansTheme;
     ({ data, error } = Object.keys(sansTheme).length ? await maj(sansTheme) : { data: [b.row], error: null });
+  }
+  // Migration 0010 pas encore exécutée : on enregistre le reste, sans les réglages d'expiration.
+  if (colonne0010Absente(error) && ("delai_expiration_h" in champs || "quantite_max_article" in champs)) {
+    const reste = sans0010(champs);
+    ({ data, error } = Object.keys(reste).length ? await maj(reste) : { data: [b.row], error: null });
   }
   if (error) return dbError(error);
   if (!data?.length) return notFound();

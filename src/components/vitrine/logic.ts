@@ -22,6 +22,9 @@ export type BoutiquePub = {
   modes: ("retrait" | "livraison" | "contact")[]; published_at: string | null;
   /** Thème de la vitrine (absent avant la migration 0009 = classique). */
   theme?: string;
+  /** Migration 0010 : heures avant annulation automatique et quantité maximale par article (absents avant elle : 48 et 10). */
+  delai_expiration_h?: number;
+  quantite_max_article?: number;
 };
 export type CataloguePub = { boutique: BoutiquePub; categories: { id: string; nom: string; position: number }[]; produits: ProduitPub[]; marque_blanche?: boolean };
 
@@ -162,10 +165,15 @@ export function mapCommandeError(status: number | null, body: unknown): Commande
     case "boutique_introuvable": return e("Cette boutique n'est plus ouverte aux commandes.");
     case "mode_invalide": return e("Ce mode de commande n'est pas proposé par la boutique.");
     case "invalid": case "client_invalide": return e(serveur || "Certains champs sont invalides.");
-    case "quantite_invalide": return e("Le panier est invalide (quantité de 1 à 99, 200 articles au maximum, 20 articles différents au maximum).");
+    case "quantite_invalide": return e("Le panier est invalide (quantité entière positive, 20 articles différents au maximum).");
+    case "quantite_max": return e(serveur || "Tu dépasses la quantité maximale autorisée par article dans cette boutique. Réduis la quantité.");
+    case "articles_max": return e("Une commande peut contenir 50 articles au maximum.");
+    case "trop_de_nouvelles": return e("Cette boutique a trop de commandes en attente de confirmation. Réessaie plus tard.", { reessayer: true });
+    case "turnstile_requis": case "turnstile_invalide": return e("La vérification anti-robot a échoué. Réessaie.", { reessayer: true });
+    case "turnstile_indisponible": return e("La vérification anti-robot est indisponible pour le moment. Réessaie dans un instant.", { reessayer: true });
     case "cle_invalide": return e("Commande interrompue, réessaie.", { reessayer: true });
     case "rate_limit": return e("Trop de tentatives. Réessaie dans une minute.", { reessayer: true });
-    case "trop_de_commandes_contact": return e("Tu as déjà plusieurs commandes en attente de confirmation dans cette boutique. Attends qu'elles soient traitées ou contacte la boutique.");
+    case "trop_de_commandes_contact": return e("Tu as déjà 2 commandes en attente de confirmation dans cette boutique. Attends qu'elles soient traitées ou expirées, ou contacte la boutique.");
     case "trop_de_commandes": return e("Cette boutique reçoit trop de commandes en ce moment. Réessaie plus tard.", { reessayer: true });
     case "origin": return e("Requête refusée par le site. Recharge la page puis réessaie.");
     case "demo": return e("Les commandes ne sont pas disponibles pour le moment.");

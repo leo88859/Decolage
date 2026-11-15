@@ -1,4 +1,4 @@
-import { eurosEnCentimes } from "@/lib/boutique/money";
+import { DELAI_EXPIRATION_DEFAUT_H, eurosEnCentimes, QUANTITE_ARTICLE_DEFAUT } from "@/lib/boutique/money";
 import { suggestSlug } from "@/lib/publish";
 import { validateBoutique, validateCategorie, validateProduit, validateVariante, type Errors } from "@/lib/boutique/validate";
 import { TRANSITIONS, type Mode, type StatutCommande, type Variante } from "@/lib/boutique/types";
@@ -70,10 +70,13 @@ export const ACTION_LABEL: Record<StatutCommande, string> = {
 export type BoutiqueForm = {
   nom: string; slug: string; description: string; couleur_principale: string; couleur_accent: string; logo: string;
   adresse: string; whatsapp: string; email: string; telephone: string; modes: Mode[]; theme: ThemeId;
+  /** Saisies texte (heures, quantité) : converties en nombres à l'envoi, vérifiées par validateBoutique. */
+  delai_expiration_h: string; quantite_max_article: string;
 };
 export const BOUTIQUE_VIDE: BoutiqueForm = {
   nom: "", slug: "", description: "", couleur_principale: "#0a1433", couleur_accent: "#ff6b4a", logo: "",
   adresse: "", whatsapp: "", email: "", telephone: "", modes: ["retrait"], theme: THEME_DEFAUT,
+  delai_expiration_h: String(DELAI_EXPIRATION_DEFAUT_H), quantite_max_article: String(QUANTITE_ARTICLE_DEFAUT),
 };
 export const slugDepuisNom = (nom: string) => (nom.trim() ? suggestSlug(nom) : "");
 
@@ -83,6 +86,8 @@ export function boutiquePayload(f: BoutiqueForm): { ok: true; body: Record<strin
     slug: f.slug.trim().toLowerCase(), nom: f.nom, description: f.description, couleur_principale: f.couleur_principale,
     couleur_accent: f.couleur_accent, logo: f.logo.trim() || null, adresse: f.adresse, whatsapp: f.whatsapp.trim() || null,
     email: f.email.trim() || null, telephone: f.telephone.trim() || null, modes: f.modes, theme: f.theme,
+    delai_expiration_h: /^[0-9]{1,3}$/.test(f.delai_expiration_h.trim()) ? Number(f.delai_expiration_h.trim()) : f.delai_expiration_h,
+    quantite_max_article: /^[0-9]{1,3}$/.test(f.quantite_max_article.trim()) ? Number(f.quantite_max_article.trim()) : f.quantite_max_article,
   };
   const v = validateBoutique(body);
   return v.ok ? { ok: true, body } : { ok: false, errors: v.errors };
@@ -92,7 +97,7 @@ export const ETAPES: { titre: string; champs: (keyof BoutiqueForm)[] }[] = [
   { titre: "Nom et adresse", champs: ["nom", "slug", "description"] },
   { titre: "Look", champs: ["theme", "couleur_principale", "couleur_accent", "logo"] },
   { titre: "Contact", champs: ["adresse", "whatsapp", "email", "telephone"] },
-  { titre: "Commande", champs: ["modes"] },
+  { titre: "Commande", champs: ["modes", "delai_expiration_h", "quantite_max_article"] },
 ];
 export function erreursEtape(etape: number, errors: Errors): Errors {
   const champs: string[] = ETAPES[etape]?.champs ?? [];

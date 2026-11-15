@@ -2,8 +2,20 @@
 
 export const PRIX_MAX_CENTIMES = 99_999_999; // ~ 1 million d'euros : même plafond que la base
 export const QUANTITE_MAX = 99;
-/** Articles au total dans une commande (miroir de la base, migration 0007). */
-export const QUANTITE_TOTALE_MAX = 200;
+/** Articles au total dans une commande (miroir de la base, migration 0010). */
+export const QUANTITE_TOTALE_MAX = 50;
+/** Quantité par article : 10 par défaut, réglable par la boutique jusqu'à QUANTITE_MAX (migration 0010). */
+export const QUANTITE_ARTICLE_DEFAUT = 10;
+/** Commandes « nouvelle » en attente par contact, et simultanées par boutique (migration 0010). */
+export const COMMANDES_ATTENTE_CONTACT_MAX = 2;
+export const COMMANDES_NOUVELLES_BOUTIQUE_MAX = 50;
+/** Commandes par adresse IP (route API, limite partagée en base). */
+export const COMMANDES_IP_MINUTE_MAX = 3;
+export const COMMANDES_IP_HEURE_MAX = 10;
+/** Délai avant annulation automatique d'une commande « nouvelle » : heures, 48 par défaut (migration 0010, CHECK 6 à 168). */
+export const DELAI_EXPIRATION_DEFAUT_H = 48;
+export const DELAI_EXPIRATION_MIN_H = 6;
+export const DELAI_EXPIRATION_MAX_H = 168;
 
 export const isCentimes = (n: unknown): n is number => typeof n === "number" && Number.isInteger(n) && n >= 0 && n <= PRIX_MAX_CENTIMES;
 

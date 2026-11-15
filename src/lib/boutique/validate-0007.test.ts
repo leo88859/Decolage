@@ -17,10 +17,10 @@ describe("référence de commande", () => {
 
 describe("plafond d'articles par commande", () => {
   it(`refuse plus de ${QUANTITE_TOTALE_MAX} articles au total, accepte exactement ${QUANTITE_TOTALE_MAX}`, () => {
-    const trop = validateCommande({ ...base, lignes: [1, 2, 3].map((i) => ({ variante_id: id(i), quantite: 99 })) });
+    const trop = validateCommande({ ...base, lignes: [{ variante_id: id(1), quantite: 25 }, { variante_id: id(2), quantite: 25 }, { variante_id: id(3), quantite: 1 }] }); // étape 2 : 50 articles au plus
     expect(trop.ok).toBe(false);
-    if (!trop.ok) expect(trop.errors.lignes).toContain("200");
-    const limite = validateCommande({ ...base, lignes: [{ variante_id: id(1), quantite: 99 }, { variante_id: id(2), quantite: 99 }, { variante_id: id(3), quantite: 2 }] });
+    if (!trop.ok) expect(trop.errors.lignes).toContain("50");
+    const limite = validateCommande({ ...base, lignes: [{ variante_id: id(1), quantite: 25 }, { variante_id: id(2), quantite: 25 }] });
     expect(limite.ok).toBe(true);
     const un = validateCommande({ ...base, lignes: [{ variante_id: id(1), quantite: 1 }] });
     expect(un.ok).toBe(true);
