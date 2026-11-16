@@ -37,7 +37,7 @@ ${marque ? `Projet généré à partir du modèle « ${t.nom} ».` : `Généré 
 |---|---|
 | index.html + style.css | Landing page statique, prête à être hébergée |
 | prototype.html | Prototype cliquable (niveau 1) — données d'exemple, aucun enregistrement |
-${marque ? "" : `| decollage.json | Configuration complète du projet (format documenté « ${PROJECT_FORMAT} » v${FORMAT_VERSION}) |`}
+${marque ? "| decollage.json | Manifeste technique du projet (configuration, sans donnée de compte), réimportable |" : `| decollage.json | Configuration complète du projet (format documenté « ${PROJECT_FORMAT} » v${FORMAT_VERSION}) |`}
 ## Où en est ce projet
 
 - **Niveau 1 — Prototype : oui.** \`prototype.html\` montre l'apparence et la navigation.
@@ -72,8 +72,8 @@ export function projectFiles(p0: Project, marque: SiteBrand | null = null): { na
     { name: "style.css", content: landingCss(p.config, p.landing) },
     // Application autonome : démarre avec les données du projet, puis enregistre dans le navigateur.
     { name: "prototype.html", content: renderPrototype(p.config, "accueil", contenu, { persist: true, storeKey: p.id, initial: p.appData, marque }) },
-    // Le fichier de configuration est au format de Décollage : absent des exports en marque blanche.
-    ...(marque ? [] : [{ name: "decollage.json", content: projectJson(p) }]),
+    // Manifeste technique (aucun secret, aucune donnée de compte) : conservé aussi en marque blanche, pour pouvoir réimporter le projet.
+    { name: "decollage.json", content: projectJson(p) },
     { name: "README.md", content: readme(p, Boolean(marque)) },
   ];
 }
