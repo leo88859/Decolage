@@ -37,7 +37,7 @@ export const STYLE_EXTRA: Record<Config["style"], string> = {
 const seedOf = (s: string) => [...s].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 2147483647, 7) || 7;
 
 /** Enregistrement des données : `persist` + `storeKey` ; `initial` = données de départ (ex. celles du projet). */
-export type ProtoOpts = { persist?: boolean; storeKey?: string; initial?: unknown };
+export type ProtoOpts = { persist?: boolean; storeKey?: string; initial?: unknown; /** Marque blanche : favicon (data URL validée) et métadonnées de partage. */ marque?: { favicon: string | null } | null };
 
 export function prototypeData(cfg: Config, start = "accueil", contenu?: Contenu, opts: ProtoOpts = {}): ProtoData {
   const t = TEMPLATE_BY_ID[cfg.templateId];
@@ -92,9 +92,11 @@ const safeScript = (s: string) => s.replace(/</g, "\\u003c");
 
 export function renderPrototype(cfg: Config, start = "accueil", contenu?: Contenu, opts: ProtoOpts = {}): string {
   const data = prototypeData(cfg, start, contenu, opts);
-  const runtime = protoRuntime.toString().replace(/<\/script/gi, "<\\/script");
+  const runtimeBrut = protoRuntime.toString().replace(/<\/script/gi, "<\\/script");
+  // Marque blanche : les identifiants techniques du moteur (clé de stockage, messages) ne portent pas le nom Décollage.
+  const runtime = opts.marque ? runtimeBrut.replace(/d[ée]collage/gi, "app") : runtimeBrut;
   const font = policeOf(cfg);
-  return `<!doctype html><html lang="fr" class="s-${cfg.style} shell-${data.shell} dash-${data.dash} anim-${data.anim}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${esc(cfg.nom)} — prototype</title>
+  return `<!doctype html><html lang="fr" class="s-${cfg.style} shell-${data.shell} dash-${data.dash} anim-${data.anim}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${esc(cfg.nom)} — prototype</title>${opts.marque ? `<meta property="og:title" content="${esc(cfg.nom)}"><meta property="og:site_name" content="${esc(cfg.nom)}">${opts.marque.favicon ? `<link rel="icon" href="${esc(opts.marque.favicon)}">` : ""}` : ""}
 ${font.url ? `<link rel="stylesheet" href="${font.url}">` : ""}${cfg.style === "luxe" ? `<link rel="stylesheet" href="${POLICES.elegante.url}">` : ""}
 <style>:root{--p:${cfg.couleurs.primaire};--a:${cfg.couleurs.accent};${STYLE_VARS[cfg.style]}${font.url ? `;--ff:${font.famille}` : ""}}${PROTO_CSS}${data.arch ? ARCH_CSS : ""}${STYLE_EXTRA[cfg.style]}${PROTO_DESIGN_CSS[designId(cfg.design) ?? ""] ?? ""}</style></head>
 <body><noscript>Ce prototype a besoin de JavaScript.</noscript>

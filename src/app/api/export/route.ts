@@ -1,6 +1,8 @@
 import "server-only";
 import { TEMPLATE_BY_ID } from "@/data/templates";
 import { generateNextProject } from "@/lib/codegen";
+import { getEffectiveBrand } from "@/lib/brand/effective";
+import { applyBrandToConfig, siteBrandFrom, type SiteBrand } from "@/lib/brand/site-brand";
 import { isCloudConfigured } from "@/lib/env";
 import { checkProject, projectFiles, slug } from "@/lib/export";
 import { originOk } from "@/lib/origin";
@@ -85,6 +87,19 @@ async function serverPlan(): Promise<{ ok: true; plan: Plan; userId: string; db:
   return { ok: true, plan: normalizePlan(profile?.plan), userId: user.id, db: adminClient() };
 }
 
+/**
+ * Identité de marque blanche à appliquer à l'export, ou null. Droit calculé côté serveur (formule du compte + option) ;
+ * FAIL-CLOSED : base absente, lecture en échec, droit refusé ou rien d'enregistré -> null (export habituel, avec la mention Décollage).
+ */
+async function exportBrand(auth: { userId: string; db: ReturnType<typeof adminClient> }): Promise<SiteBrand | null> {
+  if (!auth.db) return null;
+  try {
+    return siteBrandFrom(await getEffectiveBrand(auth.db, auth.userId));
+  } catch {
+    return null;
+  }
+}
+
 export async function POST(req: Request) {
   if (!originOk(req, { referer: false })) return json({ error: "Requête refusée (origine inattendue).", code: "origin" }, 403);
   const auth = await serverPlan();
@@ -109,12 +124,13 @@ export async function POST(req: Request) {
     return json({ error: "Ce modèle est réservé aux offres payantes.", code: "modele_premium" }, 403);
   }
 
-  const name = slug(parsed.project.config.nom) || "mon-saas";
+  const marque = await exportBrand(auth);
+  const name = slug(applyBrandToConfig(parsed.project.config, marque).nom) || "mon-saas";
   const files = parsed.kind === "next"
-    ? generateNextProject(parsed.project).map((f) => ({ name: `${name}/${f.name}`, content: f.content }))
+    ? generateNextProject(parsed.project, undefined, marque).map((f) => ({ name: `${name}/${f.name}`, content: f.content }))
     : parsed.kind === "landing"
-      ? projectFiles(parsed.project).filter((f) => f.name === "index.html" || f.name === "style.css")
-      : projectFiles(parsed.project);
+      ? projectFiles(parsed.project, marque).filter((f) => f.name === "index.html" || f.name === "style.css")
+      : projectFiles(parsed.project, marque);
   const bytes = zip(files);
   const file = parsed.kind === "next" ? `${name}-nextjs.zip` : parsed.kind === "landing" ? `${name}-landing.zip` : `${name}.zip`;
   return new Response(Buffer.from(bytes), {

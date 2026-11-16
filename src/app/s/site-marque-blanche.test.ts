@@ -205,3 +205,23 @@ describe("non-régression : sites sans marque blanche", () => {
     expect(siteBrandFrom(computeEffectiveBrand({ plan: "pro", optionActive: undefined, row: null }))).toBeNull();
   });
 });
+
+describe("démo de l'application publiée (/s/[slug]/app) : favicon, partage et identifiants techniques", () => {
+  it("avec droit : favicon, og:title, aucune mention Décollage (y compris dans le moteur)", async () => {
+    setup("pro", undefined, brandRow("u-1", { favicon_data: PNG }));
+    const html = await demo();
+    expect(html).toContain(`<link rel="icon" href="${PNG}">`);
+    expect(html).toContain('<meta property="og:title" content="Atelier Lumière">');
+    expect(html).toContain("Atelier Lumière — prototype");
+    expect(html).not.toMatch(/d[ée]collage/i);
+    expect([...html.matchAll(/Bougie Lune/g)].map((m) => html.slice(m.index! - 60, m.index! + 40))).toEqual([]);
+  });
+  it("sans droit : aucune balise de marque, moteur habituel", async () => {
+    setup("solo", false, brandRow("u-1", { favicon_data: PNG }));
+    const html = await demo();
+    expect(html).not.toContain('rel="icon"');
+    expect(html).not.toContain("og:title");
+    expect(html).toContain("Bougie Lune — prototype");
+    expect(html).toContain("decollage-app:");
+  });
+});

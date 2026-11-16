@@ -2,7 +2,8 @@ import { DEFAULT_BRAND } from "./types";
 import type { EffectiveBrand } from "./effective";
 import { brandToCssVars } from "./css";
 import { validateLogo, validateFavicon } from "./validate";
-import type { Config } from "@/lib/types";
+import { ratioOf } from "@/lib/a11y/contrast";
+import type { Config, Project } from "@/lib/types";
 
 // Marque blanche des sites publiés (landing + démo) : fonctions PURES, sans accès base.
 // Le droit vient de EffectiveBrand.entitled (calculé côté serveur) ; sans droit -> null : rien n'est imposé.
@@ -52,6 +53,7 @@ export function applyBrandToConfig(cfg: Config, brand: SiteBrand | null): Config
   return {
     ...cfg,
     nom: brand.name,
+    description: nomChange && cfg.nom ? cfg.description.split(cfg.nom).join(brand.name) : cfg.description,
     initiales: nomChange ? initialesDe(brand.name) : cfg.initiales,
     logo: brand.logo ?? cfg.logo,
     couleurs: { primaire: brand.primary ?? cfg.couleurs.primaire, accent: brand.accent ?? cfg.couleurs.accent },
@@ -64,4 +66,31 @@ export function renameInTexts<T>(value: T, from: string, to: string): T {
   const walk = (v: unknown): unknown =>
     typeof v === "string" ? v.split(from).join(to) : Array.isArray(v) ? v.map(walk) : v && typeof v === "object" ? Object.fromEntries(Object.entries(v).map(([k, x]) => [k, k === "layout" || k === "type" || k === "id" ? x : walk(x)])) : v;
   return walk(value) as T;
+}
+
+/**
+ * Projet complet avec l'identité de marque (nom, couleurs, logo) : sert aux exports. Sans marque : le projet d'origine, inchangé.
+ * L'ancien nom est remplacé dans la landing, les tarifs, le contenu et la description (copie ; l'original n'est pas modifié).
+ */
+export function applyBrandToProject(p: Project, brand: SiteBrand | null): Project {
+  if (!brand) return p;
+  const from = p.config.nom;
+  const config = applyBrandToConfig(p.config, brand);
+  return {
+    ...p,
+    config: { ...config, description: renameInTexts(config.description, from, brand.name) },
+    landing: renameInTexts(p.landing, from, brand.name),
+    pricing: renameInTexts(p.pricing, from, brand.name),
+    contenu: p.contenu ? renameInTexts(p.contenu, from, brand.name) : p.contenu,
+  };
+}
+
+const xmlEsc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
+
+/** Icône d'onglet de repli (SVG en data URL) aux initiales et à la couleur de la marque, quand aucun favicon n'est enregistré. */
+export function fallbackFaviconDataUrl(brand: Pick<SiteBrand, "name" | "primary" | "secondary">): string {
+  const ini = xmlEsc(initialesDe(brand.name).replace(/[^\p{L}\p{N}]/gu, "").slice(0, 2) || "M");
+  const fill = brand.primary ?? DEFAULT_BRAND.primary;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="${fill}"/><text x="32" y="42" text-anchor="middle" font-family="system-ui,sans-serif" font-size="28" font-weight="800" fill="${ratioOf("#ffffff", fill) >= ratioOf("#111111", fill) ? "#ffffff" : "#111111"}">${ini}</text></svg>`;
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
 }

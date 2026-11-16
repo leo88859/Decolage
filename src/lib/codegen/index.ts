@@ -10,6 +10,7 @@ import { PROTO_CSS } from "@/lib/proto-css";
 import { STYLE_EXTRA, STYLE_VARS } from "@/lib/prototype";
 import { archOf, HOME_LAYOUT, ROLES } from "@/data/archetypes";
 import { ARCH_CSS } from "@/lib/arch-css";
+import { applyBrandToProject, fallbackFaviconDataUrl, type SiteBrand } from "@/lib/brand/site-brand";
 import type { Project } from "@/lib/types";
 import { ARCH_VIEWS, generationPlan, KIND_MAP, type GenKind, type GenPage } from "./plan";
 export { generationPlan, KIND_MAP };
@@ -40,6 +41,14 @@ export const VERSIONS = { next: "16.4.2", react: "19.3.0", typescript: "^5", "@t
 
 const js = (x: unknown) => JSON.stringify(x, null, 2);
 
+/** Métadonnées de la page racine de l'application générée. Avec marque blanche : nom, Open Graph et icône (favicon du client ou icône aux initiales). */
+function rootMetadata(nom: string, description: string, marque: SiteBrand | null): string {
+  const base = `title: ${JSON.stringify(nom)}, description: ${JSON.stringify(description)}`;
+  if (!marque) return `{ ${base} }`;
+  const icon = marque.favicon ?? fallbackFaviconDataUrl(marque);
+  return `{ ${base}, applicationName: ${JSON.stringify(nom)}, openGraph: { title: ${JSON.stringify(nom)}, description: ${JSON.stringify(description)}, siteName: ${JSON.stringify(nom)}, type: "website" }, icons: { icon: ${JSON.stringify(icon)} } }`;
+}
+
 
 
 /** Réservations : colonne date et heure, ressource éventuelle, statuts qui libèrent le créneau, horaires par défaut. */
@@ -56,7 +65,8 @@ function bookingOf(templateId: string, types: FieldType[], statuts: string[]): B
   };
 }
 
-export function generateNextProject(p: Project, now = new Date()): GenFile[] {
+export function generateNextProject(p0: Project, now = new Date(), marque: SiteBrand | null = null): GenFile[] {
+  const p = applyBrandToProject(p0, marque);
   const cfg = p.config;
   const t = TEMPLATE_BY_ID[cfg.templateId];
   const demo = DEMO[cfg.templateId];
@@ -111,7 +121,7 @@ export function generateNextProject(p: Project, now = new Date()): GenFile[] {
   };
 
   const htmlClass = `s-${cfg.style} shell-${design?.shell ?? "side"} dash-${design?.dash ?? "kpi-chart"} anim-${design?.anim ?? "rise"}`;
-  const css = `/* Généré par Décollage. Couleurs et design : modifie les variables ci-dessous. */
+  const css = `/* ${marque ? "Généré automatiquement" : "Généré par Décollage"}. Couleurs et design : modifie les variables ci-dessous. */
 :root{--p:${cfg.couleurs.primaire};--a:${cfg.couleurs.accent};${STYLE_VARS[cfg.style]}${font.url ? `;--ff:${font.famille}` : ""}}
 ${PROTO_CSS}
 ${arch ? ARCH_CSS : ""}
@@ -124,7 +134,7 @@ ${arch ? ARCH_REACT_CSS : ""}
   const layout = `import type { Metadata } from "next";
 ${arch ? "" : `import { Shell } from "@/components/Shell";\n`}import "./globals.css";
 
-export const metadata: Metadata = { title: ${js(cfg.nom)}, description: ${js(cfg.description)} };
+export const metadata: Metadata = ${rootMetadata(cfg.nom, cfg.description, marque)};
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -196,13 +206,13 @@ export default function Page() {
     exclude: ["node_modules"],
   };
 
-  return [
+  const files: GenFile[] = [
     { name: "package.json", content: js(pkg) + "\n" },
     { name: "tsconfig.json", content: js(tsconfig) + "\n" },
     { name: "next.config.mjs", content: `/** @type {import('next').NextConfig} */\nconst nextConfig = {};\n\nexport default nextConfig;\n` },
     { name: ".gitignore", content: "node_modules\n.next\nout\n*.tsbuildinfo\nnext-env.d.ts\n.env*\n!.env.example\n" },
     ...(unique !== undefined ? cloudFiles(cfg.nom) : []),
-    { name: "README.md", content: readme(p, gen, skipped, name, entite.pluriel, booking, unique) },
+    { name: "README.md", content: readme(p, gen, skipped, name, entite.pluriel, booking, unique, Boolean(marque)) },
     { name: "app/layout.tsx", content: layout },
     { name: "app/globals.css", content: css },
     // Icône d'onglet aux initiales et aux couleurs du projet (détectée automatiquement par Next.js).
@@ -220,8 +230,9 @@ export default function Page() {
     { name: "lib/types.ts", content: TYPES_TS },
     { name: "lib/rules.ts", content: RULES_TS },
     { name: "lib/store.ts", content: STORE_TS },
-    { name: "lib/config.ts", content: `// Généré par Décollage à partir de ton projet. Tu peux modifier ces valeurs.\nimport type { SaasConfig } from "@/lib/types";\n\nexport const SAAS: SaasConfig = ${js(saas)};\n` },
+    { name: "lib/config.ts", content: `// ${marque ? "Généré à partir de ton projet" : "Généré par Décollage à partir de ton projet"}. Tu peux modifier ces valeurs.\nimport type { SaasConfig } from "@/lib/types";\n\nexport const SAAS: SaasConfig = ${js(saas)};\n` },
   ];
+  return marque?.favicon ? files.filter((f) => f.name !== "app/icon.svg") : files;
 }
 
 /** Coquille de la liste d'attente : avec la base branchée, le badge et le compteur ne parlent plus du stockage local. */
@@ -289,14 +300,14 @@ function archPageFiles(gen: GenPage[], nom: string, isScreen: (g: GenPage) => bo
   return files;
 }
 
-function readme(p: Project, gen: ReturnType<typeof generationPlan>["gen"], skipped: string[], name: string, entite: string, booking?: Booking, unique?: number) {
+function readme(p: Project, gen: ReturnType<typeof generationPlan>["gen"], skipped: string[], name: string, entite: string, booking?: Booking, unique?: number, marque = false) {
   const c = p.config;
   const arch = archOf(c.templateId).id === "classic" ? null : archOf(c.templateId);
   return `# ${c.nom}
 
 ${c.description}
 
-Projet Next.js généré par Décollage (type « ${TEMPLATE_BY_ID[c.templateId].nom} »${c.design ? `, design ${DESIGN_BY_ID[c.design]?.nom}` : ""}).
+Projet Next.js généré${marque ? "" : " par Décollage"} (type « ${TEMPLATE_BY_ID[c.templateId].nom} »${c.design ? `, design ${DESIGN_BY_ID[c.design]?.nom}` : ""}).
 Le code est écrit à partir de modèles et de composants préprogrammés, sans IA.
 
 ## Ce qui fonctionne
