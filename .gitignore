@@ -15,3 +15,7 @@ build/
 next-env.d.ts
 
 .vercel
+
+# Tests navigateur
+test-results/
+playwright-report/
