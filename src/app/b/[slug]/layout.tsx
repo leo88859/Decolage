@@ -4,7 +4,7 @@ import Link from "next/link";
 import { CartProvider } from "@/components/vitrine/CartProvider";
 import { ContactLinks, VitrineHeader } from "@/components/vitrine/Chrome";
 import { chargerCatalogue } from "@/components/vitrine/load";
-import { readableOn, safeColor, textOnWhite } from "@/components/vitrine/logic";
+import { orEcrin, readableOn, safeColor, textOnWhite } from "@/components/vitrine/logic";
 import { themeOf } from "@/lib/boutique/themes";
 import "@/components/vitrine/vitrine.css";
 
@@ -12,7 +12,12 @@ import "@/components/vitrine/vitrine.css";
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
   const r = await chargerCatalogue(slug);
-  if (r.etat === "ok" && r.data.marque_blanche === true) return { title: { template: `%s · ${r.data.boutique.nom}`, default: r.data.boutique.nom } };
+  if (r.etat === "ok" && r.data.marque_blanche === true) {
+    const nom = r.data.boutique.nom;
+    // Avec une marque enregistrée : nom d'application, Open Graph et favicon du client (jamais ceux de Décollage).
+    const marque = r.data.marque ? { applicationName: nom, openGraph: { siteName: nom, locale: "fr_FR", type: "website" as const }, icons: { icon: r.data.marque.icone } } : {};
+    return { title: { template: `%s · ${nom}`, default: nom }, ...marque };
+  }
   return {};
 }
 
@@ -38,7 +43,7 @@ export default async function VitrineLayout({ children, params }: { children: Re
   const masquer = r.data.marque_blanche === true;
   const main = safeColor(b.couleur_principale, "#1f45e0");
   const accent = safeColor(b.couleur_accent, "#ff6b4a");
-  const style = { "--vt-main": main, "--vt-on-main": readableOn(main), "--vt-accent": accent, "--vt-ink": textOnWhite(main) } as CSSProperties;
+  const style = { "--vt-main": main, "--vt-on-main": readableOn(main), "--vt-accent": accent, "--vt-ink": textOnWhite(main), ...(r.data.marque ? { "--vt-gold": orEcrin(accent) } : {}) } as CSSProperties;
 
   return (
     <CartProvider catalogue={r.data}>

@@ -26,7 +26,9 @@ export type BoutiquePub = {
   delai_expiration_h?: number;
   quantite_max_article?: number;
 };
-export type CataloguePub = { boutique: BoutiquePub; categories: { id: string; nom: string; position: number }[]; produits: ProduitPub[]; marque_blanche?: boolean };
+/** Identité de marque blanche renvoyée par la route publique (présente seulement si le droit est actif ET qu'une marque est enregistrée). */
+export type MarquePub = { nom: string; couleur_principale: string | null; couleur_accent: string | null; logo: string | null; icone: string };
+export type CataloguePub = { boutique: BoutiquePub; categories: { id: string; nom: string; position: number }[]; produits: ProduitPub[]; marque_blanche?: boolean; marque?: MarquePub };
 
 export const MAX_LIGNES = 20;
 export const MAX_QTE = 99;
@@ -213,6 +215,34 @@ export function textOnWhite(hex: string): string {
   }
   return c;
 }
+
+/** Logo affichable : URL https, ou data URL PNG, JPEG ou WebP (jamais SVG). */
+export const logoSur = (u: string | null | undefined): string | null =>
+  typeof u === "string" && (/^https:\/\//i.test(u) || /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(u)) ? u : null;
+
+/**
+ * Marque blanche : la boutique prend le nom, les couleurs et le logo de la marque du client (le thème garde sa mise en page et ses polices).
+ * Sans marque : le catalogue d'origine, inchangé (même objet). L'ancien nom est remplacé dans la description.
+ */
+export function appliquerMarque(data: CataloguePub): CataloguePub {
+  const m = data.marque;
+  if (!m || data.marque_blanche !== true) return data;
+  const b = data.boutique;
+  return {
+    ...data,
+    boutique: {
+      ...b,
+      nom: m.nom,
+      description: b.nom && b.nom !== m.nom ? (b.description ?? "").split(b.nom).join(m.nom) : b.description,
+      couleur_principale: safeColor(m.couleur_principale, b.couleur_principale),
+      couleur_accent: safeColor(m.couleur_accent, b.couleur_accent),
+      logo: logoSur(m.logo) ?? b.logo,
+    },
+  };
+}
+
+/** Or du thème Écrin : l'accent de la marque s'il reste lisible sur le fond noir du thème (4,5:1), sinon l'or d'origine. */
+export const orEcrin = (accent: string): string => (contrast(accent, "#0c0b09") >= 4.5 ? accent : "#e6cf8a");
 
 /** Images : seules les URL https sont affichées. */
 export const imagesSures = (imgs: readonly string[] | null | undefined) => (imgs ?? []).filter((u) => typeof u === "string" && /^https:\/\//i.test(u));

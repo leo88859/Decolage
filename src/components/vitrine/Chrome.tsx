@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useVitrine } from "./CartProvider";
-import { countArticles, mailLink, telLink, whatsappLink, type BoutiquePub } from "./logic";
+import { countArticles, logoSur, mailLink, telLink, whatsappLink, type BoutiquePub } from "./logic";
 
 /** En-tête de la boutique : logo, nom, lien du panier avec le nombre d'articles. */
 export function VitrineHeader() {
@@ -14,7 +14,7 @@ export function VitrineHeader() {
       <div className="vt-wrap">
         <Link href={`/b/${b.slug}`} className="vt-brand">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          {b.logo && /^https:\/\//i.test(b.logo) ? <img src={b.logo} alt="" className="vt-logo" width={40} height={40} /> : null}
+          {logoSur(b.logo) ? <img src={logoSur(b.logo)!} alt="" className="vt-logo" width={40} height={40} /> : null}
           <span>{b.nom}</span>
         </Link>
         <Link href={`/b/${b.slug}/panier`} className="vt-cartlink" aria-label={`Panier, ${n} article${n > 1 ? "s" : ""}`}>
