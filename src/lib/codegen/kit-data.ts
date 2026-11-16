@@ -15,6 +15,8 @@ export type NavPage = { id: string; titre: string; kind: PageKind; href: string;
 export type SaasConfig = {
   nom: string;
   initiales: string;
+  /** Logo (data URL PNG, JPEG ou WebP) ; absent = les initiales. */
+  logo?: string;
   description: string;
   cible: string;
   storageKey: string;

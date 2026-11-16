@@ -104,7 +104,7 @@ export function generateNextProject(p0: Project, now = new Date(), marque: SiteB
   const features = (contenu?.fonctionnalites ?? t.copy.features).map(([a, b]) => [a.replaceAll("{nom}", cfg.nom), b.replaceAll("{nom}", cfg.nom)] as [string, string]);
 
   const saas = {
-    nom: cfg.nom, initiales: cfg.initiales, description: cfg.description, cible: cfg.cible || t.nom,
+    nom: cfg.nom, initiales: cfg.initiales, ...(cfg.logo ? { logo: cfg.logo } : {}), description: cfg.description, cible: cfg.cible || t.nom,
     // v2 : dates et nombres enregistrés en format réel (ISO, notation point).
     storageKey: `${name}-donnees-v2`,
     entite, types, statut: demo.status, statuts, exemples,

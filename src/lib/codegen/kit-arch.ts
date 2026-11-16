@@ -94,7 +94,7 @@ export function Avatar({ n, size = 32 }: { n: string; size?: number }) {
   return <span className="av" style={{ width: size, height: size, "--h": (t.charCodeAt(0) * 37) % 360 } as React.CSSProperties}>{t.split(" ").map((w) => w[0]).slice(0, 2).join("")}</span>;
 }
 export function Logo({ size = 30 }: { size?: number }) {
-  return <span className="mark" style={{ width: size, height: size }}>{SAAS.initiales}</span>;
+  return <span className="mark" style={{ width: size, height: size }}>{SAAS.logo ? <img src={SAAS.logo} alt="" style={{ width: "100%", height: "100%", objectFit: "contain" }} /> : SAAS.initiales}</span>;
 }
 export function Empty({ t, sub: s }: { t: string; sub: string }) {
   return <div className="empty"><b>{t}</b><p className="mut">{s}</p></div>;

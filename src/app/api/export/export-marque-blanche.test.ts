@@ -73,13 +73,15 @@ describe("export AVEC droit (Pro, Illimité, Solo avec option)", () => {
     expect(mentions(t)).toEqual([]);
   });
   it("projet Next.js : dossier, métadonnées, Open Graph, favicon, README et commentaires à la marque", async () => {
-    setup("pro", undefined, brandRow({ favicon_data: PNG }));
+    setup("pro", undefined, brandRow({ favicon_data: PNG, logo_data: PNG }));
     const res = await POST(req("next"));
     expect(res.headers.get("content-disposition")).toBe('attachment; filename="atelier-lumiere-nextjs.zip"');
     const t = await texte(res);
     expect(t).toContain("atelier-lumiere/app/layout.tsx");
     expect(t).toContain('siteName: "Atelier Lumière"');
     expect(t).toContain(`icons: { icon: "${PNG}" }`);
+    expect(t).toContain(`"logo": "${PNG}"`); // logo du client dans lib/config.ts
+    expect(t).toContain("#12ab34"); // couleur de la marque dans la configuration et le CSS
     expect(t).toContain("# Atelier Lumière");
     expect(t).not.toContain("app/icon.svg"); // le favicon du client remplace l'icône générée
     expect(mentions(t)).toEqual([]);
