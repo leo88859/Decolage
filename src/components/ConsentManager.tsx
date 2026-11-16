@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import "./legal.css";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { getConsentBrand, getServerConsentBrand, subscribeConsentBrand } from "@/lib/consent/brand";
 import {
   acceptAll, CATEGORY_INFO, CONSENT_OPEN_EVENT, getConsent, needsPrompt, OPTIONAL_CATEGORIES, OPTIONAL_TRACKERS,
   refuseAll, setConsent, type ConsentChoices,
@@ -31,6 +32,8 @@ export function ConsentManager() {
   const [custom, setCustom] = useState(false);
   const [draft, setDraft] = useState<ConsentChoices>({ audience: false, medias: false, publicite: false });
   const hasTrackers = OPTIONAL_TRACKERS.length > 0;
+  // Boutique en marque blanche : nom commercial du client à la place de celui de la plateforme (informations légales inchangées).
+  const marque = useSyncExternalStore(subscribeConsentBrand, getConsentBrand, getServerConsentBrand);
 
   const show = useCallback(() => {
     setDraft(getConsent()?.choices ?? { audience: false, medias: false, publicite: false });
@@ -67,7 +70,7 @@ export function ConsentManager() {
             <p id="consent-desc">
               {hasTrackers
                 ? "Certains services facultatifs ne se chargent que si tu les acceptes. Refuser est aussi simple qu'accepter, et tu peux changer d'avis à tout moment. Ton choix n'a aucun lien avec l'acceptation des conditions d'utilisation."
-                : "Aujourd'hui, Décollage n'utilise aucun cookie ni traceur facultatif : pas de mesure d'audience, pas de publicité, pas de contenu de tiers. Il n'y a donc rien à accepter ou à refuser. Voici ce qui est utilisé, parce que le service en a besoin :"}
+                : `Aujourd'hui, ${marque ?? "Décollage"} n'utilise aucun cookie ni traceur facultatif : pas de mesure d'audience, pas de publicité, pas de contenu de tiers. Il n'y a donc rien à accepter ou à refuser. Voici ce qui est utilisé, parce que le service en a besoin :`}
             </p>
 
             {!hasTrackers && (

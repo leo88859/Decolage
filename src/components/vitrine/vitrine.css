@@ -189,3 +189,8 @@ fieldset.vt-field { border: 0; padding: 0; margin: 0 0 14px; min-width: 0; }
   .vt[data-theme="street"] .vt-card { transition: transform .15s, box-shadow .15s; }
   .vt[data-theme="street"] .vt-card:hover { transform: translate(-2px, -2px); box-shadow: 7px 7px 0 #111; }
 }
+
+/* Pied de boutique en marque blanche : bouton « Gérer mes cookies » au style des liens voisins. */
+.vt-legal { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.vt-legal button { background: none; border: 0; padding: 0; margin: 0; font: inherit; color: inherit; text-decoration: underline; cursor: pointer; }
+.vt-legal a { color: inherit; text-decoration: underline; }
