@@ -47,3 +47,36 @@ jobs:
       - name: Audit des dépendances de production (informatif)
         run: npm audit --omit=dev --audit-level=high
         continue-on-error: true
+
+  e2e:
+    name: Tests navigateur (Playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Installation des dépendances
+        run: npm ci --no-audit --no-fund
+
+      - name: Installation de Chromium pour Playwright
+        run: npx playwright install --with-deps chromium
+
+      # Playwright construit et lance le site lui-même (webServer) avec un faux Supabase en mémoire : aucun secret.
+      - name: Tests e2e
+        run: npm run test:e2e
+
+      - name: Rapport Playwright en cas d'échec
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-test-results
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 7
