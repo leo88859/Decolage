@@ -2,6 +2,7 @@ import { expect, test, type APIRequestContext } from "@playwright/test";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { projectJson } from "@/lib/export";
 import { newProjectFromIdee } from "@/lib/project";
 import { MARQUE, USERS } from "./mock-supabase";
 import { connecter, lireZip, MENTION } from "./helpers";
@@ -114,7 +115,6 @@ test("export marque blanche puis RÉIMPORT dans l'application : projet et param�
 });
 
 test("un ancien export (sans marque, projectJson d'origine) se réimporte toujours", async ({ page }) => {
-  const { projectJson } = await import("@/lib/export");
   await reimporter(page, projectJson(projet));
   await expect(page.getByText(/1 projet importé/)).toBeVisible();
   const stocke = await page.evaluate(() => JSON.parse(localStorage.getItem("decollage.data.v2") ?? "{}"));
