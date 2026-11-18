@@ -16,7 +16,9 @@ export default defineConfig({
   globalSetup: "./e2e/global-setup.ts",
   timeout: 60_000,
   expect: { timeout: 10_000 },
-  workers: 2,
+  // Un seul worker : avec 2 workers en parallèle, les premières requêtes simultanées sur /b/<adresse> restent bloquées (timeout 60 s) ;
+  // avec 1 worker, les 60 tests passent en ~1,5 min (constaté en local, Windows).
+  workers: 1,
   reporter: [["list"]],
   use: { baseURL: `http://localhost:${PORT}`, locale: "fr-FR", trace: "off" },
   projects: [
