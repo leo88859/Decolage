@@ -1,6 +1,6 @@
 import { slugError, EMAIL_RE } from "@/lib/publish";
 import { validateColor } from "@/lib/brand/validate";
-import { isCentimes, QUANTITE_MAX, QUANTITE_TOTALE_MAX } from "./money";
+import { DELAI_EXPIRATION_MAX_H, DELAI_EXPIRATION_MIN_H, isCentimes, QUANTITE_MAX, QUANTITE_TOTALE_MAX } from "./money";
 import { MODES, STATUTS_BOUTIQUE, STATUTS_COMMANDE, type Mode, type StatutBoutique, type StatutCommande } from "./types";
 import { THEME_IDS, type ThemeId } from "./themes";
 
@@ -78,8 +78,10 @@ const optional = <T>(f: (v: string) => { ok: true; value: T } | { ok: false; err
 export type BoutiqueIn = {
   slug: string; nom: string; description: string; couleur_principale: string; couleur_accent: string; logo: string | null;
   adresse: string; whatsapp: string | null; email: string | null; telephone: string | null; modes: Mode[]; statut: StatutBoutique; theme: ThemeId;
+  /** Migration 0010 : heures avant annulation automatique (6 à 168) et quantité maximale par article (1 à 99). */
+  delai_expiration_h: number; quantite_max_article: number;
 };
-const BOUTIQUE_KEYS = ["slug", "nom", "description", "couleur_principale", "couleur_accent", "logo", "adresse", "whatsapp", "email", "telephone", "modes", "statut", "theme"] as const;
+const BOUTIQUE_KEYS = ["slug", "nom", "description", "couleur_principale", "couleur_accent", "logo", "adresse", "whatsapp", "email", "telephone", "modes", "statut", "theme", "delai_expiration_h", "quantite_max_article"] as const;
 
 export function validateBoutique(input: unknown, partial = false): Result<Partial<BoutiqueIn>> {
   const r = new Reader(input, BOUTIQUE_KEYS, partial, ["slug", "nom"]);
@@ -104,6 +106,8 @@ export function validateBoutique(input: unknown, partial = false): Result<Partia
   });
   r.run("statut", (v) => ((STATUTS_BOUTIQUE as readonly unknown[]).includes(v) ? { ok: true, value: v as StatutBoutique } : { ok: false, error: "brouillon ou publiee attendu." }));
   r.run("theme", (v) => ((THEME_IDS as readonly unknown[]).includes(v) ? { ok: true, value: v as ThemeId } : { ok: false, error: "Thème inconnu." }));
+  r.run("delai_expiration_h", int(DELAI_EXPIRATION_MIN_H, DELAI_EXPIRATION_MAX_H));
+  r.run("quantite_max_article", int(1, QUANTITE_MAX));
   return r.result();
 }
 
@@ -172,7 +176,7 @@ export type CommandeIn = {
  * Entrée de la commande publique. Les clés inconnues (prix, total, paiement, statut…) sont IGNORÉES : seuls
  * variante_id et quantite de chaque ligne sont gardés ; la base relit prix et stock.
  */
-export function validateCommande(input: unknown): Result<CommandeIn> {
+export function validateCommande(input: unknown, quantiteMax: number = QUANTITE_MAX): Result<CommandeIn> {
   const errors: Errors = {};
   if (typeof input !== "object" || input === null || Array.isArray(input)) return { ok: false, errors: { _: "Objet JSON attendu." } };
   const o = input as Record<string, unknown>;
@@ -215,11 +219,17 @@ export function validateCommande(input: unknown): Result<CommandeIn> {
       const id = typeof x.variante_id === "string" && UUID_RE.test(x.variante_id) ? x.variante_id.toLowerCase() : null;
       const q = x.quantite;
       if (!id) errors[`lignes.${i}`] = "Article invalide.";
-      else if (typeof q !== "number" || !Number.isInteger(q) || q < 1 || q > QUANTITE_MAX) errors[`lignes.${i}`] = `Quantité : entier entre 1 et ${QUANTITE_MAX}.`;
+      else if (typeof q !== "number" || !Number.isInteger(q) || q < 1 || q > quantiteMax) errors[`lignes.${i}`] = `Quantité : entier entre 1 et ${quantiteMax}.`;
       else lignes.push({ variante_id: id, quantite: q });
     }
   }
   if (!errors.lignes && lignes.reduce((s, l) => s + l.quantite, 0) > QUANTITE_TOTALE_MAX) errors.lignes = `${QUANTITE_TOTALE_MAX} articles au maximum par commande.`;
+  if (!errors.lignes) {
+    // Un même article réparti sur plusieurs lignes compte une seule fois (même règle que la base).
+    const parArticle = new Map<string, number>();
+    for (const l of lignes) parArticle.set(l.variante_id, (parArticle.get(l.variante_id) ?? 0) + l.quantite);
+    if ([...parArticle.values()].some((q) => q > quantiteMax)) errors.lignes = `${quantiteMax} exemplaires au maximum par article.`;
+  }
   if (Object.keys(errors).length || !mode) return { ok: false, errors };
   return { ok: true, value: { slug, cle, mode, client, lignes } };
 }

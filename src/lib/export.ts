@@ -4,6 +4,7 @@ import { validateConfig } from "@/lib/config";
 import { landingCss, renderLanding } from "@/lib/landing";
 import { activePages, REVENUE_LABEL } from "@/lib/modules";
 import { contenuOf } from "@/lib/project";
+import { applyBrandToProject, type SiteBrand } from "@/lib/brand/site-brand";
 import { renderPrototype } from "@/lib/prototype";
 import type { AppData, Project } from "@/lib/types";
 
@@ -23,12 +24,12 @@ export function dataJson(d: AppData): string {
 export const slug = (s: string) =>
   s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "projet";
 
-function readme(p: Project): string {
+function readme(p: Project, marque = false): string {
   const c = p.config;
   const t = TEMPLATE_BY_ID[c.templateId];
   return `# ${c.nom}
 
-Généré avec Décollage à partir du modèle « ${t.nom} » (version ${c.templateVersion}).
+${marque ? `Projet généré à partir du modèle « ${t.nom} ».` : `Généré avec Décollage à partir du modèle « ${t.nom} » (version ${c.templateVersion}).`}
 
 ## Contenu de l'archive
 
@@ -36,8 +37,7 @@ Généré avec Décollage à partir du modèle « ${t.nom} » (version ${c.templ
 |---|---|
 | index.html + style.css | Landing page statique, prête à être hébergée |
 | prototype.html | Prototype cliquable (niveau 1) — données d'exemple, aucun enregistrement |
-| decollage.json | Configuration complète du projet (format documenté « ${PROJECT_FORMAT} » v${FORMAT_VERSION}) |
-
+${marque ? "| decollage.json | Manifeste technique du projet (configuration, sans donnée de compte), réimportable |" : `| decollage.json | Configuration complète du projet (format documenté « ${PROJECT_FORMAT} » v${FORMAT_VERSION}) |`}
 ## Où en est ce projet
 
 - **Niveau 1 — Prototype : oui.** \`prototype.html\` montre l'apparence et la navigation.
@@ -50,7 +50,7 @@ Généré avec Décollage à partir du modèle « ${t.nom} » (version ${c.templ
 - Types d'utilisateurs : ${c.roles.join(", ")}
 - Pages : ${activePages(c).map((x) => x.titre).join(", ")}
 - Briques : ${c.modules.map((m) => MODULE_BY_ID[m].nom).join(", ")}
-${c.domaine ? `- Domaine souhaité : ${c.domaine} (non réservé par Décollage)\n` : ""}
+${c.domaine ? `- Domaine souhaité : ${c.domaine} (non réservé${marque ? "" : " par Décollage"})\n` : ""}
 ## Pour passer en production
 
 1. Choisir une plateforme (no-code ou code) et recréer les pages listées ci-dessus.
@@ -59,27 +59,28 @@ ${c.domaine ? `- Domaine souhaité : ${c.domaine} (non réservé par Décollage)
 4. Rédiger mentions légales, politique de confidentialité et conditions d'utilisation.
 5. Héberger la landing (index.html + style.css) et réserver le nom de domaine.
 6. Tester sur mobile, mettre en place des sauvegardes et le suivi des erreurs.
-
-La feuille de route détaillée se trouve dans Décollage, onglet « Feuille de route ».
-`;
+${marque ? "" : "\nLa feuille de route détaillée se trouve dans Décollage, onglet « Feuille de route ».\n"}`;
 }
 
-export function projectFiles(p: Project): { name: string; content: string }[] {
+/** Fichiers de l'archive. Avec `marque` (droit vérifié côté serveur) : nom, couleurs, logo et favicon du client, aucune mention de Décollage. */
+export function projectFiles(p0: Project, marque: SiteBrand | null = null): { name: string; content: string }[] {
+  const p = applyBrandToProject(p0, marque);
   const pricing = p.pricing.offres.length ? p.pricing : null;
   const contenu = contenuOf(p);
   return [
-    { name: "index.html", content: renderLanding(p.config, p.landing, pricing, { inlineCss: false, contenu }) },
+    { name: "index.html", content: renderLanding(p.config, p.landing, pricing, { inlineCss: false, contenu, marque }) },
     { name: "style.css", content: landingCss(p.config, p.landing) },
     // Application autonome : démarre avec les données du projet, puis enregistre dans le navigateur.
-    { name: "prototype.html", content: renderPrototype(p.config, "accueil", contenu, { persist: true, storeKey: p.id, initial: p.appData }) },
+    { name: "prototype.html", content: renderPrototype(p.config, "accueil", contenu, { persist: true, storeKey: p.id, initial: p.appData, marque }) },
+    // Manifeste technique (aucun secret, aucune donnée de compte) : conservé aussi en marque blanche, pour pouvoir réimporter le projet.
     { name: "decollage.json", content: projectJson(p) },
-    { name: "README.md", content: readme(p) },
+    { name: "README.md", content: readme(p, Boolean(marque)) },
   ];
 }
 
 type ImportResult = { ok: true; projects: Project[]; favorites: string[] } | { ok: false; error: string };
 
-function checkProject(x: unknown): string | null {
+export function checkProject(x: unknown): string | null {
   const p = x as Project;
   if (!p || typeof p !== "object" || typeof p.id !== "string" || !p.config || !p.landing) return "Structure de projet invalide.";
   if (!TEMPLATE_BY_ID[p.config.templateId]) return `Modèle inconnu : ${String(p.config.templateId)}.`;

@@ -416,7 +416,7 @@ export function protoRuntime(D: ProtoData, archModule?: (x: any) => any) {
     S.page = id; S.q = ""; S.chip = "";
     shell(); render();
     window.scrollTo(0, 0);
-    if (parent !== window) parent.postMessage({ decollagePage: id }, "*");
+    if (parent !== window) parent.postMessage({ decollagePage: id, key: D.storeKey }, "*");
   }
   function toast(t: string, kind = "ok") {
     const el = document.createElement("div");
@@ -584,5 +584,5 @@ export function protoRuntime(D: ProtoData, archModule?: (x: any) => any) {
     setTimeout(() => { document.documentElement.style.visibility = ""; }, 600);
     parent.postMessage({ decollageHello: true, key: D.storeKey }, "*");
   }
-  if (parent !== window) parent.postMessage({ decollagePage: S.page }, "*");
+  if (parent !== window) parent.postMessage({ decollagePage: S.page, key: D.storeKey }, "*");
 }

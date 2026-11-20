@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { formatEuros } from "@/lib/boutique/money";
 import { PAIEMENT_LABEL, STATUT_LABEL, type StatutCommande } from "@/lib/boutique/types";
+import { texteExpirationAcheteur } from "@/lib/boutique/expiration";
 import { ContactLinks } from "./Chrome";
 import { useVitrine } from "./CartProvider";
 
@@ -97,6 +98,7 @@ export function SuiviView({ confirmation = false }: { confirmation?: boolean }) 
           <h2>Commande {cmd.ref}</h2>
           <p>Statut : <strong>{STATUT_LABEL[cmd.statut]}</strong></p>
           <p>Paiement : <strong>{PAIEMENT_LABEL}</strong></p>
+          {cmd.statut === "nouvelle" ? <p className="vt-hint" data-testid="expiration-acheteur">{texteExpirationAcheteur(b.delai_expiration_h)}</p> : null}
           <table className="vt-table">
             <caption className="sr-only">Articles de la commande</caption>
             <thead><tr><th scope="col">Article</th><th scope="col" className="num">Qté</th><th scope="col" className="num">Prix</th></tr></thead>

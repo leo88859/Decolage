@@ -82,6 +82,16 @@ export function BoutiqueFields({ value: v, onChange, errors: e, etapes = [0, 1, 
           {e.modes && <small id="modes-err" role="alert" style={{ color: "var(--bad)" }}>{e.modes}</small>}
         </fieldset>
       )}
+      {etapes.includes(3) && (
+        <div className="grid-2">
+          <Field label="Annulation automatique après (heures)" error={e.delai_expiration_h} hint="Une commande non confirmée au bout de ce délai est annulée et son stock remis en vente. De 6 à 168 heures (48 par défaut).">
+            {(p) => <input {...p} type="number" inputMode="numeric" min={6} max={168} step={1} className="input" value={v.delai_expiration_h} onChange={(x) => onChange({ delai_expiration_h: x.target.value })} />}
+          </Field>
+          <Field label="Quantité maximale par article" error={e.quantite_max_article} hint="Par commande et par article. De 1 à 99 (10 par défaut).">
+            {(p) => <input {...p} type="number" inputMode="numeric" min={1} max={99} step={1} className="input" value={v.quantite_max_article} onChange={(x) => onChange({ quantite_max_article: x.target.value })} />}
+          </Field>
+        </div>
+      )}
     </div>
   );
 }

@@ -10,7 +10,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   if (r.etat !== "ok") return { title: "Boutique", robots: { index: false } };
   const b = r.data.boutique;
   const description = (b.description || `Découvre les produits de ${b.nom} et commande en ligne.`).slice(0, 160);
-  return { title: { absolute: b.nom }, description, openGraph: { title: b.nom, description, type: "website", locale: "fr_FR", images: b.logo ? [b.logo] : undefined } };
+  return { title: { absolute: b.nom }, description, openGraph: { title: b.nom, description, type: "website", locale: "fr_FR", images: b.logo && /^https:\/\//i.test(b.logo) ? [b.logo] : undefined } };
 }
 
 export default async function Page({ params }: { params: Promise<{ slug: string }> }) {

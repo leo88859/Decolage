@@ -4,6 +4,10 @@ const securityHeaders = [
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
   { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains" },
+  // Anti-clickjacking : aucune page de l'application n'est chargée dans un cadre. Les aperçus du constructeur
+  // sont des iframes « srcdoc » isolés (sandbox) : ils sont contenus DANS nos pages, sans être encadrés par URL.
+  { key: "X-Frame-Options", value: "DENY" },
+  { key: "Content-Security-Policy", value: "frame-ancestors 'none'" },
 ];
 
 const nextConfig: NextConfig = {

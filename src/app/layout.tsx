@@ -3,6 +3,7 @@ import { Inter, Instrument_Serif, Space_Grotesk } from "next/font/google";
 import { CloudSync } from "@/components/CloudSync";
 import { ConsentManager } from "@/components/ConsentManager";
 import { Footer } from "@/components/Footer";
+import { HorsVitrine } from "@/components/HorsVitrine";
 import { Nav } from "@/components/Nav";
 import { PrefsApply } from "@/components/PrefsApply";
 import { Toasts } from "@/components/ui";
@@ -27,9 +28,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="fr" className={`${body.variable} ${display.variable} ${serif.variable}`}>
       <body>
         <a href="#contenu" className="sr-only">Aller au contenu</a>
-        <Nav />
+        <HorsVitrine><Nav /></HorsVitrine>
         <div id="contenu" tabIndex={-1}>{children}</div>
-        <Footer />
+        <HorsVitrine><Footer /></HorsVitrine>
         <ConsentManager />
         <Toasts />
         <CloudSync />

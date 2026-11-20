@@ -138,9 +138,9 @@ describe("seuils côté serveur (validation d'entrée des routes)", () => {
   const id = (i: number) => `0000000${i}-0000-4000-8000-000000000000`;
   const base = { slug: "chez-awa", cle: "cle-1234567890abcdef", mode: "retrait", client: { nom: "Awa", email: "awa@exemple.fr" } };
 
-  it("commande : 200 articles passent, 201 refusés ; 20 lignes passent, 21 refusées", () => {
-    expect(validateCommande({ ...base, lignes: [{ variante_id: id(1), quantite: 99 }, { variante_id: id(2), quantite: 99 }, { variante_id: id(3), quantite: 2 }] }).ok).toBe(true);
-    expect(validateCommande({ ...base, lignes: [{ variante_id: id(1), quantite: 99 }, { variante_id: id(2), quantite: 99 }, { variante_id: id(3), quantite: 3 }] }).ok).toBe(false);
+  it("commande : 50 articles passent, 51 refusés (étape 2) ; 20 lignes passent, 21 refusées", () => {
+    expect(validateCommande({ ...base, lignes: [{ variante_id: id(1), quantite: 25 }, { variante_id: id(2), quantite: 25 }] }).ok).toBe(true);
+    expect(validateCommande({ ...base, lignes: [{ variante_id: id(1), quantite: 25 }, { variante_id: id(2), quantite: 26 }] }).ok).toBe(false);
     const n = (k: number) => Array.from({ length: k }, (_, i) => ({ variante_id: `0000000${i % 10}-0000-4000-8000-0000000000${String(i).padStart(2, "0")}`, quantite: 1 }));
     expect(validateCommande({ ...base, lignes: n(20) }).ok).toBe(true);
     expect(validateCommande({ ...base, lignes: n(21) }).ok).toBe(false);

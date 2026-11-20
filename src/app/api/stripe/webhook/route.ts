@@ -1,5 +1,5 @@
 import type Stripe from "stripe";
-import { analyzeSubscription, brandEntitlementAction, brandItemsToDrop, brandRightWanted, HANDLED_EVENTS, isActiveStatus, resolvePlan, subscriptionIdOf } from "@/lib/billing";
+import { analyzeSubscription, brandEntitlementAction, brandItemsToDrop, brandRightWanted, HANDLED_EVENTS, isActiveStatus, isUuid, resolvePlan, resolveProfileLink, subscriptionIdOf } from "@/lib/billing";
 import { isPaymentConfigured, stripeBrandPrice, stripeLegacyPrices, stripePrices, stripeWebhookSecret } from "@/lib/env";
 import { normalizePlan } from "@/lib/plans";
 import { isMissingSchema, syncPublicationsWithPlan } from "@/lib/site-lifecycle";
@@ -33,16 +33,44 @@ export async function POST(req: Request) {
     const customerId = typeof sub.customer === "string" ? sub.customer : sub.customer.id;
     const admin = createAdminClient();
     // L'utilisateur est retrouvé grâce au lien enregistré par NOTRE serveur au moment du paiement.
-    const { data: profile, error: profileError } = await admin.from("profiles").select("id, plan, stripe_subscription_id, subscription_status").eq("stripe_customer_id", customerId).maybeSingle();
+    const { data: found, error: profileError } = await admin.from("profiles").select("id, plan, stripe_customer_id, stripe_subscription_id, subscription_status").eq("stripe_customer_id", customerId).maybeSingle();
     // Lecture impossible ≠ client inconnu : on ne répond JAMAIS 200 sur une panne de base (Stripe doit rejouer).
     if (profileError) throw new Error(profileError.message);
-    // Client inconnu : compte supprimé entre-temps (la suppression résilie l'abonnement, ce qui déclenche
-    // cet événement après l'effacement du profil). Ce n'est pas une erreur : on répond 200 pour que Stripe
-    // n'insiste pas. Journal sans donnée personnelle (ni identifiant client, ni e-mail).
+    let profile = found;
+    // Secours : aucun compte lié à ce client (lien jamais enregistré). On ne se fie qu'à des métadonnées concordantes
+    // (abonnement ET client relu chez Stripe). Compte supprimé entre-temps ou métadonnées absentes : ce n'est pas une erreur (200).
     if (!profile) {
-      console.warn(`[stripe] événement ${event.type} ignoré : aucun compte associé (compte supprimé ?)`);
-      return Response.json({ received: true, ignored: true });
+      const subUserId = sub.metadata?.user_id;
+      let customerUserId: unknown = null;
+      let candidate: typeof found = null;
+      if (isUuid(subUserId)) {
+        const customer = await stripe.customers.retrieve(customerId);
+        customerUserId = "deleted" in customer && customer.deleted ? null : customer.metadata?.user_id;
+        if (customerUserId === subUserId) {
+          const r = await admin.from("profiles").select("id, plan, stripe_customer_id, stripe_subscription_id, subscription_status").eq("id", subUserId).maybeSingle();
+          if (r.error) throw new Error(r.error.message);
+          candidate = r.data;
+        }
+      }
+      const decision = resolveProfileLink({ customerId, subUserId, customerUserId, profile: candidate as { id: string; stripe_customer_id: string | null } | null });
+      if (decision.action === "ignorer") {
+        // Journal sans donnée personnelle (ni e-mail, ni identifiant client).
+        console.warn(`[stripe] événement ${event.type} ignoré : aucun compte associé (${decision.reason})`);
+        return Response.json({ received: true, ignored: true });
+      }
+      if (decision.action === "alerter_autre_lien") {
+        console.error(`[stripe] ALERTE réconciliation manuelle : abonnement ${sub.id} (client ${customerId}) revendiqué par le compte ${decision.userId}, déjà lié à un autre client Stripe. Rien n'a été modifié.`);
+        return Response.json({ received: true, ignored: true });
+      }
+      if (decision.action === "reparer") {
+        // Condition « encore vide » : un lien posé entre-temps n'est jamais écrasé.
+        const { error: linkError } = await admin.from("profiles").update({ stripe_customer_id: customerId, updated_at: new Date().toISOString() }).eq("id", decision.userId).is("stripe_customer_id", null);
+        if (linkError) throw new Error(linkError.message);
+        console.warn(`[stripe] lien client Stripe réparé pour l'abonnement ${sub.id}`);
+      }
+      profile = candidate;
     }
+    if (!profile) return Response.json({ received: true, ignored: true });
     // Un ancien abonnement qui se termine ne doit pas retirer l'accès donné par un abonnement plus récent.
     if (profile.stripe_subscription_id && profile.stripe_subscription_id !== sub.id && !isActiveStatus(sub.status)) {
       return Response.json({ received: true, ignored: true });
@@ -89,7 +117,9 @@ export async function POST(req: Request) {
     }
     return Response.json({ received: true });
   } catch (e) {
-    console.error(`[stripe] échec du traitement de ${event.id} (${event.type}) : ${(e as Error).message}`);
+    // Pas de message d'erreur journalisé (peut contenir des données) : seulement le nom et le code de l'erreur.
+    const info = e as { name?: string; code?: string };
+    console.error(`[stripe] échec du traitement de ${event.id} (${event.type}) : erreur ${info.name ?? "inconnue"} ${info.code ?? "sans_code"}`);
     // 500 : Stripe renverra l'événement plus tard.
     return Response.json({ error: "Traitement impossible" }, { status: 500 });
   }
@@ -118,6 +148,6 @@ async function syncBrandOption(admin: ReturnType<typeof createAdminClient>, user
     const err = e as Error & { code?: string };
     // Migration 0006 absente : on journalise et on continue. Toute autre erreur remonte (500) pour que Stripe rejoue l'événement.
     if (!isMissingSchema(err)) throw err;
-    console.error(`[stripe] option marque blanche non synchronisée (migration 0006 exécutée ?) : ${err.message}`);
+    console.error(`[stripe] option marque blanche non synchronisée (migration 0006 exécutée ?) : code ${err.code ?? "sans_code"}`);
   }
 }

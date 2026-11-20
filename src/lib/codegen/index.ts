@@ -1,16 +1,19 @@
+import "server-only";
 import { DEMO } from "@/data/demo";
 import { DESIGN_BY_ID, designId } from "@/data/designs";
 import { TEMPLATE_BY_ID } from "@/data/templates";
 import { POLICES, policeOf } from "@/lib/config";
 import { PROTO_DESIGN_CSS } from "@/lib/design-css";
 import { slug } from "@/lib/export";
-import { activePages } from "@/lib/modules";
 import { contenuOf } from "@/lib/project";
 import { PROTO_CSS } from "@/lib/proto-css";
 import { STYLE_EXTRA, STYLE_VARS } from "@/lib/prototype";
-import { archOf, ARCHETYPES, HOME_LAYOUT, ROLES } from "@/data/archetypes";
+import { archOf, HOME_LAYOUT, ROLES } from "@/data/archetypes";
 import { ARCH_CSS } from "@/lib/arch-css";
-import type { ArchPageKind, PageKind, Project } from "@/lib/types";
+import { applyBrandToProject, fallbackFaviconDataUrl, type SiteBrand } from "@/lib/brand/site-brand";
+import type { Project } from "@/lib/types";
+import { ARCH_VIEWS, generationPlan, KIND_MAP, type GenKind, type GenPage } from "./plan";
+export { generationPlan, KIND_MAP };
 import { ARCH_KIT_TSX, ARCH_REACT_CSS, FRAME_TSX, SCREENS_TSX, SITE_TSX } from "./kit-arch";
 import { STORE_TS, TYPES_TS } from "./kit-data";
 import { RULES_TS } from "./kit-rules";
@@ -21,23 +24,13 @@ import { REACT_CSS, SHELL_TSX } from "./kit-ui";
 import { VIEWS_TSX } from "./kit-views";
 import { CLOUD_TS, CLOUD_TSX, WAITLIST_SQL } from "./kit-cloud";
 
-/** Écrans d'architecture (rendus par components/screens.tsx). */
-const ARCH_VIEWS = new Set<string>(Object.values(ARCHETYPES).flatMap((a) => a.screens.map((s) => s.view)));
 
 // Générateur de projet Next.js, sans IA : un kit de composants écrit à l'avance (kit-*.ts) + la
 // configuration du projet (nom, couleurs, design, type, pages, données) sérialisée en JSON.
 // Le résultat est une vraie application : les données sont enregistrées dans le navigateur.
 
 export type GenFile = { name: string; content: string };
-type GenKind = "accueil" | "dashboard" | "table" | "cards" | "grid" | "kanban" | "agenda" | "form" | "todo" | "goals" | "settings" | "pricing" | "login" | "activity" | "waitlist";
 
-/** Pages du prototype et leur équivalent dans le projet généré. Les autres ne sont pas générées. */
-export const KIND_MAP: Partial<Record<PageKind, GenKind>> = {
-  accueil: "accueil", dashboard: "dashboard", graphique: "dashboard", resultats: "dashboard",
-  tableau: "table", liste: "cards", grille: "grid", kanban: "kanban", calendrier: "agenda", mois: "agenda",
-  formulaire: "form", relances: "todo", objectifs: "goals", parametres: "settings", profil: "settings",
-  tarifs: "pricing", facturation: "pricing", connexion: "login", historique: "activity", notifications: "activity", waitlist: "waitlist",
-};
 const VIEW: Record<GenKind, string> = {
   accueil: "Home", dashboard: "Dashboard", table: "TableView", cards: "CardsView", grid: "CardsView", kanban: "KanbanView", agenda: "AgendaView",
   form: "FormView", todo: "TodoView", goals: "GoalsView", settings: "SettingsView", pricing: "PricingView", login: "LoginView", activity: "ActivityView", waitlist: "WaitlistView",
@@ -47,42 +40,16 @@ const VIEW: Record<GenKind, string> = {
 export const VERSIONS = { next: "16.4.2", react: "19.3.0", typescript: "^5", "@types/react": "^19", "@types/react-dom": "^19", "@types/node": "^24", "@supabase/supabase-js": "^2.118.0" };
 
 const js = (x: unknown) => JSON.stringify(x, null, 2);
-const routeId = (id: string) => id.toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "") || "page";
 
-type GenPage = { id: string; titre: string; kind: GenKind | ArchPageKind; href: string; nav: boolean; zone?: "site" | "app" };
-
-/** Ce que le générateur produit, et ce qu'il laisse de côté (affiché dans Décollage et le README). */
-export function generationPlan(p: Project): { gen: GenPage[]; skipped: string[] } {
-  const pages = activePages(p.config);
-  const gen: GenPage[] = [];
-  const skipped: string[] = [];
-  // Architecture dédiée : site public à la racine, espace utilisateur sous /app.
-  if (archOf(p.config.templateId).id !== "classic") {
-    for (const pg of pages) {
-      const k = String(pg.kind);
-      if (k.startsWith("site-")) gen.push({ id: pg.id, titre: pg.titre, kind: pg.kind as ArchPageKind, href: pg.id === "accueil" ? "/" : `/${routeId(pg.id)}`, nav: true, zone: "site" });
-      else if (ARCH_VIEWS.has(k)) gen.push({ id: pg.id, titre: pg.titre, kind: pg.kind as ArchPageKind, href: pg.id === "app" ? "/app" : `/app/${routeId(pg.id)}`, nav: true, zone: "app" });
-      else {
-        const kind = KIND_MAP[pg.kind as PageKind];
-        if (kind) gen.push({ id: routeId(pg.id), titre: pg.titre, kind, href: `/app/${routeId(pg.id)}`, nav: true, zone: "app" });
-        else if (pg.kind !== "detail") skipped.push(pg.titre);
-      }
-    }
-    return { gen, skipped };
-  }
-  const used = new Set<string>();
-  for (const pg of pages) {
-    const kind = KIND_MAP[pg.kind as PageKind];
-    if (!kind) { if (pg.kind !== "detail") skipped.push(pg.titre); continue; }
-    let id = kind === "accueil" ? "" : routeId(pg.id);
-    while (id && used.has(id)) id += "-2";
-    used.add(id);
-    gen.push({ id: id || "accueil", titre: pg.titre, kind, href: id ? `/${id}` : "/", nav: pg.nav || kind === "settings" });
-  }
-  // Une page « Paramètres » est toujours présente : c'est là que se trouvent l'import et l'export CSV.
-  if (!gen.some((g) => g.kind === "settings")) gen.push({ id: "donnees", titre: "Données", kind: "settings", href: "/donnees", nav: true });
-  return { gen, skipped };
+/** Métadonnées de la page racine de l'application générée. Avec marque blanche : nom, Open Graph et icône (favicon du client ou icône aux initiales). */
+function rootMetadata(nom: string, description: string, marque: SiteBrand | null): string {
+  const base = `title: ${JSON.stringify(nom)}, description: ${JSON.stringify(description)}`;
+  if (!marque) return `{ ${base} }`;
+  const icon = marque.favicon ?? fallbackFaviconDataUrl(marque);
+  return `{ ${base}, applicationName: ${JSON.stringify(nom)}, openGraph: { title: ${JSON.stringify(nom)}, description: ${JSON.stringify(description)}, siteName: ${JSON.stringify(nom)}, type: "website" }, icons: { icon: ${JSON.stringify(icon)} } }`;
 }
+
+
 
 /** Réservations : colonne date et heure, ressource éventuelle, statuts qui libèrent le créneau, horaires par défaut. */
 function bookingOf(templateId: string, types: FieldType[], statuts: string[]): Booking | undefined {
@@ -98,7 +65,8 @@ function bookingOf(templateId: string, types: FieldType[], statuts: string[]): B
   };
 }
 
-export function generateNextProject(p: Project, now = new Date()): GenFile[] {
+export function generateNextProject(p0: Project, now = new Date(), marque: SiteBrand | null = null): GenFile[] {
+  const p = applyBrandToProject(p0, marque);
   const cfg = p.config;
   const t = TEMPLATE_BY_ID[cfg.templateId];
   const demo = DEMO[cfg.templateId];
@@ -136,7 +104,7 @@ export function generateNextProject(p: Project, now = new Date()): GenFile[] {
   const features = (contenu?.fonctionnalites ?? t.copy.features).map(([a, b]) => [a.replaceAll("{nom}", cfg.nom), b.replaceAll("{nom}", cfg.nom)] as [string, string]);
 
   const saas = {
-    nom: cfg.nom, initiales: cfg.initiales, description: cfg.description, cible: cfg.cible || t.nom,
+    nom: cfg.nom, initiales: cfg.initiales, ...(cfg.logo ? { logo: cfg.logo } : {}), description: cfg.description, cible: cfg.cible || t.nom,
     // v2 : dates et nombres enregistrés en format réel (ISO, notation point).
     storageKey: `${name}-donnees-v2`,
     entite, types, statut: demo.status, statuts, exemples,
@@ -153,7 +121,7 @@ export function generateNextProject(p: Project, now = new Date()): GenFile[] {
   };
 
   const htmlClass = `s-${cfg.style} shell-${design?.shell ?? "side"} dash-${design?.dash ?? "kpi-chart"} anim-${design?.anim ?? "rise"}`;
-  const css = `/* Généré par Décollage. Couleurs et design : modifie les variables ci-dessous. */
+  const css = `/* ${marque ? "Généré automatiquement" : "Généré par Décollage"}. Couleurs et design : modifie les variables ci-dessous. */
 :root{--p:${cfg.couleurs.primaire};--a:${cfg.couleurs.accent};${STYLE_VARS[cfg.style]}${font.url ? `;--ff:${font.famille}` : ""}}
 ${PROTO_CSS}
 ${arch ? ARCH_CSS : ""}
@@ -166,7 +134,7 @@ ${arch ? ARCH_REACT_CSS : ""}
   const layout = `import type { Metadata } from "next";
 ${arch ? "" : `import { Shell } from "@/components/Shell";\n`}import "./globals.css";
 
-export const metadata: Metadata = { title: ${js(cfg.nom)}, description: ${js(cfg.description)} };
+export const metadata: Metadata = ${rootMetadata(cfg.nom, cfg.description, marque)};
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -238,13 +206,13 @@ export default function Page() {
     exclude: ["node_modules"],
   };
 
-  return [
+  const files: GenFile[] = [
     { name: "package.json", content: js(pkg) + "\n" },
     { name: "tsconfig.json", content: js(tsconfig) + "\n" },
     { name: "next.config.mjs", content: `/** @type {import('next').NextConfig} */\nconst nextConfig = {};\n\nexport default nextConfig;\n` },
     { name: ".gitignore", content: "node_modules\n.next\nout\n*.tsbuildinfo\nnext-env.d.ts\n.env*\n!.env.example\n" },
     ...(unique !== undefined ? cloudFiles(cfg.nom) : []),
-    { name: "README.md", content: readme(p, gen, skipped, name, entite.pluriel, booking, unique) },
+    { name: "README.md", content: readme(p, gen, skipped, name, entite.pluriel, booking, unique, Boolean(marque)) },
     { name: "app/layout.tsx", content: layout },
     { name: "app/globals.css", content: css },
     // Icône d'onglet aux initiales et aux couleurs du projet (détectée automatiquement par Next.js).
@@ -262,8 +230,9 @@ export default function Page() {
     { name: "lib/types.ts", content: TYPES_TS },
     { name: "lib/rules.ts", content: RULES_TS },
     { name: "lib/store.ts", content: STORE_TS },
-    { name: "lib/config.ts", content: `// Généré par Décollage à partir de ton projet. Tu peux modifier ces valeurs.\nimport type { SaasConfig } from "@/lib/types";\n\nexport const SAAS: SaasConfig = ${js(saas)};\n` },
+    { name: "lib/config.ts", content: `// ${marque ? "Généré à partir de ton projet" : "Généré par Décollage à partir de ton projet"}. Tu peux modifier ces valeurs.\nimport type { SaasConfig } from "@/lib/types";\n\nexport const SAAS: SaasConfig = ${js(saas)};\n` },
   ];
+  return marque?.favicon ? files.filter((f) => f.name !== "app/icon.svg") : files;
 }
 
 /** Coquille de la liste d'attente : avec la base branchée, le badge et le compteur ne parlent plus du stockage local. */
@@ -331,14 +300,14 @@ function archPageFiles(gen: GenPage[], nom: string, isScreen: (g: GenPage) => bo
   return files;
 }
 
-function readme(p: Project, gen: ReturnType<typeof generationPlan>["gen"], skipped: string[], name: string, entite: string, booking?: Booking, unique?: number) {
+function readme(p: Project, gen: ReturnType<typeof generationPlan>["gen"], skipped: string[], name: string, entite: string, booking?: Booking, unique?: number, marque = false) {
   const c = p.config;
   const arch = archOf(c.templateId).id === "classic" ? null : archOf(c.templateId);
   return `# ${c.nom}
 
 ${c.description}
 
-Projet Next.js généré par Décollage (type « ${TEMPLATE_BY_ID[c.templateId].nom} »${c.design ? `, design ${DESIGN_BY_ID[c.design]?.nom}` : ""}).
+Projet Next.js généré${marque ? "" : " par Décollage"} (type « ${TEMPLATE_BY_ID[c.templateId].nom} »${c.design ? `, design ${DESIGN_BY_ID[c.design]?.nom}` : ""}).
 Le code est écrit à partir de modèles et de composants préprogrammés, sans IA.
 
 ## Ce qui fonctionne

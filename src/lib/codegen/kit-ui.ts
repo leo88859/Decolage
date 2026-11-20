@@ -1,3 +1,4 @@
+import "server-only";
 // Kit du générateur : composants React copiés tels quels dans chaque projet généré.
 // Mêmes règles que kit-data.ts : pas d'accent grave ni de « ${ » dans ces textes.
 
@@ -40,7 +41,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
   return (
     <>
       <aside className="side">
-        <div className="brand"><span className="mark" style={{ width: 32, height: 32 }}>{SAAS.initiales}</span><b>{SAAS.nom}</b></div>
+        <div className="brand"><span className="mark" style={{ width: 32, height: 32 }}>{SAAS.logo ? <img src={SAAS.logo} alt="" style={{ width: "100%", height: "100%", objectFit: "contain" }} /> : SAAS.initiales}</span><b>{SAAS.nom}</b></div>
         <nav aria-label="Navigation principale">
           {nav.map((p) => (
             <Link key={p.id} href={p.href} data-t={p.titre} className={(p.href === "/" ? path === "/" : path.startsWith(p.href)) ? "on" : ""}>

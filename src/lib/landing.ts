@@ -3,6 +3,8 @@ import { DESIGN_BY_ID, type Anim } from "@/data/designs";
 import { POLICES, policeOf } from "@/lib/config";
 import { LANDING_DESIGN_CSS } from "@/lib/design-css";
 import { TEMPLATE_BY_ID } from "@/data/templates";
+import { applyBrandToConfig, renameInTexts, type SiteBrand } from "@/lib/brand/site-brand";
+import { WAITLIST_CONSENT_FIELD, waitlistConsentText } from "@/lib/waitlist-consent";
 import type { Config, Contenu, Landing, LandingLayout, LandingSection, LandingSectionType, Pricing, VisualStyle } from "@/lib/types";
 
 export const SECTION_LABEL: Record<LandingSectionType, string> = {
@@ -206,6 +208,7 @@ details summary{transition:color .2s}details summary:hover{color:${p}}details[op
 .wl{display:flex;gap:8px;flex-wrap:wrap;max-width:520px;margin:0 auto;justify-content:center}.wl input[type=email]{flex:1;min-width:220px;padding:14px 16px;border:1.5px solid #cbd5e1;border-radius:12px;font:inherit;background:#fff;color:#0f172a}.wl input[type=email]:focus{outline:none;border-color:${p};box-shadow:0 0 0 4px ${p}33}
 .wl-note{width:100%;font-size:13.5px;margin:6px 0 0;text-align:center}.hp{position:absolute;left:-9999px;width:1px;height:1px;opacity:0}
 .wl-banner{position:sticky;top:0;z-index:10;text-align:center;padding:12px;font-weight:600;font-family:system-ui,sans-serif}.wl-banner.ok{background:#dcfce7;color:#14532d}.wl-banner.bad{background:#ffe4e6;color:#881337}
+.wl-consent{display:flex;gap:8px;align-items:flex-start;width:100%;font-size:13px;line-height:1.45;text-align:left;cursor:pointer}.wl-consent input{margin-top:3px;flex:none;width:auto}
 .wl-rgpd{width:100%;font-size:12.5px;line-height:1.5;margin:2px 0 0;text-align:center}.wl-rgpd a{color:inherit;text-decoration:underline}
 .split .wl{margin:0;justify-content:flex-start}.split .wl-note,.split .wl-rgpd{text-align:left}
 .shine{background:linear-gradient(90deg,${p},${a},${p});background-size:200% auto;-webkit-background-clip:text;background-clip:text;color:transparent;animation:w .8s cubic-bezier(.2,.7,.2,1) forwards,shine 6s linear infinite;animation-delay:calc(var(--w) * 70ms + 80ms),0s}@keyframes shine{to{background-position:200% center}}
@@ -265,10 +268,16 @@ addEventListener("load",function(){setTimeout(function(){requestAnimationFrame(f
 /** Liste d'attente : `action` = URL d'envoi du formulaire (null = aperçu, rien n'est envoyé). */
 export type WaitlistOpts = { action: string | null; merci?: boolean; erreur?: boolean; appHref?: string };
 
-export function renderLanding(cfg: Config, landing: Landing, pricing: Pricing | null, opts: { inlineCss: boolean; waitlist?: WaitlistOpts; contenu?: Contenu; demoScroll?: boolean }): string {
+export function renderLanding(cfg0: Config, landing0: Landing, pricing: Pricing | null, opts0: { inlineCss: boolean; waitlist?: WaitlistOpts; contenu?: Contenu; demoScroll?: boolean; marque?: SiteBrand | null }): string {
+  // Marque blanche : décidée côté serveur (null = pas de droit, rien n'est imposé, rendu identique à avant).
+  const marque = opts0.marque ?? null;
+  const cfg = applyBrandToConfig(cfg0, marque);
+  // Les textes générés contiennent le nom du projet : on y met le nom commercial.
+  const landing = renameInTexts(landing0, cfg0.nom, cfg.nom);
+  const opts = marque && opts0.contenu ? { ...opts0, contenu: renameInTexts(opts0.contenu, cfg0.nom, cfg.nom) } : opts0;
   const wl = opts.waitlist;
   const form = (id: string) =>
-    `<form class="wl" id="${id}" method="post" ${wl!.action ? `action="${esc(wl!.action)}"` : `onsubmit="event.preventDefault();this.querySelector('.wl-note').textContent='Aperçu : rien n’est envoyé tant que le site n’est pas publié.'"`}><input type="email" name="email" required maxlength="254" placeholder="ton@email.fr" aria-label="Ton adresse email"><input type="text" name="site" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true"><button class="btn primary">${esc(landing.boutonPrincipal)}</button><p class="wl-note muted">Inscris-toi pour être prévenu·e du lancement.</p><p class="wl-rgpd muted">Ton adresse e-mail sert uniquement à te prévenir du lancement de ${esc(cfg.nom)} : elle est collectée pour le compte de l’éditeur de ce site. Pour exercer tes droits (accès, suppression…), utilise le contact indiqué dans la <a href="/confidentialite" target="_blank" rel="noopener">politique de confidentialité</a> de Décollage, qui héberge ce site.</p></form>`;
+    `<form class="wl" id="${id}" method="post" ${wl!.action ? `action="${esc(wl!.action)}"` : `onsubmit="event.preventDefault();this.querySelector('.wl-note').textContent='Aperçu : rien n’est envoyé tant que le site n’est pas publié.'"`}><input type="email" name="email" required maxlength="254" placeholder="ton@email.fr" aria-label="Ton adresse email"><input type="text" name="site" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true"><label class="wl-consent"><input type="checkbox" name="${WAITLIST_CONSENT_FIELD}" value="oui" required><span>${esc(waitlistConsentText(cfg.nom, Boolean(marque)))}</span></label><button class="btn primary">${esc(landing.boutonPrincipal)}</button><p class="wl-note muted">Inscris-toi pour être prévenu·e du lancement.</p><p class="wl-rgpd muted">Ton adresse e-mail sert uniquement à te prévenir du lancement de ${esc(cfg.nom)} : elle est collectée pour le compte de l’éditeur de ce site. Pour exercer tes droits (accès, suppression…), utilise le contact indiqué dans la <a href="/confidentialite" target="_blank" rel="noopener">politique de confidentialité</a> ${marque ? "de la plateforme" : "de Décollage,"} qui héberge ce site.</p></form>`;
   const t = TEMPLATE_BY_ID[cfg.templateId];
   const mark = cfg.logo ? `<img src="${esc(cfg.logo)}" alt="">` : esc(cfg.initiales);
   const head = `<div class="wrap top"><div class="brand"><span class="mark">${mark}</span>${esc(cfg.nom)}</div><a class="btn primary" href="#cta">${esc(landing.boutonPrincipal)}</a></div>`;
@@ -354,11 +363,12 @@ export function renderLanding(cfg: Config, landing: Landing, pricing: Pricing | 
   }).join("\n");
 
   const foot = `<footer><div class="wrap" style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap"><span>© ${new Date().getFullYear()} ${esc(cfg.nom)}</span><span>${cfg.domaine ? esc(cfg.domaine) : ""}</span></div></footer>`;
+  const marqueCss = marque ? `<style>:root{${marque.cssVars}}.orb.o2{background:var(--brand-secondary)}.brand,.mark{min-width:0}.brand{overflow-wrap:anywhere}.mark img{max-width:100%;height:100%;object-fit:contain}</style>` : "";
   const css = opts.inlineCss ? `<style>${landingCss(cfg, landing)}</style>` : `<link rel="stylesheet" href="style.css">`;
   const hero = landing.sections.find((s) => s.type === "hero");
   return `<!doctype html>
 <html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${esc(cfg.nom)}</title><meta name="description" content="${esc(hero?.texte ?? cfg.description)}">${fontLinks(cfg)}${css}</head>
+<title>${esc(cfg.nom)}</title><meta name="description" content="${esc(marque ? hero?.texte || cfg.description || cfg.nom : hero?.texte ?? cfg.description)}">${marque ? `<meta property="og:title" content="${esc(cfg.nom)}"><meta property="og:site_name" content="${esc(cfg.nom)}"><meta property="og:type" content="website">${marque.favicon ? `<link rel="icon" type="image/png" href="${esc(marque.favicon)}">` : ""}` : ""}${fontLinks(cfg)}${css}${marqueCss}</head>
 <body>${wl?.merci ? `<div class="wl-banner ok" role="status">✓ Merci ! Ton inscription est enregistrée.</div>` : wl?.erreur ? `<div class="wl-banner bad" role="alert">Adresse invalide ou inscription impossible. Réessaie.</div>` : ""}${head}
 ${body}
 ${foot}${REVEAL_SCRIPT}${opts.demoScroll ? DEMO_SCROLL : ""}</body></html>`;

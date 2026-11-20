@@ -1,7 +1,7 @@
 import "server-only";
 import { cache } from "react";
 import { GET } from "@/app/api/boutique/catalogue/[slug]/route";
-import type { CataloguePub } from "./logic";
+import { appliquerMarque, type CataloguePub } from "./logic";
 
 export type Chargement = { etat: "ok"; data: CataloguePub } | { etat: "absent" } | { etat: "indisponible" };
 
@@ -13,7 +13,7 @@ export const chargerCatalogue = cache(async (slug: string): Promise<Chargement> 
     if (!res.ok) return { etat: "indisponible" };
     const data = (await res.json()) as CataloguePub;
     if (!data?.boutique || !Array.isArray(data.produits)) return { etat: "indisponible" };
-    return { etat: "ok", data };
+    return { etat: "ok", data: appliquerMarque(data) }; // marque blanche : nom, couleurs et logo du client
   } catch {
     return { etat: "indisponible" };
   }

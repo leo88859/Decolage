@@ -1,13 +1,15 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import type { FrameWindows } from "@/components/AppDataBridge";
+import { validateBridgeMessage } from "@/lib/bridge";
 
 /**
  * Aperçu sans clignotement : deux iframes superposés. Le nouveau rendu se charge dans celui
  * qui est caché, puis prend la place de l'ancien d'un fondu, une fois prêt.
  * `onPage` reçoit la page affichée quand on navigue dans le prototype.
  */
-export function LivePreview({ html, title, onPage, sandbox = "allow-scripts allow-forms allow-downloads" }: { html: string; title: string; onPage?: (id: string) => void; sandbox?: string }) {
+export function LivePreview({ html, title, onPage, projectId, windowsRef, sandbox = "allow-scripts allow-forms allow-downloads" }: { html: string; title: string; onPage?: (id: string) => void; projectId: string; windowsRef?: FrameWindows; sandbox?: string }) {
   const [st, setSt] = useState<{ docs: [string, string]; front: 0 | 1; want: string }>({ docs: [html, ""], front: 0, want: html });
   // Nouveau rendu demandé : il part dans l'iframe caché (mise à jour d'état pendant le rendu, sans effet).
   if (html !== st.want) {
@@ -31,15 +33,19 @@ export function LivePreview({ html, title, onPage, sandbox = "allow-scripts allo
   useEffect(() => { pageCb.current = onPage; });
 
   useEffect(() => {
+    const wins = () => frames.map((f) => f.current?.contentWindow ?? null);
+    if (windowsRef) windowsRef.current = wins;
     const onMsg = (e: MessageEvent) => {
-      if (!frames.some((f) => f.current && e.source === f.current.contentWindow)) return;
-      const id = (e.data as { decollagePage?: unknown })?.decollagePage;
-      if (typeof id === "string") pageCb.current?.(id);
+      const r = validateBridgeMessage(
+        { source: e.source, origin: e.origin, data: e.data },
+        { projectId, expectedWindows: wins(), allowedOrigins: [window.location.origin], sandboxedFrames: true },
+      );
+      if (r.ok && r.message.type === "page") pageCb.current?.(r.message.id);
     };
     window.addEventListener("message", onMsg);
     return () => window.removeEventListener("message", onMsg);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [projectId]);
 
   return (
     <div className="lp">

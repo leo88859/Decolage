@@ -1,3 +1,4 @@
+import "server-only";
 // Kit du générateur : components/views.tsx, les pages fonctionnelles communes du projet généré.
 // Toute écriture passe par lib/store.ts (validation de lib/rules.ts) : aucun faux succès.
 // Mêmes règles que kit-data.ts : pas d'accent grave ni de « ${ » dans ce texte.

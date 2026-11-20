@@ -1,7 +1,9 @@
 import "server-only";
+import { getEffectiveBrand } from "@/lib/brand/effective";
+import { siteBrandFrom, type SiteBrand } from "@/lib/brand/site-brand";
 import { isCloudConfigured } from "@/lib/env";
 import { validateSiteData, type SiteData } from "@/lib/publish";
-import { createPublicClient } from "@/lib/supabase/server";
+import { createAdminClient, createPublicClient } from "@/lib/supabase/server";
 
 /** Données validées d'un site publié, ou null. */
 export async function loadSite(slug: string): Promise<SiteData | null> {
@@ -17,11 +19,29 @@ export async function loadSite(slug: string): Promise<SiteData | null> {
   return v.ok ? v.data : null;
 }
 
+/**
+ * Identité de marque blanche du propriétaire d'un site publié, ou null.
+ * Droit calculé côté serveur (effective.ts) ; FAIL-CLOSED : pas de clé, lecture en échec, droit refusé -> null (rendu habituel).
+ */
+export async function loadSiteBrand(slug: string): Promise<SiteBrand | null> {
+  try {
+    if (!isCloudConfigured() || !/^[a-z0-9-]{3,40}$/.test(slug)) return null;
+    const admin = createAdminClient();
+    const r = await admin.from("sites").select("user_id").eq("slug", slug).maybeSingle();
+    const owner = (r.data as { user_id?: unknown } | null)?.user_id;
+    if (r.error || typeof owner !== "string" || !owner) return null;
+    return siteBrandFrom(await getEffectiveBrand(admin, owner));
+  } catch {
+    return null;
+  }
+}
+
 /** En-têtes des pages publiées : uniquement nos scripts en ligne, aucune ressource externe sauf images et polices. */
 export const SITE_HEADERS = {
   "content-type": "text/html; charset=utf-8",
   "content-security-policy":
-    "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data: https:; form-action 'self'; base-uri 'none'; frame-ancestors 'self'",
+    "default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src data: https:; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
+  "x-frame-options": "DENY",
   "x-content-type-options": "nosniff",
   "referrer-policy": "strict-origin-when-cross-origin",
   "cache-control": "public, max-age=0, s-maxage=60",

@@ -4,11 +4,12 @@ import { useCallback, useEffect, useState } from "react";
 import { Modal, toast } from "@/components/ui";
 import { formatEuros } from "@/lib/boutique/money";
 import { STATUT_LABEL, STATUTS_COMMANDE, type Commande, type StatutCommande } from "@/lib/boutique/types";
+import { dateExpiration, delaiValide, restantMs, tempsRestantLabel } from "@/lib/boutique/expiration";
 import { ErrorBox, WithBoutique } from "./BoutiqueContext";
 import { ACTION_LABEL, api, prochainsStatuts } from "./logic";
 
 export function Commandes() {
-  return <WithBoutique>{({ boutique }) => <Liste bid={boutique.id} />}</WithBoutique>;
+  return <WithBoutique>{({ boutique }) => <Liste bid={boutique.id} delaiH={delaiValide(boutique.delai_expiration_h)} />}</WithBoutique>;
 }
 
 const QUAND = (iso: string) => new Date(iso).toLocaleString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
@@ -19,18 +20,50 @@ function SansPaiement() {
   return <span className="badge badge-line">Commande sans paiement en ligne</span>;
 }
 
-function Liste({ bid }: { bid: string }) {
+function Liste({ bid, delaiH }: { bid: string; delaiH: number }) {
   const [filtre, setFiltre] = useState<StatutCommande | "">("");
   const [liste, setListe] = useState<Commande[] | null>(null);
   const [fail, setFail] = useState<{ code: string; message: string } | null>(null);
   const [sel, setSel] = useState<string | null>(null);
+
+  const [attente, setAttente] = useState<number | null>(null);
+  const [coches, setCoches] = useState<string[]>([]);
+  const [confirmer, setConfirmer] = useState(false);
+  const [busyLot, setBusyLot] = useState(false);
+  const [msgLot, setMsgLot] = useState("");
+  const [maintenant, setMaintenant] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setMaintenant(Date.now()), 60_000); // le temps restant se met à jour toutes les minutes
+    return () => clearInterval(t);
+  }, []);
 
   const charger = useCallback(async () => {
     const r = await api<{ commandes: Commande[] }>(`/${bid}/commandes${filtre ? `?statut=${filtre}` : ""}`);
     if (!r.ok) return setFail({ code: r.code, message: r.message });
     setFail(null);
     setListe(r.data.commandes);
+    setCoches((x) => x.filter((ref) => r.data.commandes.some((c) => c.ref === ref && c.statut === "nouvelle")));
+    // Compteur des commandes en attente de confirmation (indépendant du filtre affiché).
+    const a = await api<{ commandes: Commande[] }>(`/${bid}/commandes?statut=nouvelle`);
+    setAttente(a.ok ? a.data.commandes.length : null);
   }, [bid, filtre]);
+
+  async function annulerLot() {
+    setBusyLot(true);
+    setMsgLot("");
+    const r = await api<{ annulees: string[]; ignorees: string[] }>(`/${bid}/commandes/annuler`, { method: "POST", body: { refs: coches } });
+    setBusyLot(false);
+    setConfirmer(false);
+    if (!r.ok) setMsgLot(r.message);
+    else {
+      setCoches([]);
+      const n = r.data.annulees.length;
+      toast(`${n} commande${n > 1 ? "s" : ""} annulée${n > 1 ? "s" : ""}, stock remis en vente`);
+      if (r.data.ignorees.length) setMsgLot(`${r.data.ignorees.length} commande(s) n'étaient plus « nouvelle » : elles n'ont pas été modifiées.`);
+    }
+    await charger();
+  }
+  const nouvelles = (liste ?? []).filter((c) => c.statut === "nouvelle");
 
   useEffect(() => {
     // Chargement depuis l'API à chaque changement de filtre.
@@ -42,6 +75,23 @@ function Liste({ bid }: { bid: string }) {
 
   return (
     <div className="stack">
+      <div className="alert alert-info" role="status" data-testid="compteur-attente">
+        <strong>{attente === null ? "Commandes en attente de confirmation : chargement…" : `${attente} commande${attente > 1 ? "s" : ""} en attente de confirmation`}</strong>
+        <span className="mut"> · sans confirmation sous {delaiH} heures, une commande est annulée automatiquement et son stock remis en vente.</span>
+      </div>
+      {msgLot && <ErrorBox message={msgLot} />}
+      {coches.length > 0 && (
+        <div className="row">
+          <button className="btn btn-danger" disabled={busyLot} onClick={() => setConfirmer(true)}>Annuler la sélection ({coches.length})</button>
+          <button className="btn btn-ghost" onClick={() => setCoches([])}>Désélectionner</button>
+        </div>
+      )}
+      {confirmer && (
+        <div className="alert alert-warn" role="alertdialog" aria-label="Confirmer l'annulation multiple">
+          <p style={{ marginTop: 0 }}>Annuler {coches.length} commande{coches.length > 1 ? "s" : ""} « nouvelle » est définitif et remet leur stock en vente.</p>
+          <div className="row"><button className="btn btn-danger" disabled={busyLot} onClick={() => void annulerLot()}>{busyLot ? "Annulation…" : "Oui, annuler"}</button><button className="btn btn-ghost" onClick={() => setConfirmer(false)}>Non, garder</button></div>
+        </div>
+      )}
       <div className="row" style={{ justifyContent: "space-between" }}>
         <div className="field" style={{ minWidth: 200 }}>
           <label htmlFor="f-statut">Filtrer par statut</label>
@@ -60,12 +110,13 @@ function Liste({ bid }: { bid: string }) {
       ) : (
         <div className="scroll-x panel" style={{ padding: 8 }}>
           <table className="table">
-            <caption className="mut" style={{ textAlign: "left", padding: "8px 10px" }}>{liste.length} commande{liste.length > 1 ? "s" : ""} (200 dernières au maximum)</caption>
-            <thead><tr><th scope="col">Commande</th><th scope="col">Client</th><th scope="col">Total</th><th scope="col">Statut</th><th scope="col"><span className="sr-only">Action</span></th></tr></thead>
+            <caption className="mut" style={{ textAlign: "left", padding: "8px 10px" }}>{liste.length} commande{liste.length > 1 ? "s" : ""} (200 dernières au maximum){nouvelles.length > 0 ? <> · <button className="btn btn-sm btn-ghost" onClick={() => setCoches(nouvelles.map((c) => c.ref).slice(0, 50))}>Sélectionner les nouvelles (50 max)</button></> : null}</caption>
+            <thead><tr><th scope="col"><span className="sr-only">Sélection</span></th><th scope="col">Commande</th><th scope="col">Client</th><th scope="col">Total</th><th scope="col">Statut</th><th scope="col"><span className="sr-only">Action</span></th></tr></thead>
             <tbody>
               {liste.map((c) => (
                 <tr key={c.ref}>
-                  <td><strong>{c.ref}</strong><br /><span className="mut">{QUAND(c.created_at)}</span></td>
+                  <td>{c.statut === "nouvelle" ? <input type="checkbox" aria-label={`Sélectionner la commande ${c.ref}`} checked={coches.includes(c.ref)} onChange={(e) => setCoches((x) => (e.target.checked ? [...x, c.ref] : x.filter((r) => r !== c.ref)))} /> : null}</td>
+                  <td><strong>{c.ref}</strong><br /><span className="mut">{QUAND(c.created_at)}</span>{c.statut === "nouvelle" ? <><br /><span className="mut" data-testid="expiration-commande">Expire le {QUAND(dateExpiration(c.created_at, delaiH) ?? c.created_at)} · {tempsRestantLabel(restantMs(c.created_at, delaiH, maintenant))}</span></> : null}</td>
                   <td>{c.client_nom}</td>
                   <td style={{ whiteSpace: "nowrap" }}>{formatEuros(c.total_centimes)}</td>
                   <td><span className={`badge ${BADGE[c.statut]}`}>{STATUT_LABEL[c.statut]}</span></td>
@@ -76,12 +127,12 @@ function Liste({ bid }: { bid: string }) {
           </table>
         </div>
       )}
-      <Detail bid={bid} commande={commande} onClose={() => setSel(null)} reload={charger} />
+      <Detail bid={bid} delaiH={delaiH} maintenant={maintenant} commande={commande} onClose={() => setSel(null)} reload={charger} />
     </div>
   );
 }
 
-function Detail({ bid, commande: c, onClose, reload }: { bid: string; commande: Commande | null; onClose: () => void; reload: () => Promise<void> }) {
+function Detail({ bid, delaiH, maintenant, commande: c, onClose, reload }: { bid: string; delaiH: number; maintenant: number; commande: Commande | null; onClose: () => void; reload: () => Promise<void> }) {
   const [busy, setBusy] = useState(false);
   const [fail, setFail] = useState("");
   const [annul, setAnnul] = useState(false);
@@ -108,6 +159,7 @@ function Detail({ bid, commande: c, onClose, reload }: { bid: string; commande: 
         <div className="stack">
           <div className="alert alert-info"><strong>Commande sans paiement en ligne.</strong> Paiement : non payée en ligne, à régler directement avec le client.</div>
           <p style={{ margin: 0 }}><span className={`badge ${BADGE[c.statut]}`}>{STATUT_LABEL[c.statut]}</span> <span className="mut">· reçue le {QUAND(c.created_at)} · mode : {c.mode}</span></p>
+          {c.statut === "nouvelle" && <p className="mut" style={{ margin: 0 }}>Annulation automatique le {QUAND(dateExpiration(c.created_at, delaiH) ?? c.created_at)} (reste environ {tempsRestantLabel(restantMs(c.created_at, delaiH, maintenant))}) sans confirmation de ta part.</p>}
           <div>
             <strong>{c.client_nom}</strong><br />
             {c.client_email && <a href={`mailto:${c.client_email}`}>{c.client_email}</a>}{c.client_email && c.client_telephone && " · "}

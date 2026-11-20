@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import { Confirm, CopyButton, download, toast } from "@/components/ui";
 import { slug } from "@/lib/export";
-import { buildLanding, LAYOUTS, landingCss, landingText, moveSection, renderLanding, SECTION_LABEL } from "@/lib/landing";
+import { buildLanding, LAYOUTS, landingText, moveSection, renderLanding, SECTION_LABEL } from "@/lib/landing";
 import { can } from "@/lib/plans";
 import { contenuOf } from "@/lib/project";
 import { updateProject, useData } from "@/lib/store";
@@ -24,12 +24,22 @@ export function LandingTab({ project: p }: { project: Project }) {
   const save = (next: Landing, label = "Landing : modifiée") => updateProject(p.id, (x) => ({ ...x, landing: { ...next, edited: true } }), label);
   const setSection = (id: string, patch: Partial<LandingSection>) => save({ ...l, sections: l.sections.map((s) => (s.id === id ? { ...s, ...patch } : s)) });
 
-  function exportFiles() {
+  // Le fichier est généré par le serveur (POST /api/export), qui relit la formule réelle du compte : le bouton grisé n'est qu'un confort.
+  async function exportFiles() {
     if (!can(plan, "exportFichiers")) return;
-    download("index.html", renderLanding(p.config, l, pricing, { inlineCss: false, contenu }), "text/html");
-    setTimeout(() => download("style.css", landingCss(p.config, l), "text/css"), 300);
-    updateProject(p.id, (x) => x, "Landing : exportée");
-    toast("index.html et style.css téléchargés");
+    try {
+      const res = await fetch("/api/export", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind: "landing", project: p }) });
+      if (!res.ok) {
+        const err = (await res.json().catch(() => null)) as { error?: string } | null;
+        toast(err?.error ?? "Export impossible pour le moment.", "error");
+        return;
+      }
+      download(`${slug(p.config.nom) || "mon-saas"}-landing.zip`, await res.blob(), "application/zip");
+      updateProject(p.id, (x) => x, "Landing : exportée");
+      toast("Archive index.html + style.css téléchargée");
+    } catch {
+      toast("Export impossible : vérifie ta connexion.", "error");
+    }
   }
 
   return (

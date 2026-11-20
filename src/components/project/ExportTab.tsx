@@ -1,13 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 import { download, toast } from "@/components/ui";
-import { generateNextProject, generationPlan } from "@/lib/codegen";
-import { projectFiles, projectJson, slug } from "@/lib/export";
+import { generationPlan } from "@/lib/codegen/plan";
+import { projectJson, slug } from "@/lib/export";
 import { can, prixCourt } from "@/lib/plans";
 import { updateProject, useData } from "@/lib/store";
 import type { Project } from "@/lib/types";
-import { zip } from "@/lib/zip";
 
 const FILES = [
   ["index.html + style.css", "Page de vente statique, hébergeable telle quelle."],
@@ -18,25 +18,34 @@ const FILES = [
 
 export function ExportTab({ project: p }: { project: Project }) {
   const { plan } = useData();
+  const [busy, setBusy] = useState(false);
   const allowed = can(plan, "exportFichiers");
   const { gen, skipped } = generationPlan(p);
   const name = slug(p.config.nom) || "mon-saas";
 
-  function zipAll() {
-    if (!allowed) return;
-    download(`${name}.zip`, zip(projectFiles(p)) as BlobPart, "application/zip");
-    updateProject(p.id, (x) => x, "Export : archive téléchargée");
-    toast("Archive téléchargée");
+  // L'archive est générée par le serveur (POST /api/export), qui relit la formule réelle du compte en base.
+  // Le bouton grisé ci-dessous n'est qu'un confort d'affichage : il ne protège rien, le serveur décide.
+  async function exportFromServer(kind: "archive" | "next") {
+    if (!allowed || busy) return;
+    setBusy(true);
+    try {
+      const res = await fetch("/api/export", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind, project: p }) });
+      if (!res.ok) {
+        const err = (await res.json().catch(() => null)) as { error?: string } | null;
+        toast(err?.error ?? "Export impossible pour le moment.", "error");
+        return;
+      }
+      download(kind === "next" ? `${name}-nextjs.zip` : `${name}.zip`, await res.blob(), "application/zip");
+      updateProject(p.id, (x) => x, kind === "next" ? "Export : projet Next.js téléchargé" : "Export : archive téléchargée");
+      toast(kind === "next" ? "Projet Next.js téléchargé" : "Archive téléchargée");
+    } catch {
+      toast("Export impossible : vérifie ta connexion.", "error");
+    } finally {
+      setBusy(false);
+    }
   }
-
-  function zipNext() {
-    if (!allowed) return;
-    // Tout est rangé dans un dossier au nom du projet.
-    const files = generateNextProject(p).map((f) => ({ name: `${name}/${f.name}`, content: f.content }));
-    download(`${name}-nextjs.zip`, zip(files) as BlobPart, "application/zip");
-    updateProject(p.id, (x) => x, "Export : projet Next.js téléchargé");
-    toast("Projet Next.js téléchargé");
-  }
+  const zipAll = () => exportFromServer("archive");
+  const zipNext = () => exportFromServer("next");
 
   return (
     <div className="stack" style={{ gap: 22 }}>
@@ -49,7 +58,7 @@ export function ExportTab({ project: p }: { project: Project }) {
             Ajouter, modifier, supprimer, rechercher, trier, importer et exporter en CSV fonctionnent, avec des saisies vérifiées (dates, montants, e-mails, créneaux de réservation). Les données sont enregistrées dans le navigateur de chaque utilisateur : rien n&apos;est partagé entre visiteurs.
           </p>
           <div className="row" style={{ marginTop: 14 }}>
-            <button className="btn btn-coral" onClick={zipNext} disabled={!allowed}>Télécharger le projet Next.js (.zip){allowed ? "" : " · offre payante"}</button>
+            <button className="btn btn-coral" onClick={zipNext} disabled={!allowed || busy}>Télécharger le projet Next.js (.zip){allowed ? "" : " · offre payante"}</button>
           </div>
           <p className="tiny mut" style={{ marginTop: 10 }}>Pour le lancer : <code className="kbd">npm install</code> puis <code className="kbd">npm run dev</code> (Node.js 20 ou plus). Les étapes de mise en ligne sont dans le README.</p>
         </div>
@@ -77,7 +86,7 @@ export function ExportTab({ project: p }: { project: Project }) {
             {FILES.map(([n, d]) => <div key={n} className="kv"><b className="small">{n}</b><span className="small mut" style={{ textAlign: "right" }}>{d}</span></div>)}
           </div>
           <div className="row">
-            <button className="btn" onClick={zipAll} disabled={!allowed}>Télécharger l&apos;archive .zip{allowed ? "" : " · offre payante"}</button>
+            <button className="btn" onClick={zipAll} disabled={!allowed || busy}>Télécharger l&apos;archive .zip{allowed ? "" : " · offre payante"}</button>
             <button className="btn btn-ghost" onClick={() => { download(`${name}.decollage.json`, projectJson(p), "application/json"); toast("Configuration exportée"); }}>Configuration JSON seule</button>
           </div>
           {!allowed && <p className="hint">Les exports de fichiers sont inclus dans les offres payantes (dès {prixCourt("solo")}/mois). La configuration JSON reste toujours exportable gratuitement : tes données t&apos;appartiennent. <Link href="/parametres" style={{ textDecoration: "underline" }}>Voir les offres</Link></p>}

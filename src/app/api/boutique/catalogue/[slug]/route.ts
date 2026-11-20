@@ -1,5 +1,5 @@
-import { json, notFound } from "@/lib/boutique/api";
-import { marqueBlancheBoutique } from "@/lib/brand/public";
+import { colonne0010Absente, json, notFound } from "@/lib/boutique/api";
+import { marqueBoutique } from "@/lib/brand/public";
 import { isCloudConfigured } from "@/lib/env";
 import { createPublicClient } from "@/lib/supabase/server";
 import { colonneThemeAbsente } from "@/lib/boutique/themes";
@@ -23,16 +23,20 @@ export async function GET(_req: Request, { params }: { params: Promise<{ slug: s
   const db = createPublicClient();
   const COLONNES = "id, slug, nom, description, couleur_principale, couleur_accent, logo, adresse, whatsapp, email, telephone, modes, published_at";
   const lire = (colonnes: string) => db.from("boutiques").select(colonnes).eq("slug", slug).eq("statut", "publiee").maybeSingle<BoutiquePub>();
-  let { data: b, error } = await lire(`${COLONNES}, theme`);
-  // Migration 0009 pas encore exécutée : la vitrine s'affiche quand même, en thème classique.
-  if (colonneThemeAbsente(error)) ({ data: b, error } = await lire(COLONNES));
+  // Migrations 0009 (thème) et 0010 (délai d'expiration, quantité maximale) pas encore exécutées : la vitrine s'affiche quand même
+  // (thème classique, 48 h, 10 par article). On retire les colonnes absentes une à une.
+  const C10 = "delai_expiration_h, quantite_max_article";
+  let { data: b, error } = await lire(`${COLONNES}, theme, ${C10}`);
+  if (colonne0010Absente(error)) ({ data: b, error } = await lire(`${COLONNES}, theme`));
+  if (colonneThemeAbsente(error)) ({ data: b, error } = await lire(`${COLONNES}, ${C10}`));
+  if (colonneThemeAbsente(error) || colonne0010Absente(error)) ({ data: b, error } = await lire(COLONNES));
   if (error) return json({ error: "Lecture impossible pour le moment.", code: "server" }, 500);
   if (!b) return notFound();
   const [cats, prods, vues, marqueBlanche] = await Promise.all([
     db.from("categories").select("id, nom, position").eq("boutique_id", b.id).order("position").order("nom"),
     db.from("produits").select("id, categorie_id, titre, description, prix_centimes, images, position").eq("boutique_id", b.id).order("position").order("created_at"),
     db.from("variantes_publiques").select("id, produit_id, nom, position, disponible, stock_bas").eq("boutique_id", b.id).order("position"),
-    marqueBlancheBoutique(slug), // booléen décidé côté serveur (fail-closed : false = mention affichée)
+    marqueBoutique(slug), // droit décidé côté serveur (fail-closed : false = mention affichée) + identité de marque
   ]);
   if (cats.error || prods.error) return json({ error: "Lecture impossible pour le moment.", code: "server" }, 500);
   let variantes: VariantePublique[] = [];
@@ -51,5 +55,5 @@ export async function GET(_req: Request, { params }: { params: Promise<{ slug: s
       .sort((x, y) => x.position - y.position)
       .map((v) => ({ id: v.id, nom: v.nom, position: v.position, disponible: v.disponible, stock_bas: v.stock_bas })),
   }));
-  return Response.json({ boutique: b, categories: cats.data ?? [], produits, marque_blanche: marqueBlanche === true }, { headers: { "cache-control": "public, max-age=15, stale-while-revalidate=60" } });
+  return Response.json({ boutique: b, categories: cats.data ?? [], produits, marque_blanche: marqueBlanche.entitled === true, ...(marqueBlanche.marque ? { marque: marqueBlanche.marque } : {}) }, { headers: { "cache-control": "public, max-age=15, stale-while-revalidate=60" } });
 }

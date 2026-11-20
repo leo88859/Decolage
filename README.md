@@ -11,7 +11,11 @@ npm run check      # types + lint + tests
 npm run build
 ```
 
-Aucune variable d'environnement n'est nécessaire.
+Aucune variable d'environnement n'est nécessaire. Node.js 20.9 ou plus est requis.
+
+`npm run typecheck` lance d'abord `next typegen`, qui génère les types de routes (`PageProps`, `RouteContext`) : il fonctionne donc sur un clone neuf, sans `next dev` ni `next build` préalable.
+
+**Intégration continue :** `.github/workflows/ci.yml` vérifie les types, le lint, les tests et le build à chaque push et pull request, sans aucun secret (Supabase et Stripe ne sont pas configurés en CI) et sans rien déployer. `.github/dependabot.yml` propose les mises à jour de dépendances sous forme de pull requests.
 
 ## Organisation
 

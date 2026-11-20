@@ -34,12 +34,12 @@ describe("POST|GET /api/boutique/expiration", () => {
     expect(h.rpc).not.toHaveBeenCalled();
   });
 
-  it("bon secret : annule les commandes de plus de 72 h par défaut (POST ou GET) et renvoie le nombre", async () => {
+  it("bon secret : sans paramètre, chaque boutique est traitée avec son propre délai (fonction sans argument, 0010) ; ?heures=N force un âge unique", async () => {
     vi.stubEnv("CRON_SECRET", "s3cret-de-test");
     const r = await call("POST", "Bearer s3cret-de-test");
     expect(r.status).toBe(200);
-    expect(await r.json()).toEqual({ annulees: 3, heures: 72 });
-    expect(h.rpc).toHaveBeenCalledWith("boutique_expirer_commandes_nouvelles", { p_age: "72 hours" });
+    expect(await r.json()).toEqual({ annulees: 3, heures: null });
+    expect(h.rpc).toHaveBeenCalledWith("boutique_expirer_commandes_nouvelles");
     expect((await call("GET", "Bearer s3cret-de-test", "?heures=24")).status).toBe(200);
     expect(h.rpc).toHaveBeenLastCalledWith("boutique_expirer_commandes_nouvelles", { p_age: "24 hours" });
   });

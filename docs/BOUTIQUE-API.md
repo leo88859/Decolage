@@ -96,14 +96,15 @@ Une commande sans paiement réserve du stock. Une commande « nouvelle » jamais
 
 **Elle n'est planifiée nulle part** (aucun cron créé). Deux façons de l'appeler, au choix du patron :
 
-1. **pg_cron dans Supabase** (Database -> Extensions -> activer `pg_cron`), puis dans le SQL Editor, par exemple toutes les heures et pour les commandes de plus de 72 heures :
+1. **pg_cron dans Supabase** (Database -> Extensions -> activer `pg_cron`, à faire toi-même), puis exécuter le fichier `supabase/0010b_planification_pg_cron.sql` dans le SQL Editor (après 0010). Il planifie toutes les 15 minutes l'expiration, avec le délai propre à chaque boutique (48 h par défaut). Ne pas écrire la planification à la main avec un délai fixe : c'est ce fichier qui fait foi.
    ```sql
-   select cron.schedule('expirer-commandes-nouvelles', '17 * * * *', $$select public.boutique_expirer_commandes_nouvelles(interval '72 hours')$$);
+   -- Référence (identique au fichier 0010b) :
+   select cron.schedule('expirer-commandes-nouvelles', '*/15 * * * *', $$select public.boutique_expirer_commandes_nouvelles()$$);
    -- pour arrêter : select cron.unschedule('expirer-commandes-nouvelles');
    ```
 2. **Route protégée** `/api/boutique/expiration` (POST ou GET) : elle n'existe que si la variable d'environnement OPTIONNELLE `CRON_SECRET` est définie (sinon 404). Appel : en-tête `Authorization: Bearer <CRON_SECRET>`, paramètre facultatif `?heures=72` (entier de 1 à 720). Réponse `{ annulees, heures }`. Un planificateur externe (ou Vercel Cron, qui envoie ce même en-tête) peut l'appeler. Le dépôt ne fournit aucune valeur ni clé : le patron choisit un secret long et aléatoire.
 
-Appel manuel unique (SQL Editor) : `select public.boutique_expirer_commandes_nouvelles(interval '72 hours');`
+Appel manuel unique (SQL Editor) : `select public.boutique_expirer_commandes_nouvelles();` (annule réellement les commandes éligibles ; lire d'abord `supabase/0010_controle_lecture_seule.sql`).
 
 ### Mise à jour (migration 0008)
-Délai par défaut **72 heures** : `boutique_expirer_commandes_nouvelles()` sans argument (la version avec `p_age` reste). N'annule que `nouvelle` ET `non_payee`, pose `annulee_le` et `annulation_motif = 'expiree_automatiquement'`, exécutable par `service_role` seulement. Comparaison `pg_cron` / route protégée, recommandation et mode d'emploi : `docs/EXPIRATION-COMMANDES.md`.
+Délai par défaut **48 heures**, réglable par boutique (6 à 168 h) depuis la migration 0010 : `boutique_expirer_commandes_nouvelles()` sans argument applique le délai de chaque boutique. La version avec `p_age` reste pour la route `?heures=N`. N'annule que `nouvelle` ET `non_payee` ET `expiration_eligible` (0010) : les commandes antérieures à 0010 ne sont jamais annulées automatiquement. Pose `annulee_le` et `annulation_motif = 'expiree_automatiquement'`, exécutable par `service_role` seulement. Comparaison `pg_cron` / route protégée, recommandation et mode d'emploi : `docs/EXPIRATION-COMMANDES.md`.

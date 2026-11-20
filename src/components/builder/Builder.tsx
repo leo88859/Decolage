@@ -68,7 +68,8 @@ export function Builder({ project, initialStep = "perso" }: { project: Project; 
   const router = useRouter();
   const { plan } = useData();
   const h = useHistory<Config>(project.config);
-  useAppDataBridge(project.id);
+  const frameWindows = useRef<() => Array<Window | null>>(() => []);
+  useAppDataBridge(project.id, frameWindows);
   const cfg = h.value;
   const [step, setStep] = useState<StepId>(initialStep);
   const [view, setView] = useState<"prototype" | "landing">("prototype");
@@ -577,7 +578,7 @@ export function Builder({ project, initialStep = "perso" }: { project: Project; 
           </div>
           <div className={`device ${device}`} style={{ height: device === "mobile" ? "min(760px, calc(100vh - 200px))" : "calc(100vh - 186px)" }}>
             <div className="device-bar"><i /><i /><i /><span className="url">{cfg.domaine || `${slug(cfg.nom)}.exemple`} · {view === "prototype" ? `application / ${pages.find((p) => p.id === currentPage)?.titre ?? ""}` : "page de vente"}</span></div>
-            <LivePreview html={srcDoc} title={view === "prototype" ? "Aperçu de l'application" : "Aperçu de la page de vente"} onPage={setPage} />
+            <LivePreview html={srcDoc} title={view === "prototype" ? "Aperçu de l'application" : "Aperçu de la page de vente"} onPage={setPage} projectId={project.id} windowsRef={frameWindows} />
           </div>
         </section>
       </div>
